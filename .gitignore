@@ -1,0 +1,22 @@
+# Virtual Environment (Το πιο σημαντικό!)
+Lasca.venv/
+venv/
+ENV/
+
+# Python cache (Αρχεία που φτιάχνει η Python για να τρέχει πιο γρήγορα)
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE settings (Ρυθμίσεις του VS Code που αφορούν μόνο εσένα)
+.vscode/
+
+# Windows & System files
+Thumbs.db
+desktop.ini
+
+# Data & Temporary files (Αν δεν θέλεις να ανεβαίνουν μεγάλα αρχεία δεδομένων)
+*.log
+*.sqlite
+
+not_4_git/
