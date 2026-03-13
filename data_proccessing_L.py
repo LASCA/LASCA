@@ -6,6 +6,7 @@ def grad2rad(g):
     g_rad = g * math.pi / 200.0
     return g_rad
 
+
 def ctg(a):
     tan_a = math.tan(a)
     if abs(tan_a) < 1e-15:
