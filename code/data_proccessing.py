@@ -1,6 +1,8 @@
 import math, csv 
 from typing import Optional, List, Tuple, Dict
 from dataclasses import dataclass
+import pandas as pd
+import numpy as np
 
 # computation functions 
     #BASICS
@@ -229,8 +231,8 @@ def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool 
     m_int = sum(1 for i in vertex_idxs if points[i].angle is not None)
 
     # Start and end azimuths from coordinates
-    G_start_m = deutero_them(points[i_T1].X, points[i_T1].Y, points[i_T2].X, points[i_T2].Y) if ori_start else 0.0
-    G_end_m = deutero_them(points[i_T3].X, points[i_T3].Y, points[i_T4].X, points[i_T4].Y) if ori_end else None
+    G_start_m = deutero_them(points[i_T1].X, points[i_T1].Y, points[i_T2].X, points[i_T2].Y)[0] if ori_start else 0.0
+    G_end_m = deutero_them(points[i_T3].X, points[i_T3].Y, points[i_T4].X, points[i_T4].Y)[0] if ori_end else None
 
     # Sum of measured angles
     sum_theta = sum(float(points[i].angle) for i in vertex_idxs if points[i].angle is not None)
@@ -414,3 +416,120 @@ def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decim
                 fmt_linear(r.X),
                 fmt_linear(r.Y)
             ])
+
+# SYNORTHOSI STATHMOY
+
+
+def solve_lsa_detailed(observations):
+    """
+    Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
+    """
+    df = pd.DataFrame(observations)
+    points = df['to'].unique().tolist()
+    periods = df['per'].unique().tolist()
+    m, r_count = len(points), len(periods)
+    
+    # 1. Μέσοι όροι (πάντα υπολογίζονται)
+    reduced_matrix = np.zeros((m, r_count))
+    for k, per in enumerate(periods):
+        p_obs = df[df['per'] == per].groupby('to')['val'].mean()
+        base_val = p_obs.loc[points[0]]
+        for i, pt in enumerate(points):
+            diff = p_obs.loc[pt] - base_val
+            reduced_matrix[i, k] = (diff + 200) % 400 - 200
+
+    final_means_array = np.mean(reduced_matrix, axis=1)
+    final_means = [(val % 400.0) for val in final_means_array]
+
+    # 2. Έλεγχος Βαθμών Ελευθερίας
+    f = (m - 1) * (r_count - 1)
+    
+    v_matrix = np.zeros((m, r_count))
+    total_vv = 0.0
+    sigma_0 = 0.0
+    sv_calculated = 0.0
+    
+    # Υπολογισμός σφαλμάτων ΜΟΝΟ αν f > 0
+    if f > 0:
+        for k in range(r_count):
+            theta_k = np.mean(reduced_matrix[:, k] - final_means_array)
+            for i in range(m):
+                v_val = reduced_matrix[i, k] - final_means_array[i] - theta_k
+                v_matrix[i, k] = v_val
+                total_vv += (v_val * 10000.0)**2
+        
+        sigma_sq = total_vv / f
+        sigma_0 = np.sqrt(sigma_sq)
+        q_vv_ii = ((m * r_count) - m - r_count + 5) / (m * r_count)
+        sv_calculated = sigma_0 * np.sqrt(q_vv_ii)
+
+    # 3. Δημιουργία γραμμών αποτελεσμάτων (Αναλυτικά στοιχεία)
+    section_3_rows = []
+    for k, per in enumerate(periods):
+        p_orig = df[df['per'] == per].groupby('to').first()
+        for i, pt in enumerate(points):
+            v_cc = v_matrix[i, k] * 10000.0
+            
+            # tik υπολογισμός μόνο αν sv > 0
+            t_ik = 0.0
+            if sv_calculated > 0:
+                r_ik = v_cc / sv_calculated
+                if f > 1 and (f - r_ik**2) > 0:
+                    t_ik = r_ik * np.sqrt((f - 1) / (f - r_ik**2))
+                else:
+                    t_ik = r_ik
+
+            section_3_rows.append({
+                'to': pt, 'f1': p_orig.loc[pt, 'f1'], 'f2': p_orig.loc[pt, 'f2'],
+                'val': p_orig.loc[pt, 'val'], 'v': v_cc, 
+                'sv': sv_calculated, 'ext_v': t_ik
+            })
+            
+    # Τυπική απόκλιση μέσου όρου (αν r=1, βάζουμε 0 ή μια τυπική τιμή οργάνου)
+    std_mean = (sigma_0 / np.sqrt(r_count)) if r_count > 1 else 0.0
+    std_display = f"{std_mean:.2f}" if r_count > 1 else "--"
+    
+    results = [[pt, f"{final_means[i]:.5f}", std_display] for i, pt in enumerate(points)]
+    
+    stats = {'var': total_vv/f if f>0 else 0, 'std': sigma_0, 'f': f, 'vv': total_vv}
+    
+    return results, stats, section_3_rows 
+
+
+def process_network_data(raw_data):
+    """
+    Δέχεται το αρχικό DataFrame, ομαδοποιεί ανά Στάση, υπολογίζει τους μέσους όρους I/II 
+    και τρέχει τη συνόρθωση για όλο το δίκτυο.
+    """
+    all_results = []
+    detailed_analysis_data = {}
+    
+    # Ομαδοποίηση ανά σταθμό
+    for st_name, group in raw_data.groupby('From'):
+        st_name_str = str(st_name).replace('.0', '')
+        observations = []
+        
+        # Υπολογισμός (Face I + Face II) / 2
+        for _, row in group.iterrows():
+            l2_corr = row['Face_II'] - 200.0 if row['Face_II'] >= 200.0 else row['Face_II'] + 200.0
+            l_avg = (row['Face_I'] + l2_corr) / 2.0
+            observations.append({
+                'to': str(row['To']), 
+                'per': str(row['Period']), 
+                'val': l_avg, 
+                'f1': row['Face_I'], 
+                'f2': row['Face_II']
+            })
+        
+        # Κλήση του πυρήνα συνόρθωσης
+        res, stats, s3 = solve_lsa_detailed(observations)
+        
+        # Προσθήκη του ονόματος της στάσης στα τελικά αποτελέσματα
+        all_results.extend([[st_name_str] + r for r in res])
+        
+        # Αποθήκευση των αναλυτικών στατιστικών για μελλοντικό Report
+        detailed_analysis_data[st_name_str] = {'stats': stats, 'rows': s3}
+        
+    results_df = pd.DataFrame(all_results, columns=["Στάση", "Στόχος", "Διεύθυνση", "σ (cc)"])
+    
+    return results_df, detailed_analysis_data

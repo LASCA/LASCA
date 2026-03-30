@@ -11,6 +11,8 @@ ENV/
 # IDE settings (Ρυθμίσεις του VS Code που αφορούν μόνο εσένα)
 .vscode/
 
+*.csv
+
 # Windows & System files
 Thumbs.db
 desktop.ini
