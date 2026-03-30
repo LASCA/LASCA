@@ -30,7 +30,8 @@ if __name__ == "__main__":
         print(f"❌ Σφάλμα: Δεν βρέθηκε το αρχείο {input_file}. Φτιάξε ένα δοκιμαστικό CSV!")
     
     #NEW
-    #odeysi working 
+    #odeysi working     
+
     csv_file = "RYM.csv"  # Το όνομα του αρχείου σου
     scale = "1:200"       # Κλίμακα
     terrain = "Ομαλό"     # Έδαφος

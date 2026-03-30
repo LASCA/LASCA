@@ -10,7 +10,7 @@ ENV/
 
 # IDE settings (Ρυθμίσεις του VS Code που αφορούν μόνο εσένα)
 .vscode/
-
+# ότι έχει κατάληξει .csv Να μην ανεβει
 *.csv
 
 # Windows & System files

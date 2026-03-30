@@ -278,6 +278,7 @@ def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool 
     sum_dY = sum(dY_i)
 
     # Target differences from fixed endpoints
+    #new
     dX_m = (points[i_T3].X - points[i_T2].X) if (points[i_T3].X is not None and points[i_T2].X is not None) else None
     dY_m = (points[i_T3].Y - points[i_T2].Y) if (points[i_T3].Y is not None and points[i_T2].Y is not None) else None
 
