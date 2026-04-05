@@ -9,7 +9,9 @@ if __name__ == "__main__":
     
     cs.setup_project_structure() 
 
-    input_file = "SAMPLEINPUTFILE_HZ.csv" 
+    # input_file = "SAMPLEINPUTFILE_HZ.csv" 
+
+    input_file = cs.DATA_DIR / cs.SYN_STATHMOY_INPUT
 
     try:
         # 2. Διαβάζουμε τα δεδομένα (όπως το έκανες στο UI)
@@ -32,7 +34,7 @@ if __name__ == "__main__":
 
     #odeysi     
 
-    csv_file = "RYM.csv"  # Το όνομα του αρχείου σου
+    csv_file = cs.DATA_DIR / cs.ODEUSI_INPUT
     scale = "1:200"       # Κλίμακα
     terrain = "Ομαλό"     # Έδαφος
     klass = "Πρωτεύουσα"  # Τάξη
@@ -67,7 +69,7 @@ if __name__ == "__main__":
         print("\n📈 --- ΜΕΤΡΙΚΑ & ΣΦΑΛΜΑΤΑ ---")
         for k, v in meta["metrics"].items():
             if k == "is_closed":
-                print(f"{k:12} = {'✅ ΚΛΕΙΝΕΙ' if v else '❌ ΔΕΝ ΚΛΕΙΝΕΙ'}")
+                print(f"{k:12} = {' ΚΛΕΙΝΕΙ' if v else ' ΔΕΝ ΚΛΕΙΝΕΙ'}")
             elif isinstance(v, float):
                 print(f"{k:12} = {v:.5f}")
             else:
@@ -83,7 +85,7 @@ if __name__ == "__main__":
    
 
     #trigonometriki ypsometria
-    input = "sample_trig_level.xlsx"
+    input = cs.DATA_DIR / cs.TRIG_LEVEL_INPUT
 
     try:
         # 1. Διαβάζουμε το αρχείο
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         df_results = dpr.trig_leveling(df)
 
         # 3. Απλό print για να δούμε το τελικό dataframe!
-        print(df_results)
+        print(f"\nΑποτελέσματα Τριγωνομετρικής Υψομετρίας\n{df_results}")
 
     except FileNotFoundError:
         print(f"Σφάλμα: Το αρχείο '{input}' δεν βρέθηκε.")
