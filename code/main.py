@@ -73,14 +73,31 @@ if __name__ == "__main__":
             else:
                 print(f"{k:12} = {v}")
 
-        # 5. Εξαγωγή αποτελεσμάτων
-        out_file = csv_file.replace(".csv", "_results.csv")
-        dpr.export_traverse_results_to_csv(results, out_file)
-        print(f"\n💾 Αποθηκεύτηκαν στο: {out_file}")
+        # # 5. Εξαγωγή αποτελεσμάτων
+        # out_file = csv_file.replace(".csv", "_results.csv")
+        # dpr.export_traverse_results_to_csv(results, out_file)
+        # print(f"\n💾 Αποθηκεύτηκαν στο: {out_file}")
 
     except Exception as e:
         print(f"\n❌ Σφάλμα κατά την εκτέλεση: {e}")
    
-    
-    
+
+    #trigonometriki ypsometria
+    input = "sample_trig_level.xlsx"
+
+    try:
+        # 1. Διαβάζουμε το αρχείο
+        df = pd.read_excel(input)
+
+        # 2. Περνάμε το dataframe στη συνάρτησή σου για να υπολογίσει το dh
+        df_results = dpr.trig_leveling(df)
+
+        # 3. Απλό print για να δούμε το τελικό dataframe!
+        print(df_results)
+
+    except FileNotFoundError:
+        print(f"Σφάλμα: Το αρχείο '{input}' δεν βρέθηκε.")
+    except Exception as e:
+        print(f"Προέκυψε σφάλμα: {e}")
+
     

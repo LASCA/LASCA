@@ -534,3 +534,32 @@ def process_network_data(raw_data):
     results_df = pd.DataFrame(all_results, columns=["Στάση", "Στόχος", "Διεύθυνση", "σ (cc)"])
     
     return results_df, detailed_analysis_data
+
+#trigonometriki ypsometria
+def trig_leveling(dataframe):
+    #Διαβάζω το αρχείο excel 
+    #Ορίζω τις μεταβλητές που συμμετέχουν 
+    h_station = dataframe['H_station']
+    h_target = dataframe['H_target']
+    z_grad = dataframe['Z_grad']
+    slope = dataframe['Slope_D']
+
+    #Μετατρέπω ζενίθια απο grad σε rad
+    z_rad = g2r(z_grad)
+    #Υπολογίζω ΔΗ
+    dataframe['dh'] = (slope * np.cos(z_rad)) + h_station - h_target
+    dataframe['dh'] = dataframe['dh'].round(3)
+    # Ομαδοποίηση ανά From/To και υπολογισμός μέσου όρου στο dh
+    # 1. Υπολογίζουμε το μέσο όρο (χωρίς το .round)
+    mean_values = dataframe.groupby(['From', 'To'])['dh'].transform('mean')
+    
+    # 2. Το μετατρέπουμε σε κείμενο (string) "κλειδώνοντας" αυστηρά 3 δεκαδικά!
+    # Το 'f"{x:.3f}"' σημαίνει "πάρε τον αριθμό x και δείξε τον με 3 (3f) δεκαδικά".
+    dataframe['dh_mean'] = mean_values.apply(lambda x: f"{x:.3f}")
+    
+    # 3. Βρίσκουμε τις γραμμές που ΔΕΝ είναι οι τελευταίες
+    duplicates = dataframe.duplicated(subset=['From', 'To'], keep='last')
+    
+    # 4. Βάζουμε κενό στις διπλότυπες
+    dataframe.loc[duplicates, 'dh_mean'] = ""
+    return dataframe

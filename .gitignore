@@ -12,6 +12,7 @@ ENV/
 .vscode/
 # ότι έχει κατάληξει .csv Να μην ανεβει
 *.csv
+*.xlsx
 
 # Windows & System files
 Thumbs.db
