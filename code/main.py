@@ -28,6 +28,8 @@ if __name__ == "__main__":
         print("\n📊 --- ΑΠΟΤΕΛΕΣΜΑΤΑ ---")
         print(results_df.to_string(index=False))
 
+        vis.plot_std_dev_lollipop_df(results_df)
+
     except FileNotFoundError:
         print(f"❌ Σφάλμα: Δεν βρέθηκε το αρχείο {input_file}. Φτιάξε ένα δοκιμαστικό CSV!")
     
