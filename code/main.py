@@ -75,6 +75,9 @@ if __name__ == "__main__":
             else:
                 print(f"{k:12} = {v}")
 
+        vis.traverse_plot(results)
+        
+
         # # 5. Εξαγωγή αποτελεσμάτων
         # out_file = csv_file.replace(".csv", "_results.csv")
         # dpr.export_traverse_results_to_csv(results, out_file)
