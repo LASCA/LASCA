@@ -25,6 +25,8 @@ directories = [
 ]
 
 ODEUSI_INPUT = "RYM.csv"
+#ODEUSI_INPUT = "od1.csv"
+#ODEUSI_INPUT = "od2.csv"
 SYN_STATHMOY_INPUT = "SAMPLEINPUTFILE_HZ.csv"
 TRIG_LEVEL_INPUT = "sample_trig_level.xlsx"
 
