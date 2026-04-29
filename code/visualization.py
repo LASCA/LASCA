@@ -13,6 +13,7 @@ import base64
 from typing import List
 import pandas as pd
 from matplotlib.gridspec import GridSpec
+import matplotlib.ticker as ticker
 
 def traverse_plot(results: list) -> str:
     valid_points = [p for p in results if p.X is not None and p.Y is not None]
@@ -107,18 +108,18 @@ def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
 
     # 2. Πλοτάρισμα των Σημείων Λεπτομερείας (Cyan κύκλοι)
     ax.scatter(results_df['X'], results_df['Y'], 
-               color='#00FFFF', s=40, label='Σημεία Λεπτομερείας', 
-               zorder=3, alpha=0.6, edgecolors='white', linewidths=0.5)
+               color="#C0C0C0", s=40, label='Σημεία Λεπτομερείας', 
+               zorder=3, alpha=0.8, linewidths=0.5)
 
-    # 3. Πλοτάρισμα της Στάσης (Κόκκινο τρίγωνο)
-    ax.scatter(xs, ys, color='#00FFFF', marker='^', s=200, 
-               label=f'Στάση: {station_name}', edgecolors='white', zorder=5)
+    # 3. Πλοτάρισμα της Στάσης 
+    ax.scatter(xs, ys, color="#00FF00", marker='^', s=200, 
+               label=f'Στάση: {station_name}', zorder=5)
 
     # 4. Προσθήκη Labels (Ονόματα σημείων)
     # Χρησιμοποιούμε ένα μικρό offset (0.2m) για να μην πέφτει το κείμενο πάνω στο σύμβολο
     for i, row in results_df.iterrows():
         ax.text(row['X'] + 0.15, row['Y'] + 0.15, str(row['Σημείο']), 
-                color='white', fontsize=9, alpha=0.9, zorder=6)
+                color='white', fontsize=5, alpha=0.9, zorder=6)
 
     # Προσθήκη label ειδικά για τη στάση
     ax.text(xs + 0.2, ys + 0.2, station_name, 
@@ -130,7 +131,8 @@ def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
     
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
-    
+    ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
+    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     # --- ΚΡΙΣΙΜΟ: Ίση κλίμακα αξόνων ---
     # Χωρίς αυτό, οι γωνίες και οι αποστάσεις θα φαίνονται παραμορφωμένες
     ax.set_aspect('equal', adjustable='box') 

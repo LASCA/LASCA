@@ -126,48 +126,24 @@ def tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C):
     ym = (k1 * ya + k2 * yb + k3 * yc) / sk
     return xm, ym
 
-def tachymetry(xs, ys, zs, i, xo, yo, zo, hz_o, measurements, apply_scale, scale_factor):
-    results = []
-    g_so, s_so = deutero_them(xs, ys, xo, yo)
-    final_scale_factor = 1.0
-    for point_id, hz, z, sd, t in measurements:
-        if sd <= 0:
-             results.append((point_id, "SD <= 0", "", ""))
-             continue
-        z_rad = g2r(z)
-        hd_measured = sd * math.sin(z_rad)
-        vd = sd * math.cos(z_rad)
-        hd_final = hd_measured
-        if apply_scale:
-            hd_final = hd_measured * scale_factor
-            final_scale_factor = scale_factor
-        hz_diff = norm400(hz - hz_o)
-        g_sp = norm400(g_so + hz_diff)
-        xp, yp = proto_themeliodes(xs, ys, hd_final, g_sp)
-        zp = zs + i + vd - t
-        # Επιστρέφει τα raw δεδομένα (στρογγυλοποιημένα)
-        results.append((point_id, round(xp, 3), round(yp, 3), round(zp, 3)))
-    return results, g_so, final_scale_factor
-
-
-def tachymetry2(excel_path, apply_scale=False, scale_factor=1.0):
+def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
     # 1. Διάβασμα των Sheets
     df_st = pd.read_excel(excel_path, sheet_name='Station')
     df_meas = pd.read_excel(excel_path, sheet_name='Measurements')
 
     # 2. Τράβηγμα των δεδομένων της στάσης
     st = df_st.iloc[0]
-    # --- ΝΕΟ: Διαβάζουμε και το όνομα της στάσης ---
+
     st_name = st['Station_Name'] 
     
     xs, ys, zs, i = st['XS'], st['YS'], st['ZS'], st['I']
     xo, yo, zo, hz_o = st['XO'], st['YO'], st['ZO'], st['HZ_O']
 
     # Υπολογισμός Γωνίας Διεύθυνσης Προσανατολισμού
-    g_so, _ = deutero_them(xs, ys, xo, yo)
+    g_so, S = deutero_them(xs, ys, xo, yo)
     
     results = []
-    for _, row in df_meas.iterrows():
+    for S, row in df_meas.iterrows():
         p_id, hz, z, sd, t = row['PointID'], row['Hz'], row['Z'], row['SD'], row['TargetHeight']
         if sd <= 0: continue
 
@@ -183,9 +159,9 @@ def tachymetry2(excel_path, apply_scale=False, scale_factor=1.0):
         zp = zs + i + vd - t
 
         results.append({'Σημείο': p_id, 'X': round(xp, 3), 'Y': round(yp, 3), 'Z': round(zp, 3)})
-
-    # --- ΕΠΙΣΤΡΕΦΟΥΜΕ: Το df, το όνομα ΚΑΙ τις συντεταγμένες ---
-    return pd.DataFrame(results), st_name, (xs, ys, zs)
+    results = pd.DataFrame(results)
+  
+    return results , st_name, (xs, ys, zs)
 
 #ODEUSI
     #metatropes
