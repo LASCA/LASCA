@@ -94,100 +94,58 @@ def traverse_plot(results: list) -> str:
     plt.show()
     return ""
 
-def traverse_plot2(results: list) -> str:
 
-    # 1. Φιλτράρουμε τα σημεία που έχουν συντεταγμένες (X, Y)
-    valid_points = [p for p in results if p.X is not None and p.Y is not None]
-    
-    if not valid_points:
-        return ""
-
-    # Εξαγωγή δεδομένων
-    X = [p.X for p in valid_points]
-    Y = [p.Y for p in valid_points]
-    names = [p.name for p in valid_points]
-
+def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
+    """
+    Δημιουργεί ένα τοπογραφικό διάγραμμα με τη στάση και τα σημεία λεπτομερείας.
+    """
+    # 1. Ρύθμιση στυλ (Dark Theme για επαγγελματικό look)
     plt.style.use('dark_background')
-    plt.rcParams['font.family'] = 'Segoe UI'
-    
-    # 2. Στήσιμο του καμβά
-    fig, ax = plt.subplots(figsize=(7, 10))
-    fig.patch.set_facecolor('#121212') 
+    fig, ax = plt.subplots(figsize=(10, 8))
+    fig.patch.set_facecolor('#121212')
     ax.set_facecolor('#121212')
-    ax.ticklabel_format(useOffset=False, style='plain', axis='both')
+
+    # 2. Πλοτάρισμα των Σημείων Λεπτομερείας (Cyan κύκλοι)
+    ax.scatter(results_df['X'], results_df['Y'], 
+               color='#00FFFF', s=40, label='Σημεία Λεπτομερείας', 
+               zorder=3, alpha=0.6, edgecolors='white', linewidths=0.5)
+
+    # 3. Πλοτάρισμα της Στάσης (Κόκκινο τρίγωνο)
+    ax.scatter(xs, ys, color='#00FFFF', marker='^', s=200, 
+               label=f'Στάση: {station_name}', edgecolors='white', zorder=5)
+
+    # 4. Προσθήκη Labels (Ονόματα σημείων)
+    # Χρησιμοποιούμε ένα μικρό offset (0.2m) για να μην πέφτει το κείμενο πάνω στο σύμβολο
+    for i, row in results_df.iterrows():
+        ax.text(row['X'] + 0.15, row['Y'] + 0.15, str(row['Σημείο']), 
+                color='white', fontsize=9, alpha=0.9, zorder=6)
+
+    # Προσθήκη label ειδικά για τη στάση
+    ax.text(xs + 0.2, ys + 0.2, station_name, 
+            color='#00FFFF', fontsize=11, fontweight='bold', zorder=6)
+
+    # 5. Αισθητικές παρεμβάσεις και Τίτλοι
+    ax.set_title(f"Τοπογραφικό Σκαρίφημα - {station_name}", loc='left', 
+                 fontsize=14, fontweight='bold', pad=20, color='white')
     
-    n = len(valid_points)
-
-    # Βρίσκουμε το πρώτο και το τελευταίο σημείο (προσανατολισμός)
-    orient_indices = [0, n - 1] if n >= 2 else [0]
-    # Όλα τα υπόλοιπα είναι οι κύριες στάσεις
-    station_indices = [i for i in range(n) if i not in orient_indices]
-
-    # Διαχωρίζουμε τα X και Y
-    X_orient = [X[i] for i in orient_indices]
-    Y_orient = [Y[i] for i in orient_indices]
-
-    X_stations = [X[i] for i in station_indices]
-    Y_stations = [Y[i] for i in station_indices]
-
-    # 3. Σχεδιασμός των σημείων
-    # Σημεία Προσανατολισμού (Τρίγωνα - Κενά εσωτερικά)
-    if X_orient:
-        ax.scatter(X_orient, Y_orient, marker='^', s=90, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
-
-    # Κύριες Στάσεις Όδευσης (CAD Style: Σταυρός + Ανοιχτός Κύκλος)
-    if X_stations:
-        # Layer 1: Το σταυρόνημα (+)
-        ax.scatter(X_stations, Y_stations, marker='+', s=40, color='#00FFFF', linewidths=1.2, zorder=5)
-        # Layer 2: Ο εξωτερικός κύκλος (o) κενός εσωτερικά
-        ax.scatter(X_stations, Y_stations, marker='o', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.2, zorder=6)
-
-    # Προσθήκη ονομάτων δίπλα στα σημεία
-    for i, txt in enumerate(names):
-        ax.annotate(
-            txt, 
-            (X[i], Y[i]), 
-            xytext=(7, 7), 
-            textcoords='offset points',
-            fontsize=11,
-            fontweight='bold',
-            color="#FFFEFE"
-        )
+    ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
+    ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
     
-    # 4. Σχεδιασμός των γραμμών (Σκοπεύσεις vs Οδεύσεις)
-    if n >= 4:
-        # Προσανατολισμός Αρχής (T1 -> T2): Διακεκομμένη γραμμή
-        ax.plot(X[0:2], Y[0:2], color='gray', linestyle='--', linewidth=1.5, label="Σκοπεύσεις Προσανατολισμού")
-        
-        # Κύρια Όδευση (T2 -> ... -> T3): 
-        ax.plot(X[1:n-1], Y[1:n-1], color="#FF00BB", linestyle='-', linewidth=1.5, label="Πλευρές Όδευσης")
-        
-        # Προσανατολισμός Τέλους (T3 -> T4): Διακεκομμένη γραμμή
-        ax.plot(X[n-2:n], Y[n-2:n], color='gray', linestyle='--', linewidth=1.5)
-    else:
-        # Αν για κάποιο λόγο τα σημεία είναι λιγότερα, ενώνουμε απλά με μια γραμμή
-        ax.plot(X, Y, color='#FF00BB', linestyle='-', linewidth=2)
-
-    # 5. Αισθητικές παρεμβάσεις (Τίτλοι, πλέγμα, κλίμακα)
-    ax.set_title("Διάγραμμα Όδευσης", fontsize=14, fontweight='bold', pad=15, loc='left')
-    ax.set_xlabel("X (m)", fontsize=11, fontweight='bold')
-    ax.set_ylabel("Y (m)", fontsize=11, fontweight='bold')
+    # --- ΚΡΙΣΙΜΟ: Ίση κλίμακα αξόνων ---
+    # Χωρίς αυτό, οι γωνίες και οι αποστάσεις θα φαίνονται παραμορφωμένες
+    ax.set_aspect('equal', adjustable='box') 
     
-    # Το grid βοηθάει στην αίσθηση του χώρου
-    ax.grid(True, linestyle=':', alpha=0.7)
+    # Πλέγμα (Grid)
+    ax.grid(True, linestyle='--', alpha=0.15, color='white')
     
-    # Ρύθμιση του υπομνήματος (Legend)
-    legend = ax.legend(loc='best', prop={'weight': 'bold'})
-    legend.get_frame().set_facecolor('#1e1e1e')
-    legend.get_frame().set_edgecolor('#333333')
+    # Υπόμνημα
+    legend = ax.legend(loc='best', frameon=True, facecolor='#1e1e1e', edgecolor='none')
     for text in legend.get_texts():
         text.set_color("white")
-    
-    # ΕΞΑΙΡΕΤΙΚΑ ΣΗΜΑΝΤΙΚΟ: Ίδια κλίμακα σε X και Y
-    ax.set_aspect('equal', adjustable='datalim')
 
+    # Αυτόματη ρύθμιση περιθωρίων
+    plt.tight_layout()
     plt.show()
-    return "" # Κρατάω το return επειδή η συνάρτησή σου δηλώνει -> str
 
 def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     # 1. Επεξεργασία του DataFrame

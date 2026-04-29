@@ -9,8 +9,31 @@ if __name__ == "__main__":
     
     cs.setup_project_structure() 
 
-    # input_file = "SAMPLEINPUTFILE_HZ.csv" 
+    #ταχυμετρια
+    input_file = cs.DATA_DIR / cs.TAXYMETRIA_INPUT
 
+    try:
+        # Κλήση της συνάρτησης - Όλα τα δεδομένα (Στάση & Μετρήσεις) είναι μέσα στο Excel
+        df_results, st_name, st_coords = dpr.tachymetry2(input_file, apply_scale=True, scale_factor=0.9996)
+        
+        xs_val = st_coords[0]
+        ys_val = st_coords[1]
+
+        vis.plot_survey_points(df_results, xs_val, ys_val, station_name= st_name)
+        
+        # Έλεγχος αν το DataFrame είναι άδειο
+        if df_results.empty:
+            print("Προσοχή: Δεν βρέθηκαν έγκυρα δεδομένα προς υπολογισμό.")
+        else:
+            print("\nΥπολογισμένες Συντεταγμένες:")
+            print(df_results.to_string(index=False))
+            
+    except FileNotFoundError:
+        print(f"Σφάλμα: Το αρχείο '{input_file}' δεν βρέθηκε.")
+    except Exception as e:
+        print(f"Παρουσιάστηκε σφάλμα κατά την εκτέλεση: {e}")
+
+    #συνορθωση σταθμου
     input_file = cs.DATA_DIR / cs.SYN_STATHMOY_INPUT
 
     try:
