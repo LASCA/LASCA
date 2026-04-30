@@ -1,19 +1,11 @@
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import os, sys, csv
-from typing import Optional, List, Tuple, Dict
 import matplotlib.pyplot as plt
-import io
-import base64
-from typing import List
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 import matplotlib.ticker as ticker
+from adjustText import adjust_text 
+from matplotlib.lines import Line2D
+import matplotlib.ticker as ticker
+from matplotlib.lines import Line2D  
 
 def traverse_plot(results: list) -> str:
     valid_points = [p for p in results if p.X is not None and p.Y is not None]
@@ -95,57 +87,66 @@ def traverse_plot(results: list) -> str:
     plt.show()
     return ""
 
-
 def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
-    """
-    Δημιουργεί ένα τοπογραφικό διάγραμμα με τη στάση και τα σημεία λεπτομερείας.
-    """
-    # 1. Ρύθμιση στυλ (Dark Theme για επαγγελματικό look)
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(10, 8))
+    plt.rcParams['font.family'] = 'Segoe UI'
+    
+    fig, ax = plt.subplots(figsize=(12, 9))
     fig.patch.set_facecolor('#121212')
     ax.set_facecolor('#121212')
-
-    # 2. Πλοτάρισμα των Σημείων Λεπτομερείας (Cyan κύκλοι)
-    ax.scatter(results_df['X'], results_df['Y'], 
-               color="#C0C0C0", s=40, label='Σημεία Λεπτομερείας', 
-               zorder=3, alpha=0.8, linewidths=0.5)
-
-    # 3. Πλοτάρισμα της Στάσης 
-    ax.scatter(xs, ys, color="#00FF00", marker='^', s=200, 
-               label=f'Στάση: {station_name}', zorder=5)
-
-    # 4. Προσθήκη Labels (Ονόματα σημείων)
-    # Χρησιμοποιούμε ένα μικρό offset (0.2m) για να μην πέφτει το κείμενο πάνω στο σύμβολο
-    for i, row in results_df.iterrows():
-        ax.text(row['X'] + 0.15, row['Y'] + 0.15, str(row['Σημείο']), 
-                color='white', fontsize=5, alpha=0.9, zorder=6)
-
-    # Προσθήκη label ειδικά για τη στάση
-    ax.text(xs + 0.2, ys + 0.2, station_name, 
-            color='#00FFFF', fontsize=11, fontweight='bold', zorder=6)
-
-    # 5. Αισθητικές παρεμβάσεις και Τίτλοι
-    ax.set_title(f"Τοπογραφικό Σκαρίφημα - {station_name}", loc='left', 
-                 fontsize=14, fontweight='bold', pad=20, color='white')
     
+    # Plain style για να μην έχουμε εκθέτες
+    ax.ticklabel_format(useOffset=False, style='plain', axis='both')
+
+    # 1. Σημεία Λεπτομερείας
+    ax.scatter(results_df['X'], results_df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
+    ax.scatter(results_df['X'], results_df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
+
+    # 2. Στάση
+    ax.scatter(xs, ys, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, label=f'Στάση: {station_name}', zorder=10)
+
+    # 3. Δυναμικά Labels χωρίς δεκαδικά (Με βελτιωμένη τοποθέτηση)
+    texts = []
+    for i, row in results_df.iterrows():
+        point_id = str(int(row['Σημείο']))
+        # Δίνουμε ένα μικρό αρχικό offset (π.χ. 0.3 μέτρα) για να μην πέφτει στο κέντρο του σταυρού
+        texts.append(ax.text(row['X'] + 0.3, row['Y'] + 0.3, point_id, color="#FFFEFE", fontsize=9, fontweight='bold'))
+
+    # Αφήνουμε την adjust_text να κινηθεί ελεύθερα (χωρίς το only_move)
+    # Της περνάμε τα x, y των σημείων για να ξέρει τι να αποφύγει
+    adjust_text(texts, 
+                x=results_df['X'].values,
+                y=results_df['Y'].values,
+                ax=ax,
+                expand_points=(1.5, 1.5)) # Της δίνουμε "χώρο" να σπρώξει τα labels
+
+    # 4. Label Στάσης
+    ax.text(xs, ys, f"  {station_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
+
+    # 5. Αισθητική & Άξονες
+    ax.set_title(f"ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ - {station_name}", loc='left', fontsize=14, fontweight='bold', pad=20)
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
+    ax.set_aspect('equal', adjustable='datalim')
+    ax.grid(True, linestyle=':', alpha=0.3)
+    
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
-    # --- ΚΡΙΣΙΜΟ: Ίση κλίμακα αξόνων ---
-    # Χωρίς αυτό, οι γωνίες και οι αποστάσεις θα φαίνονται παραμορφωμένες
-    ax.set_aspect('equal', adjustable='box') 
-    
-    # Πλέγμα (Grid)
-    ax.grid(True, linestyle='--', alpha=0.15, color='white')
-    
-    # Υπόμνημα
-    legend = ax.legend(loc='best', frameon=True, facecolor='#1e1e1e', edgecolor='none')
-    for text in legend.get_texts():
-        text.set_color("white")
 
-    # Αυτόματη ρύθμιση περιθωρίων
+    # 6. Διόρθωση Υπομνήματος με Line2D (Όπως το είχες)
+    detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
+                          markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
+    cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
+                         markersize=6, markeredgewidth=1.2)
+    
+    handles, labels = ax.get_legend_handles_labels()
+    # Εδώ βάζουμε τα δύο σύμβολα μαζί στο υπόμνημα
+    handles.insert(0, (detail_proxy, cross_proxy))
+    labels.insert(0, 'Σημεία Λεπτομερείας')
+
+    legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#1e1e1e', edgecolor='none')
+    for text in legend.get_texts(): text.set_color("white")
+
     plt.tight_layout()
     plt.show()
 
