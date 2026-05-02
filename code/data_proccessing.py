@@ -577,3 +577,4 @@ def trig_leveling(dataframe):
     # 4. Βάζουμε κενό στις διπλότυπες
     dataframe.loc[duplicates, 'dh_mean'] = ""
     return dataframe
+
