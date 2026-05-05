@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, Settings } from 'lucide-react';
+import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'adjustment', label: 'Συνόρθωση', icon: <Target size={20} /> },
@@ -10,41 +10,56 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen">
-      <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+    <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative`}>
+      
+      {/* Κουμπί Toggle για άνοιγμα/κλείσιμο */}
+ 
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`absolute -right-3 top-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-1 border-2 border-slate-950 z-[100] transition-transform duration-300 shadow-lg ${!isOpen ? 'rotate-0' : ''}`}
+      >
+        {isOpen ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+      </button>
+
+      {/* Header Sidebar */}
+      <div className={`p-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800 overflow-hidden`}>
+        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
           <Compass size={24} />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">LASCA</h1>
-          <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">v2.0 PRO</p>
-        </div>
+        {isOpen && (
+          <div className="transition-opacity duration-300">
+            <h1 className="text-xl font-bold text-white tracking-tight leading-none">LASCA</h1>
+            <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase mt-1">v2.0 PRO</p>
+          </div>
+        )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 mt-4">
+      {/* Navigation */}
+      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-hidden">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+            className={`w-full flex items-center ${isOpen ? 'px-4 justify-between' : 'justify-center'} py-3 rounded-xl transition-all ${
               activeTab === item.id 
-              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' 
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_0_10px_rgba(37,99,235,0.05)]' 
+              : 'text-slate-400 hover:bg-slate-800 hover:text-white border border-transparent'
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               {item.icon}
-              <span className="font-semibold text-sm">{item.label}</span>
+              {isOpen && <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>}
             </div>
-            {activeTab === item.id && <ChevronRight size={16} />}
+            {isOpen && activeTab === item.id && <ChevronRight size={16} className="opacity-50" />}
           </button>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-        <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-white transition-colors">
-          <Settings size={20} />
-          <span className="font-medium text-sm">Ρυθμίσεις</span>
+      {/* Footer Sidebar */}
+      <div className="p-4 border-t border-slate-800 bg-slate-900/50 overflow-hidden">
+        <button className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-3 text-slate-500 hover:text-white transition-colors`}>
+          <Settings size={20} className="shrink-0" />
+          {isOpen && <span className="font-medium text-sm whitespace-nowrap">Ρυθμίσεις</span>}
         </button>
       </div>
     </aside>

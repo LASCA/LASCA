@@ -1,26 +1,25 @@
 import React from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Play } from 'lucide-react';
 
 const Header = ({ activeTab }) => {
   return (
-    <header className="h-20 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-10">
+    <header className="h-20 bg-slate-950/50 backdrop-blur-md border-b border-slate-800/60 flex items-center justify-between px-10 sticky top-0 z-50">
       <div>
-        <h2 className="text-2xl font-bold text-white capitalize">
-          {activeTab === 'dashboard' ? 'Επισκόπηση' : activeTab}
+        <h2 className="text-2xl font-bold text-white capitalize tracking-tight">
+          {activeTab === 'dashboard' ? 'Επισκόπηση' : 
+           activeTab === 'adjustment' ? 'Συνόρθωση Δικτύου' : activeTab}
         </h2>
-        <p className="text-xs text-slate-500">Project: Survey_2024_01</p>
+        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Project: Survey_2024_01</p>
       </div>
       
       <div className="flex items-center gap-4">
-        <div className="text-right mr-4 border-r border-slate-800 pr-4">
-           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Status</p>
-           <p className="text-xs text-emerald-500 font-medium flex items-center gap-1.5">
-             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-             Connected
-           </p>
-        </div>
-        <button className="bg-white text-slate-950 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2 shadow-lg">
-          <Upload size={18} /> Import Master Excel
+        {activeTab === 'adjustment' && (
+          <button className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl font-bold text-[11px] transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/20 active:scale-95">
+            <Play size={14} fill="currentColor" /> ΕΚΤΕΛΕΣΗ
+          </button>
+        )}
+        <button className="bg-white text-slate-950 px-5 py-2 rounded-xl font-bold text-[11px] hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2 shadow-lg active:scale-95">
+          <Upload size={14} /> IMPORT EXCEL
         </button>
       </div>
     </header>
