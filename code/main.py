@@ -1,98 +1,55 @@
+import pandas as pd
 import configuration_settings as cs
 import data_proccessing as dpr
 import visualization as vis
-import sys
-import pandas as pd
+import matplotlib.pyplot as plt # Προσθήκη για το plt.show() αν χρειαστεί
 
+def run_app_logic(excel_path):
+    xls = pd.ExcelFile(excel_path)
+    results = {}
 
-if __name__ == "__main__":
-    
-    cs.setup_project_structure() 
-
-    #ταχυμετρια
-    input_file = cs.DATA_DIR / cs.TAXYMETRIA_INPUT
-
-    try:
-        # Κλήση της συνάρτησης - Όλα τα δεδομένα (Στάση & Μετρήσεις) είναι μέσα στο Excel
-        df_results, st_name, st_coords = dpr.tachymetry(input_file, apply_scale=True, scale_factor=1)
+    # 1. Module: Συνόρθωση Σταθμού
+    if 'synorthosi_stathmou' in xls.sheet_names:
+        print("processing: Adjustment...")
+        df_adj = pd.read_excel(xls, 'synorthosi_stathmou')
+        df_adj[['From', 'To', 'Period']] = df_adj[['From', 'To', 'Period']].ffill()
         
-        xs_val = st_coords[0]
-        ys_val = st_coords[1]
-
-        vis.plot_survey_points(df_results, xs_val, ys_val, station_name= st_name)
+        # Εκτέλεση υπολογισμών
+        adj_df, adj_meta = dpr.process_network_data(df_adj)
+        results['adjustment'] = adj_df
         
-        # Έλεγχος αν το DataFrame είναι άδειο
-        if df_results.empty:
-            print("Προσοχή: Δεν βρέθηκαν έγκυρα δεδομένα προς υπολογισμό.")
-        else:
-            print("\nΥπολογισμένες Συντεταγμένες:")
-            print(df_results.to_string(index=False))
-            
-    except FileNotFoundError:
-        print(f"Σφάλμα: Το αρχείο '{input_file}' δεν βρέθηκε.")
-    except Exception as e:
-        print(f"Παρουσιάστηκε σφάλμα κατά την εκτέλεση: {e}")
+        # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
+        print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
+        vis.plot_std_dev_lollipop_df(adj_df)
+        plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
 
-    # #συνορθωση σταθμου
-    input_file = cs.DATA_DIR / cs.SYN_STATHMOY_INPUT
-
-    try:
-        # 2. Διαβάζουμε τα δεδομένα (όπως το έκανες στο UI)
-        print(f"📖 Διαβάζω το αρχείο: {input_file}...")
-        df = pd.read_csv(input_file, sep=';')
-        df.columns = ['From', 'To', 'Period', 'Face_I', 'Face_II']
-        df[['From', 'To', 'Period']] = df[['From', 'To', 'Period']].ffill()
-
-        # 3. Τρέχουμε τη συνόρθωση
-        print("⚙️ Εκτέλεση συνόρθωσης...")
-        results_df, detailed_analysis = dpr.process_network_data(df)
-
-        # 4. Τυπώνουμε τα αποτελέσματα στο τερματικό
-        print("\n📊 --- ΑΠΟΤΕΛΕΣΜΑΤΑ ---")
-        print(results_df.to_string(index=False))
-
-        vis.plot_std_dev_lollipop_df(results_df)
-
-    except FileNotFoundError:
-        print(f"❌ Σφάλμα: Δεν βρέθηκε το αρχείο {input_file}. Φτιάξε ένα δοκιμαστικό CSV!")
-    
-
-    #odeysi     
-
-    csv_file = cs.DATA_DIR / cs.ODEUSI_INPUT
-    scale = "1:200"       # Κλίμακα
-    terrain = "Ομαλό"     # Έδαφος
-    klass = "Πρωτεύουσα"  # Τάξη
-
-
-    print("===" * 15)
-    print(" 🚀 TopoStation - Traverse Calculator")
-    print("===" * 15)
-    print(f"📖 Ανάγνωση αρχείου: {csv_file}")
-    print(f"⚙️ Παράμετροι: Κλίμακα={scale}, Έδαφος={terrain}, Τάξη={klass}\n")
-
-    try:
-        # 1. Φόρτωση δεδομένων
-        points = dpr.load_traverse_from_csv(csv_file)
+    # 2. Module: Όδευση
+    if 'traverse' in xls.sheet_names:
+        print("processing: Traverse...")
+        df_trav = pd.read_excel(xls, 'traverse')
         
-        # 2. Εκτέλεση όδευσης
-        results, meta = dpr.traverse(points, ori_start=True, ori_end=True,
-                                     scale=scale, terrain=terrain, klass=klass)
-
-        # 3. Εμφάνιση Αποτελεσμάτων
-        print("📊 --- ΑΠΟΤΕΛΕΣΜΑΤΑ ΟΔΕΥΣΗΣ ---")
-        for r in results:
-            angle_str = f"{r.theta:.4f}" if r.theta is not None else "None"
-            g_str = f"{r.G:.4f}" if r.G is not None else "None"
-            s_str = f"{r.S:.3f}" if r.S is not None else "None"
-            x_str = f"{r.X:.3f}" if r.X is not None else "None"
-            y_str = f"{r.Y:.3f}" if r.Y is not None else "None"
-            
-            print(f"{r.name:6} θ={angle_str:>8} G={g_str:>8} S={s_str:>8} X={x_str:>12} Y={y_str:>12}")
+        # 1. Φόρτωση δεδομένων από το DataFrame (αντί για CSV)
+        points = dpr.load_traverse_from_dataframe(df_trav)
         
-        # 4. Εμφάνιση Μετρικών
-        print("\n📈 --- ΜΕΤΡΙΚΑ & ΣΦΑΛΜΑΤΑ ---")
-        for k, v in meta["metrics"].items():
+        # 2. Εκτέλεση όδευσης (Με τις παραμέτρους σου)
+        scale = "1:200"       # Κλίμακα
+        terrain = "Ομαλό"     # Έδαφος
+        klass = "Πρωτεύουσα"  # Τάξη
+        
+        trav_res, trav_meta = dpr.traverse(
+            points, 
+            ori_start=True, 
+            ori_end=True,
+            scale=scale, 
+            terrain=terrain, 
+            klass=klass
+        )
+        
+        results['traverse'] = trav_res
+        
+        # 3. Εμφάνιση Μετρικών στο Τερματικό (όπως τα είχες)
+        print("\n📈 --- ΜΕΤΡΙΚΑ & ΣΦΑΛΜΑΤΑ ΟΔΕΥΣΗΣ ---")
+        for k, v in trav_meta["metrics"].items():
             if k == "is_closed":
                 print(f"{k:12} = {' ΚΛΕΙΝΕΙ' if v else ' ΔΕΝ ΚΛΕΙΝΕΙ'}")
             elif isinstance(v, float):
@@ -100,34 +57,56 @@ if __name__ == "__main__":
             else:
                 print(f"{k:12} = {v}")
 
-        vis.traverse_plot(results)
+        # 4. Εμφάνιση Γραφήματος Όδευσης
+        print("📊 Εμφάνιση σχεδίου όδευσης...")
+        vis.traverse_plot(trav_res)
+
+#3. Module: Ταχυμετρία
+    # Βάζουμε ένα print για να βλέπεις ποια φύλλα διαβάζει πραγματικά το Python
+    print("Φύλλα που βρέθηκαν στο Excel:", xls.sheet_names) 
+
+    if 'stations_taxymetria' in xls.sheet_names and 'measurements_taxymetria' in xls.sheet_names:
+        print("processing: Tachymetry (2-sheet mode)...")
         
-
-        # # 5. Εξαγωγή αποτελεσμάτων
-        # out_file = csv_file.replace(".csv", "_results.csv")
-        # dpr.export_traverse_results_to_csv(results, out_file)
-        # print(f"\n💾 Αποθηκεύτηκαν στο: {out_file}")
-
-    except Exception as e:
-        print(f"\n❌ Σφάλμα κατά την εκτέλεση: {e}")
-   
-
-    #trigonometriki ypsometria
-    input = cs.DATA_DIR / cs.TRIG_LEVEL_INPUT
-
-    try:
-        # 1. Διαβάζουμε το αρχείο
-        df = pd.read_excel(input)
-
-        # 2. Περνάμε το dataframe στη συνάρτησή σου για να υπολογίσει το dh
-        df_results = dpr.trig_leveling(df)
-
-        # 3. Απλό print για να δούμε το τελικό dataframe!
-        print(f"\nΑποτελέσματα Τριγωνομετρικής Υψομετρίας\n{df_results}")
-
-    except FileNotFoundError:
-        print(f"Σφάλμα: Το αρχείο '{input}' δεν βρέθηκε.")
-    except Exception as e:
-        print(f"Προέκυψε σφάλμα: {e}")
-
+        # Καλούμε τη συνάρτηση (υποθέτοντας ότι στο data_proccessing.py είναι όπως την κάναμε πριν)
+        df_tax, st_name, coords = dpr.tachymetry(excel_path) 
+        results['points'] = df_tax
+        
+        # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΤΑΧΥΜΕΤΡΙΑΣ ---
+        print(f"📊 Εμφάνιση χάρτη σημείων για τη στάση {st_name}...")
+        vis.plot_survey_points(df_tax, coords[0], coords[1], station_name=st_name)
+    else:
+        print("⚠️ ΠΡΟΣΟΧΗ: Δεν βρέθηκαν τα φύλλα 'Station' και 'Measurements' για την Ταχυμετρία!")
+# 4. Module: Τριγωνομετρική Υψομετρία
+    if 'trig_leveling' in xls.sheet_names:
+        print("processing: Trigonometric Leveling...")
+        
+        # 1. Διαβάζουμε το φύλλο trig_leveling
+        df_trig = pd.read_excel(xls, 'trig_leveling')
+        
+        # 2. Κάνουμε τους υπολογισμούς
+        df_trig_res = dpr.trig_leveling(df_trig)
+        
+        # 3. Αποθηκεύουμε τα αποτελέσματα στο γενικό λεξικό
+        results['trig_leveling'] = df_trig_res
+        
+        # 4. Εμφάνιση του DataFrame στο τερματικό για έλεγχο
+        print("\n📊 --- ΑΠΟΤΕΛΕΣΜΑΤΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ ---")
+        # Εμφανίζουμε τις σημαντικές στήλες για να μην γεμίσει η οθόνη
+        print(df_trig_res[['From', 'To', 'dh', 'dh_mean']])
+    return results
     
+if __name__ == "__main__":
+    # 1. Αρχικοποίηση φακέλων αν δεν υπάρχουν
+    cs.setup_project_structure()
+    
+    # 2. Ορισμός του Master Excel (π.χ. data/format.xlsx)
+    # Χρησιμοποιούμε το όνομα που έχεις ορίσει στο configuration_settings
+    master_file = cs.DATA_DIR / "format.xlsx" 
+    
+    if not master_file.exists():
+        print(f"❌ Το αρχείο {master_file} δεν βρέθηκε!")
+    else:
+        print("🚀 --- TopoApp Backend (Master Routine) Started ---")
+        final_data = run_app_logic(master_file)
+        print("\n🎉 Όλες οι διεργασίες ολοκληρώθηκαν.")

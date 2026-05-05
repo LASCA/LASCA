@@ -127,25 +127,30 @@ def tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C):
     return xm, ym
 
 def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
-    # 1. Διάβασμα των Sheets
-    df_st = pd.read_excel(excel_path, sheet_name='Station')
-    df_meas = pd.read_excel(excel_path, sheet_name='Measurements')
+    # 1. Διάβασμα των 2 ξεχωριστών Sheets
+    df_st = pd.read_excel(excel_path, sheet_name='stations_taxymetria')
+    df_meas = pd.read_excel(excel_path, sheet_name='measurements_taxymetria')
 
-    # 2. Τράβηγμα των δεδομένων της στάσης
+    # 2. Τράβηγμα των δεδομένων της στάσης (από το sheet Station)
     st = df_st.iloc[0]
 
+    # Εδώ είναι το κρίσιμο σημείο: Πρέπει να γράφεται ΑΚΡΙΒΩΣ όπως στο Excel
     st_name = st['Station_Name'] 
     
-    xs, ys, zs, i = st['XS'], st['YS'], st['ZS'], st['I']
+    xs, ys, zs, i = st['XS'], st['YS'], st['ZS'], st['Station_Height']
     xo, yo, zo, hz_o = st['XO'], st['YO'], st['ZO'], st['HZ_O']
 
     # Υπολογισμός Γωνίας Διεύθυνσης Προσανατολισμού
-    g_so, S = deutero_them(xs, ys, xo, yo)
+    g_so, S_dist = deutero_them(xs, ys, xo, yo)
     
     results = []
-    for S, row in df_meas.iterrows():
-        p_id, hz, z, sd, t = row['PointID'], row['Hz'], row['Z'], row['SD'], row['TargetHeight']
-        if sd <= 0: continue
+    # 3. Επεξεργασία των μετρήσεων (από το sheet Measurements)
+    for index, row in df_meas.iterrows():
+        p_id, hz, z, sd, t = row['Point_ID'], row['Hz'], row['Z'], row['SD'], row['TargetHeight']
+        
+        # Έλεγχος για κενές γραμμές ή μηδενικές αποστάσεις
+        if pd.isna(sd) or sd <= 0: 
+            continue
 
         z_rad = g2r(z)
         hd = sd * math.sin(z_rad)
@@ -159,10 +164,9 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
         zp = zs + i + vd - t
 
         results.append({'Σημείο': p_id, 'X': round(xp, 3), 'Y': round(yp, 3), 'Z': round(zp, 3)})
-    results = pd.DataFrame(results)
-  
-    return results , st_name, (xs, ys, zs)
-
+    
+    results_df = pd.DataFrame(results)
+    return results_df, st_name, (xs, ys, zs)
 #ODEUSI
     #metatropes
 def small_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:
@@ -226,6 +230,56 @@ class RR:
     corr_dY: Optional[float]
     X: Optional[float]
     Y: Optional[float]
+
+# Αν δεν έχεις ορίσει ήδη την κλάση TraversePoint, βάλε και αυτό:
+from dataclasses import dataclass
+@dataclass
+class TraversePoint:
+    name: str
+    angle: float = None
+    dist: float = None
+    X: float = None
+    Y: float = None
+
+def load_traverse_from_dataframe(df):
+    """
+    Διαβάζει το DataFrame της όδευσης και επιστρέφει λίστα με TraversePoint.
+    Διαβάζει τις στήλες βάσει της θέσης τους (0, 1, 2, 3, 4) για να αποφύγει 
+    προβλήματα με Ελληνικούς χαρακτήρες (Χ, Υ) ή κρυφά κενά στους τίτλους!
+    """
+    points = []
+    
+    # Παίρνουμε τα ακριβή ονόματα των στηλών βάσει της θέσης τους
+    col_name = df.columns[0]  # 1η στήλη (Στάσεις)
+    col_hz = df.columns[1]    # 2η στήλη (Γωνίες)
+    col_dist = df.columns[2]  # 3η στήλη (Αποστάσεις)
+    col_x = df.columns[3]     # 4η στήλη (Χ)
+    col_y = df.columns[4]     # 5η στήλη (Υ)
+    
+    for index, row in df.iterrows():
+        # Διαβάζουμε την τιμή του ονόματος
+        name_val = row[col_name]
+        
+        if pd.isna(name_val): 
+            continue # Προσπερνάμε τις κενές γραμμές
+            
+        # Διαβάζουμε τις υπόλοιπες τιμές
+        angle_val = row[col_hz]
+        dist_val = row[col_dist]
+        x_val = row[col_x]
+        y_val = row[col_y]
+        
+        # Μετατροπή σε float όπου υπάρχει τιμή, αλλιώς None
+        pt = TraversePoint(
+            name=str(name_val).strip() if pd.notna(name_val) else "",
+            angle=float(angle_val) if pd.notna(angle_val) else None,
+            dist=float(dist_val) if pd.notna(dist_val) else None,
+            X=float(x_val) if pd.notna(x_val) else None,
+            Y=float(y_val) if pd.notna(y_val) else None
+        )
+        points.append(pt)
+        
+    return points
 
 def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool = True, scale: str = "1:1000",
     terrain: str = "Ομαλό", klass: str = "Πρωτεύουσα") -> Tuple[List[RR], Dict]:
@@ -374,6 +428,8 @@ def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool 
     }
 
     return results, {"metrics": metrics}
+
+
 
 # OPTIONAL: CSV LOADER
 def load_traverse_from_csv(filepath: str) -> List[TraversePoint]:
@@ -551,30 +607,29 @@ def process_network_data(raw_data):
 
 #trigonometriki ypsometria
 def trig_leveling(dataframe):
-    #Διαβάζω το αρχείο excel 
-    #Ορίζω τις μεταβλητές που συμμετέχουν 
+    # Ορίζω τις μεταβλητές που συμμετέχουν (με τα ακριβή ονόματα από το Excel)
     h_station = dataframe['H_station']
     h_target = dataframe['H_target']
-    z_grad = dataframe['Z_grad']
+    z_grad = dataframe['Z[grad]']  # Διορθώθηκε εδώ βάσει της εικόνας σου!
     slope = dataframe['Slope_D']
 
-    #Μετατρέπω ζενίθια απο grad σε rad
+    # Μετατρέπω ζενίθια απο grad σε rad
     z_rad = g2r(z_grad)
-    #Υπολογίζω ΔΗ
+    
+    # Υπολογίζω ΔΗ
     dataframe['dh'] = (slope * np.cos(z_rad)) + h_station - h_target
     dataframe['dh'] = dataframe['dh'].round(3)
+    
     # Ομαδοποίηση ανά From/To και υπολογισμός μέσου όρου στο dh
-    # 1. Υπολογίζουμε το μέσο όρο (χωρίς το .round)
     mean_values = dataframe.groupby(['From', 'To'])['dh'].transform('mean')
     
-    # 2. Το μετατρέπουμε σε κείμενο (string) "κλειδώνοντας" αυστηρά 3 δεκαδικά!
-    # Το 'f"{x:.3f}"' σημαίνει "πάρε τον αριθμό x και δείξε τον με 3 (3f) δεκαδικά".
+    # Το μετατρέπουμε σε κείμενο "κλειδώνοντας" 3 δεκαδικά
     dataframe['dh_mean'] = mean_values.apply(lambda x: f"{x:.3f}")
     
-    # 3. Βρίσκουμε τις γραμμές που ΔΕΝ είναι οι τελευταίες
+    # Βρίσκουμε τις γραμμές που ΔΕΝ είναι οι τελευταίες
     duplicates = dataframe.duplicated(subset=['From', 'To'], keep='last')
     
-    # 4. Βάζουμε κενό στις διπλότυπες
+    # Βάζουμε κενό στις διπλότυπες
     dataframe.loc[duplicates, 'dh_mean'] = ""
+    
     return dataframe
-
