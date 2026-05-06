@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu } from 'lucide-react';
 
 const Adjustment = () => {
-  // State για τα δεδομένα
+  // State για τα δεδομένα - Με τα νέα πεδία από τις εικόνες σου
   const [observations, setObservations] = useState([
-    { id: 1, station: "ST1", target: "P1", hz: "120.4500", v: "100.1200", sd: "45.231", hr: "1.50", adj_hz: "120.4502", std_dev: "0.0012" },
-    { id: 2, station: "ST1", target: "P2", hz: "235.1200", v: "98.4500", sd: "12.890", hr: "1.50", adj_hz: "235.1205", std_dev: "0.0011" },
+    { id: 1, station: "8", target: "15", Period: "1", Face_I: "0.0000", Face_II: "200.0006", adj_hz: "200.0003", std_dev: "0.0012" },
+    { id: 2, station: "8", target: "20", Period: "1", Face_I: "45.0010", Face_II: "245.0012", adj_hz: "45.0011", std_dev: "0.0015" },
   ]);
 
-  // State για το αν έχει εκτελεστεί η συνόρθωση
   const [isAdjusted, setIsAdjusted] = useState(false);
 
   const handleInputChange = (id, field, value) => {
@@ -17,20 +16,18 @@ const Adjustment = () => {
 
   const addRowAt = (index) => {
     const newId = Date.now();
-    const newRow = { id: newId, station: "", target: "", hz: "", v: "", sd: "", hr: "", adj_hz: "", std_dev: "" };
+    const newRow = { id: newId, station: "", target: "", Period: "", Face_I: "", Face_II: "", adj_hz: "", std_dev: "" };
     const updated = [...observations];
     updated.splice(index + 1, 0, newRow);
     setObservations(updated);
   };
 
-  const runAdjustment = () => {
-    setIsAdjusted(true);
-  };
+  const runAdjustment = () => setIsAdjusted(true);
 
   return (
     <div className="flex flex-col gap-6 p-4">
       
-      {/* ACTION BAR */}
+      {/* ACTION BAR - Μόνο το κουμπί εσωτερικά πλέον */}
       <div className="flex justify-end mb-2">
         <button 
           onClick={runAdjustment}
@@ -47,7 +44,7 @@ const Adjustment = () => {
 
       <div className="grid grid-cols-12 gap-8">
         
-        {/* ΠΙΝΑΚΑΣ - ΑΡΙΣΤΕΡΑ (8/12) */}
+        {/* ΠΙΝΑΚΑΣ */}
         <div className="col-span-12 lg:col-span-8 flex flex-col gap-0">
           <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl overflow-hidden shadow-2xl">
             <table className="w-full text-left border-collapse">
@@ -56,12 +53,11 @@ const Adjustment = () => {
                   <th className="p-5 w-12 text-center font-bold text-slate-600">#</th>
                   <th className="p-4 font-bold text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.3)]">From</th>
                   <th className="p-4 font-bold text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.3)]">To</th>
-                  <th className="p-4 font-bold font-mono text-fuchsia-500 drop-shadow-[0_0_5px_rgba(217,70,239,0.3)]">Hz</th>
-                  <th className="p-4 font-bold font-mono text-slate-400">V</th>
-                  <th className="p-4 font-bold font-mono text-slate-400">Slope</th>
-                  <th className="p-4 font-bold font-mono text-slate-400">Height</th>
+                  <th className="p-4 font-bold font-mono text-fuchsia-500 drop-shadow-[0_0_5px_rgba(217,70,239,0.3)]">Period</th>
+                  <th className="p-4 font-bold font-mono text-slate-400">Face I</th>
+                  <th className="p-4 font-bold font-mono text-slate-400">Face II</th>
 
-                  {/* ΜΕΤΑΦΟΡΑ ΣΤΟ ΤΕΛΟΣ ΚΑΙ ΠΡΑΣΙΝΟ ΧΡΩΜΑ */}
+                  {/* ΠΡΑΣΙΝΑ ΑΠΟΤΕΛΕΣΜΑΤΑ ΣΤΟ ΤΕΛΟΣ */}
                   {isAdjusted && (
                     <>
                       <th className="p-4 font-bold font-mono text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] animate-in fade-in zoom-in duration-500">
@@ -72,7 +68,6 @@ const Adjustment = () => {
                       </th>
                     </>
                   )}
-
                   <th className="p-5 w-12"></th>
                 </tr>
               </thead>
@@ -88,19 +83,16 @@ const Adjustment = () => {
                         <input className="w-full bg-transparent p-2 text-sm outline-none text-slate-300 focus:text-blue-400" value={obs.target} onChange={(e) => handleInputChange(obs.id, 'target', e.target.value)} />
                       </td>
                       <td className="p-2">
-                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.hz} onChange={(e) => handleInputChange(obs.id, 'hz', e.target.value)} />
+                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.Period} onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} />
                       </td>
                       <td className="p-2">
-                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.v} onChange={(e) => handleInputChange(obs.id, 'v', e.target.value)} />
+                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.Face_I} onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)} />
                       </td>
                       <td className="p-2">
-                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.sd} onChange={(e) => handleInputChange(obs.id, 'sd', e.target.value)} />
-                      </td>
-                      <td className="p-2">
-                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.hr} onChange={(e) => handleInputChange(obs.id, 'hr', e.target.value)} />
+                        <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.Face_II} onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} />
                       </td>
 
-                      {/* ΑΠΟΤΕΛΕΣΜΑΤΑ ΠΡΑΣΙΝΑ ΠΡΙΝ ΤΟ TRASH ICON */}
+                      {/* ΤΑ ΑΠΟΤΕΛΕΣΜΑΤΑ ΕΔΩ */}
                       {isAdjusted && (
                         <>
                           <td className="p-2 animate-in slide-in-from-left-2 duration-500">
@@ -124,11 +116,8 @@ const Adjustment = () => {
                     </tr>
                     
                     <tr className="h-0 p-0">
-                      <td colSpan={isAdjusted ? "11" : "9"} className="p-0 h-0 relative">
-                        <button 
-                          onClick={() => addRowAt(index)}
-                          className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 shadow-2xl scale-75 hover:scale-100"
-                        >
+                      <td colSpan={isAdjusted ? "9" : "7"} className="p-0 h-0 relative">
+                        <button onClick={() => addRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 shadow-2xl scale-75 hover:scale-100">
                           <PlusCircle size={16} />
                         </button>
                       </td>
@@ -138,16 +127,16 @@ const Adjustment = () => {
               </tbody>
             </table>
             
-            <button onClick={() => addRowAt(observations.length - 1)} className="w-full p-5 text-[10px] text-slate-500 hover:text-blue-400 hover:bg-blue-600/[0.02] transition-all flex justify-center items-center gap-3 font-black uppercase tracking-[0.3em] border-t border-slate-800/60">
+            <button onClick={() => addRowAt(observations.length - 1)} className="w-full p-5 text-[10px] text-slate-500 hover:text-blue-400 transition-all flex justify-center items-center gap-3 font-black uppercase tracking-[0.3em] border-t border-slate-800/60">
               <PlusCircle size={16} /> ΠΡΟΣΘΉΚΗ ΝΈΑΣ ΕΓΓΡΑΦΉΣ
             </button>
           </div>
         </div>
 
-        {/* ΓΡΑΦΗΜΑ - ΔΕΞΙΑ (4/12) */}
+        {/* ΧΑΡΤΗΣ */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 h-full">
           <div className="flex-1 bg-slate-900/40 border border-slate-800/60 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col min-h-[500px]">
-            <div className="p-6 border-b border-slate-800/60 flex justify-between items-center bg-slate-950/20">
+            <div className="p-6 border-b border-slate-800/60 bg-slate-950/20">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-3">
                 <Activity size={14} className="text-blue-500" /> ΠΡΟΕΠΙΣΚΌΠΗΣΗ ΔΙΚΤΎΟΥ
               </span>
@@ -163,7 +152,6 @@ const Adjustment = () => {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
