@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu } from 'lucide-react';
 
-const Adjustment = () => {
-  // State για τα δεδομένα - Με τα νέα πεδία από τις εικόνες σου
-  const [observations, setObservations] = useState([
-    { id: 1, station: "8", target: "15", Period: "1", Face_I: "0.0000", Face_II: "200.0006", adj_hz: "200.0003", std_dev: "0.0012" },
-    { id: 2, station: "8", target: "20", Period: "1", Face_I: "45.0010", Face_II: "245.0012", adj_hz: "45.0011", std_dev: "0.0015" },
-  ]);
-
+// Δεχόμαστε τα δεδομένα από το App.jsx μέσω props
+const Adjustment = ({ observations, setObservations }) => {
+  
   const [isAdjusted, setIsAdjusted] = useState(false);
 
   const handleInputChange = (id, field, value) => {
@@ -16,18 +12,28 @@ const Adjustment = () => {
 
   const addRowAt = (index) => {
     const newId = Date.now();
-    const newRow = { id: newId, station: "", target: "", Period: "", Face_I: "", Face_II: "", adj_hz: "", std_dev: "" };
+    const newRow = { id: newId, station: "", target: "", Period: "1", Face_I: "", Face_II: "", adj_hz: "", std_dev: "" };
     const updated = [...observations];
     updated.splice(index + 1, 0, newRow);
     setObservations(updated);
   };
 
-  const runAdjustment = () => setIsAdjusted(true);
+  // Εδώ μελλοντικά θα μπει το axios.post για το backend
+  const runAdjustment = () => {
+    setIsAdjusted(true);
+    // Παράδειγμα: Αν θέλουμε να γεμίσουμε "ψεύτικα" αποτελέσματα για τεστ
+    const computedData = observations.map(obs => ({
+        ...obs,
+        adj_hz: (parseFloat(obs.Face_I || 0) + parseFloat(obs.Face_II || 200) - 200) / 1, // Απλή αναγωγή για το εφέ
+        std_dev: "0.0015"
+    }));
+    setObservations(computedData);
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4">
       
-      {/* ACTION BAR - Μόνο το κουμπί εσωτερικά πλέον */}
+      {/* ACTION BAR */}
       <div className="flex justify-end mb-2">
         <button 
           onClick={runAdjustment}
@@ -45,7 +51,7 @@ const Adjustment = () => {
       <div className="grid grid-cols-12 gap-8">
         
         {/* ΠΙΝΑΚΑΣ */}
-        <div className="col-span-12 lg:col-span-8 flex flex-col gap-0">
+        <div className="col-span-12 lg:col-span-8 flex flex-col gap-0 text-slate-200">
           <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl overflow-hidden shadow-2xl">
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-950/80 text-[13px] tracking-wide border-b border-slate-800/60">
@@ -57,7 +63,6 @@ const Adjustment = () => {
                   <th className="p-4 font-bold font-mono text-slate-400">Face I</th>
                   <th className="p-4 font-bold font-mono text-slate-400">Face II</th>
 
-                  {/* ΠΡΑΣΙΝΑ ΑΠΟΤΕΛΕΣΜΑΤΑ ΣΤΟ ΤΕΛΟΣ */}
                   {isAdjusted && (
                     <>
                       <th className="p-4 font-bold font-mono text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] animate-in fade-in zoom-in duration-500">
@@ -92,16 +97,15 @@ const Adjustment = () => {
                         <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400" value={obs.Face_II} onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} />
                       </td>
 
-                      {/* ΤΑ ΑΠΟΤΕΛΕΣΜΑΤΑ ΕΔΩ */}
                       {isAdjusted && (
                         <>
                           <td className="p-2 animate-in slide-in-from-left-2 duration-500">
-                            <div className="w-full p-2 text-sm font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                            <div className="w-full p-2 text-sm font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
                               {obs.adj_hz}
                             </div>
                           </td>
                           <td className="p-2 animate-in slide-in-from-left-4 duration-700">
-                            <div className="w-full p-2 text-[11px] font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                            <div className="w-full p-2 text-[11px] font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
                               {obs.std_dev}
                             </div>
                           </td>
@@ -127,13 +131,20 @@ const Adjustment = () => {
               </tbody>
             </table>
             
+            {/* Αν ο πίνακας είναι κενός δείξε ένα μήνυμα */}
+            {observations.length === 0 && (
+              <div className="p-20 text-center text-slate-600">
+                <p className="uppercase tracking-[0.2em] text-xs font-bold">Δεν βρέθηκαν δεδομένα. Κάντε Import ή προσθέστε χειροκίνητα.</p>
+              </div>
+            )}
+
             <button onClick={() => addRowAt(observations.length - 1)} className="w-full p-5 text-[10px] text-slate-500 hover:text-blue-400 transition-all flex justify-center items-center gap-3 font-black uppercase tracking-[0.3em] border-t border-slate-800/60">
               <PlusCircle size={16} /> ΠΡΟΣΘΉΚΗ ΝΈΑΣ ΕΓΓΡΑΦΉΣ
             </button>
           </div>
         </div>
 
-        {/* ΧΑΡΤΗΣ */}
+        {/* ΧΑΡΤΗΣ / ΠΡΟΕΠΙΣΚΟΠΗΣΗ */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 h-full">
           <div className="flex-1 bg-slate-900/40 border border-slate-800/60 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col min-h-[500px]">
             <div className="p-6 border-b border-slate-800/60 bg-slate-950/20">
