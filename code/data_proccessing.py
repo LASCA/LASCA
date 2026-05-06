@@ -582,14 +582,14 @@ def process_network_data(raw_data):
         
         # Υπολογισμός (Face I + Face II) / 2
         for _, row in group.iterrows():
-            l2_corr = row['Face_II'] - 200.0 if row['Face_II'] >= 200.0 else row['Face_II'] + 200.0
-            l_avg = (row['Face_I'] + l2_corr) / 2.0
+            l2_corr = row['Face II'] - 200.0 if row['Face II'] >= 200.0 else row['Face II'] + 200.0
+            l_avg = (row['Face I'] + l2_corr) / 2.0
             observations.append({
                 'to': str(row['To']), 
                 'per': str(row['Period']), 
                 'val': l_avg, 
-                'f1': row['Face_I'], 
-                'f2': row['Face_II']
+                'f1': row['Face I'], 
+                'f2': row['Face II']
             })
         
         # Κλήση του πυρήνα συνόρθωσης

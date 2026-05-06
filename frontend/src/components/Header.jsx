@@ -6,7 +6,7 @@ const Header = ({ activeTab }) => {
       <div>
         <h2 className="text-2xl font-bold text-white capitalize tracking-tight">
           {activeTab === 'dashboard' ? 'Επισκόπηση' : 
-           activeTab === 'adjustment' ? 'Συνόρθωση Δικτύου' : activeTab}
+           activeTab === 'adjustment' ? 'Συνόρθωση Σταθμού' : activeTab}
         </h2>
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">
           Project: Survey_2024_01

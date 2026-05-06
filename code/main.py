@@ -8,20 +8,20 @@ def run_app_logic(excel_path):
     xls = pd.ExcelFile(excel_path)
     results = {}
 
-    # 1. Module: Συνόρθωση Σταθμού
-    if 'synorthosi_stathmou' in xls.sheet_names:
-        print("processing: Adjustment...")
-        df_adj = pd.read_excel(xls, 'synorthosi_stathmou')
-        df_adj[['From', 'To', 'Period']] = df_adj[['From', 'To', 'Period']].ffill()
+    # # 1. Module: Συνόρθωση Σταθμού
+    # if 'synorthosi_stathmou' in xls.sheet_names:
+    #     print("processing: Adjustment...")
+    #     df_adj = pd.read_excel(xls, 'synorthosi_stathmou')
+    #     df_adj[['From', 'To', 'Period']] = df_adj[['From', 'To', 'Period']].ffill()
         
-        # Εκτέλεση υπολογισμών
-        adj_df, adj_meta = dpr.process_network_data(df_adj)
-        results['adjustment'] = adj_df
+    #     # Εκτέλεση υπολογισμών
+    #     adj_df, adj_meta = dpr.process_network_data(df_adj)
+    #     results['adjustment'] = adj_df
         
-        # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
-        print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
-        vis.plot_std_dev_lollipop_df(adj_df)
-        plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
+    #     # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
+    #     print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
+    #     vis.plot_std_dev_lollipop_df(adj_df)
+    #     plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
 
     # 2. Module: Όδευση
     if 'traverse' in xls.sheet_names:
@@ -59,7 +59,7 @@ def run_app_logic(excel_path):
 
         # 4. Εμφάνιση Γραφήματος Όδευσης
         print("📊 Εμφάνιση σχεδίου όδευσης...")
-        vis.traverse_plot(trav_res)
+        vis.traverse_plot2(trav_res)
 
 #3. Module: Ταχυμετρία
     # Βάζουμε ένα print για να βλέπεις ποια φύλλα διαβάζει πραγματικά το Python
