@@ -1,158 +1,91 @@
-import React, { useState } from 'react';
-import { Trash2, PlusCircle, Map, Activity, Calculator } from 'lucide-react';
+import React from 'react';
+import { 
+  Table as TableIcon, 
+  Map as MapIcon, 
+  Info,
+  Database
+} from 'lucide-react';
 
-const Traverse = () => {
-  const [data, setData] = useState([
-    { id: 1, point: "Σ7", hz: "", sd: "", x: "412384.2", y: "4491788", type: "fixed" },
-    { id: 2, point: "Σ6", hz: "330.9927", sd: "42.198", x: "412358.3", y: "4491843", type: "fixed" },
-    { id: 3, point: "S1", hz: "137.9477", sd: "26.938", x: "", y: "", type: "calculated" },
-    { id: 4, point: "S2", hz: "144.3772", sd: "38.76", x: "", y: "", type: "calculated" },
-  ]);
-
-  const [isCalculated, setIsCalculated] = useState(false);
-
-  const handleInputChange = (id, field, value) => {
-    setData(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row));
-  };
-
-  const addRow = () => {
-    const newId = Date.now();
-    setData([...data, { id: newId, point: "", hz: "", sd: "", x: "", y: "", type: "calculated" }]);
-  };
-
+const Traverse = ({ data = [], metrics = {} }) => {
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6">
       
-      {/* ACTION BAR */}
-      <div className="flex justify-end mb-2">
-        <button 
-          onClick={() => setIsCalculated(true)}
-          className={`flex items-center gap-2 px-6 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-            isCalculated 
-            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
-            : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20'
-          }`}
-        >
-          <Calculator size={16} />
-          {isCalculated ? "ΕΠΙΛΥΣΗ ΟΔΕΥΣΗΣ ΟΛΟΚΛΗΡΩΘΗΚΕ" : "ΕΠΙΛΥΣΗ ΟΔΕΥΣΗΣ"}
-        </button>
+      {/* METRICS DASHBOARD - Στο ίδιο στυλ με την κεφαλίδα της συνορθώσης */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard label="Γωνιακό Σφάλμα (fβ)" value={metrics.fb || "---"} unit="g" color="text-amber-500" />
+        <MetricCard label="Γραμμικό Σφάλμα (W)" value={metrics.w || "---"} unit="m" color="text-emerald-500" />
+        <MetricCard label="Κλασματική Ακρίβεια" value={metrics.precision ? `1:${metrics.precision}` : "---"} color="text-cyan-500" />
+        <MetricCard label="Μήκος Όδευσης" value={metrics.totalLength || "---"} unit="m" color="text-slate-300" />
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
+      <div className="flex flex-1 gap-6 min-h-0">
         
-        {/* ΠΙΝΑΚΑΣ ΟΔΕΥΣΗΣ (8/12) */}
-        <div className="col-span-12 lg:col-span-8">
-          <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl overflow-hidden shadow-2xl">
+        {/* ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ - Με την οριοθέτηση και τα ονόματα στηλών της συνορθώσης */}
+        <div className="w-[48%] flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 rounded-lg">
+              <Database size={18} className="text-amber-500" />
+            </div>
+            <span className="font-bold text-sm tracking-widest text-slate-200 uppercase">Πρωτογενή Δεδομένα Όδευσης</span>
+          </div>
+
+          <div className="flex-1 overflow-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-950/80 text-[12px] tracking-wider border-b border-slate-800/60 text-slate-400 uppercase">
-                <tr>
-                  <th className="p-4 font-bold text-cyan-400">Point / Station</th>
-                  <th className="p-4 font-bold text-fuchsia-500">Hz [grad]</th>
-                  <th className="p-4 font-bold text-slate-300">Slope_D [m]</th>
-                  <th className="p-4 font-bold text-emerald-400">X [m]</th>
-                  <th className="p-4 font-bold text-emerald-400">Y [m]</th>
-                  <th className="p-4 w-12"></th>
+              {/* HEADER ΣΤΗΛΩΝ - Ίδιο στυλ με τη συνορθώση */}
+              <thead className="bg-[#0f172a] sticky top-0 z-20">
+                <tr className="border-b border-slate-800/50">
+                  <th className="p-4 text-xs font-bold text-amber-500 uppercase tracking-tighter">Station</th>
+                  <th className="p-4 text-xs font-bold text-amber-500 uppercase tracking-tighter text-center">Hz [grad]</th>
+                  <th className="p-4 text-xs font-bold text-amber-500 uppercase tracking-tighter text-center">Slope_D [m]</th>
+                  <th className="p-4 text-xs font-bold text-amber-500 uppercase tracking-tighter text-right">X [m]</th>
+                  <th className="p-4 text-xs font-bold text-amber-500 uppercase tracking-tighter text-right">Y [m]</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/30">
-                {data.map((row, index) => (
-                  <tr key={row.id} className="group hover:bg-blue-600/[0.03] transition-all">
-                    {/* Point Name */}
-                    <td className="p-2">
-                      <input 
-                        className="w-full bg-transparent p-2 text-sm font-bold text-cyan-400 outline-none focus:bg-slate-800/50 rounded-lg transition-all"
-                        value={row.point}
-                        onChange={(e) => handleInputChange(row.id, 'point', e.target.value)}
-                      />
-                    </td>
-                    {/* Horizontal Angle */}
-                    <td className="p-2">
-                      <input 
-                        className="w-full bg-transparent p-2 text-sm font-mono text-fuchsia-400 outline-none focus:bg-slate-800/50 rounded-lg transition-all"
-                        value={row.hz}
-                        placeholder="0.0000"
-                        onChange={(e) => handleInputChange(row.id, 'hz', e.target.value)}
-                      />
-                    </td>
-                    {/* Distance */}
-                    <td className="p-2">
-                      <input 
-                        className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded-lg transition-all"
-                        value={row.sd}
-                        placeholder="0.000"
-                        onChange={(e) => handleInputChange(row.id, 'sd', e.target.value)}
-                      />
-                    </td>
-                    {/* X Coordinate */}
-                    <td className="p-2">
-                      <input 
-                        className={`w-full p-2 text-sm font-mono outline-none rounded-lg transition-all ${
-                          row.type === 'fixed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-transparent text-slate-400'
-                        }`}
-                        value={row.x}
-                        onChange={(e) => handleInputChange(row.id, 'x', e.target.value)}
-                      />
-                    </td>
-                    {/* Y Coordinate */}
-                    <td className="p-2">
-                      <input 
-                        className={`w-full p-2 text-sm font-mono outline-none rounded-lg transition-all ${
-                          row.type === 'fixed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-transparent text-slate-400'
-                        }`}
-                        value={row.y}
-                        onChange={(e) => handleInputChange(row.id, 'y', e.target.value)}
-                      />
-                    </td>
-                    {/* Delete Icon */}
-                    <td className="p-4">
-                      <button 
-                        onClick={() => setData(data.filter(d => d.id !== row.id))}
-                        className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                {data.length > 0 ? (
+                  data.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/20 transition-all group">
+                      <td className="p-4 font-bold text-slate-300 flex items-center gap-2">
+                        {row.name?.startsWith('Σ') && <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />}
+                        {row.name || "-"}
+                      </td>
+                      <td className="p-4 font-mono text-amber-400/80 text-center">{row.hz || "-"}</td>
+                      <td className="p-4 font-mono text-slate-400 text-center">{row.sd || "-"}</td>
+                      <td className="p-4 font-mono text-cyan-400/70 text-right tabular-nums">{row.x || "-"}</td>
+                      <td className="p-4 font-mono text-cyan-400/70 text-right tabular-nums">{row.y || "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="p-20 text-center">
+                      <Info size={40} className="mx-auto mb-4 text-slate-700" />
+                      <p className="text-slate-500 text-xs font-medium uppercase tracking-[0.2em]">Αναμονή για εισαγωγή Excel...</p>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
-            
-            <button 
-              onClick={addRow}
-              className="w-full p-5 text-[10px] text-slate-500 hover:text-blue-400 hover:bg-blue-600/[0.02] transition-all flex justify-center items-center gap-3 font-black uppercase tracking-[0.3em] border-t border-slate-800/60"
-            >
-              <PlusCircle size={16} /> ΠΡΟΣΘΉΚΗ ΝΈΑΣ ΣΤΆΣΗΣ / ΣΗΜΕΊΟΥ
-            </button>
           </div>
         </div>
 
-        {/* ΔΕΞΙΟ PANEL - ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΟΔΕΥΣΗΣ (4/12) */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-          <div className="flex-1 bg-slate-900/40 border border-slate-800/60 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col min-h-[500px]">
-            <div className="p-6 border-b border-slate-800/60 flex justify-between items-center bg-slate-950/20">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-3">
-                <Map size={14} className="text-blue-500" /> ΠΡΟΕΠΙΣΚΌΠΗΣΗ ΌΔΕΥΣΗΣ
-              </span>
-              <Activity size={14} className="text-emerald-500 animate-pulse" />
-            </div>
-            
-            <div className="flex-1 flex items-center justify-center relative">
-              {/* Background Grid */}
-              <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:32px_32px]"></div>
-              
-              <div className="text-center z-10">
-                <div className="relative mb-6 inline-block">
-                   <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full"></div>
-                   <Map className="text-slate-800 relative" size={80} strokeWidth={0.5} />
-                </div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                  Traverse Geometry
-                </p>
-                <p className="text-[9px] text-slate-700 mt-2 uppercase tracking-widest px-10">
-                  Εδώ θα απεικονίζεται η πολυγωνική όδευση σε πραγματικό χρόνο
-                </p>
+        {/* ΠΕΡΙΟΧΗ ΔΙΑΓΡΑΜΜΑΤΟΣ */}
+        <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative group">
+          <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-pink-500/10 rounded-lg">
+                <MapIcon size={18} className="text-pink-500" />
               </div>
+              <span className="font-bold text-sm tracking-widest text-slate-200 uppercase">Οπτικοποίηση Όδευσης</span>
             </div>
+          </div>
+
+          <div className="flex-1 bg-[#030712] m-6 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
+             {/* Εδώ θα εμφανίζεται το διάγραμμα */}
+             <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+             <div className="text-center z-10">
+                <MapIcon size={48} className="mx-auto mb-4 text-slate-800 group-hover:text-pink-500/50 transition-all duration-700" />
+                <p className="text-[10px] tracking-[0.4em] text-slate-600 font-black uppercase">Visual Engine Ready</p>
+             </div>
           </div>
         </div>
 
@@ -160,5 +93,19 @@ const Traverse = () => {
     </div>
   );
 };
+
+// Helper component για τα Metrics
+const MetricCard = ({ label, value, unit, color }) => (
+  <div className="bg-[#0b1120] border border-slate-800/50 p-5 rounded-2xl shadow-lg hover:border-slate-700 transition-all group">
+    <div className="flex items-center gap-2 mb-2">
+      <div className={`w-1 h-3 rounded-full ${color.replace('text', 'bg')} opacity-50`} />
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+    </div>
+    <div className="flex items-baseline gap-1">
+      <span className={`text-2xl font-mono font-black tracking-tighter ${color} tabular-nums`}>{value}</span>
+      {unit && <span className="text-xs font-bold text-slate-600 uppercase">{unit}</span>}
+    </div>
+  </div>
+);
 
 export default Traverse;
