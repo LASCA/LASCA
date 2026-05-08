@@ -8,7 +8,7 @@ import {
   Activity
 } from 'lucide-react';
 
-const Dashboard = ({ setObservations }) => {
+const Dashboard = ({ setObservations, setTraverseData }) => {
 
   // ΣΥΝΑΡΤΗΣΗ ΓΙΑ ΤΟ IMPORT ΤΟΥ EXCEL
   const handleFileUpload = (e) => {
@@ -28,29 +28,44 @@ const Dashboard = ({ setObservations }) => {
       try {
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
 
-        if (data.length === 0) {
-          toast.error('Το αρχείο φαίνεται να είναι κενό.', { id: loadingToast });
-          return;
+        // --- 1. ΔΙΑΧΕΙΡΙΣΗ ΣΥΝΟΡΘΩΣΗΣ (Πρώτο Φύλλο) ---
+        const wsAdjustment = wb.Sheets[wb.SheetNames[0]];
+        const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
+        
+        if (dataAdj.length > 0) {
+          const formattedAdj = dataAdj.map((row, index) => ({
+            id: Date.now() + index,
+            station: row['Stations'] || row['Station'] || row['From'] || "",
+            target: row['Target'] || row['To'] || "",
+            Period: row['Period'] || "1",
+            Face_I: row['Hz [grad]'] || row['Face I'] || "0.0000",
+            Face_II: row['Face II'] || "200.0000",
+            adj_hz: "",
+            std_dev: ""
+          }));
+          setObservations(formattedAdj);
         }
 
-        // Φιλτράρισμα και μορφοποίηση των δεδομένων
-        const formatted = data.map((row, index) => ({
-          id: Date.now() + index,
-          station: row['Stations'] || row['Station'] || row['From'] || "",
-          target: row['Target'] || row['To'] || "",
-          Period: row['Period'] || "1",
-          Face_I: row['Hz [grad]'] || row['Face I'] || "0.0000",
-          Face_II: row['Face II'] || "200.0000",
-          adj_hz: "",
-          std_dev: ""
-        }));
+        // --- 2. ΔΙΑΧΕΙΡΙΣΗ ΟΔΕΥΣΗΣ (Φύλλο "traverse") ---
+        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
+        if (traverseSheetName) {
+          const wsTraverse = wb.Sheets[traverseSheetName];
+          const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-        setObservations(formatted);
-        toast.success(`Επιτυχής εισαγωγή ${formatted.length} εγγραφών!`, { id: loadingToast });
+          // Mapping βάσει της δομής του πίνακα σου
+          const formattedTraverse = dataTraverse.map(row => ({
+            name: row['Stations'] || row['Station'] || "",
+            hz: row['Hz [grad]'] || "",
+            sd: row['Slope_D [m]'] || "",
+            x: row['X [m]'] || "",
+            y: row['Y [m]'] || ""
+          }));
+
+          setTraverseData(formattedTraverse);
+        }
+
+        toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
       } catch (err) {
         console.error(err);
         toast.error('Σφάλμα κατά την επεξεργασία του αρχείου.', { id: loadingToast });
@@ -58,8 +73,7 @@ const Dashboard = ({ setObservations }) => {
     };
 
     reader.readAsBinaryString(file);
-    // Reset το input για να μπορεί να ξαναφορτώσει το ίδιο αρχείο αν χρειαστεί
-    e.target.value = null;
+    e.target.value = null; // Reset για επόμενη χρήση
   };
 
   return (
