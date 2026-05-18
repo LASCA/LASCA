@@ -25,7 +25,31 @@ const Traverse = ({ data = [], metrics = {} }) => {
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
-          select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 0.8em; }
+
+          /* Custom Select Styling */
+         select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.4rem center;
+            background-size: 0.7em;
+            /* Force dark theme for the dropdown popup on some browsers */
+            color-scheme: dark; 
+          }
+
+          /* Βελτίωση της εμφάνισης των επιλογών */
+          select option {
+            background-color: #0b1120; /* Ίδιο με το card background σου */
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            padding: 12px;
+          }
+
+          /* Hover effect στο select box */
+          select:hover {
+            border-color: rgba(251, 191, 36, 0.4);
+            background-color: rgba(15, 23, 42, 0.8);
+          }
         `}
       </style>
 
@@ -46,32 +70,41 @@ const Traverse = ({ data = [], metrics = {} }) => {
                 </div>
 
                 {/* --- ΝΕΕΣ ΕΠΙΛΟΓΕΣ ΠΑΡΑΜΕΤΡΩΝ --- */}
-                <div className="flex items-center gap-6 border-l border-slate-800 pl-8">
-                   <div className="flex flex-col gap-1">
-                     <label className="text-[7px] font-black text-slate-500 tracking-widest">Τάξη</label>
-                     <select className="bg-slate-900/50 border border-slate-800 text-[10px] text-slate-300 rounded px-2 pr-6 py-1 outline-none focus:border-amber-500/30 transition-all cursor-pointer font-mono">
-                       <option>Ι</option>
-                       <option>ΙΙ</option>
-                     </select>
-                   </div>
+                <div className="flex items-center gap-5 border-l border-slate-800/60 pl-6">
+                  {/* Τάξη */}
+                  <div className="flex flex-col gap-1 group">
+                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
+                      Τάξη
+                    </label>
+                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
+                      <option value="1">Ι</option>
+                      <option value="2">ΙΙ</option>
+                    </select>
+                  </div>
 
-                   <div className="flex flex-col gap-1">
-                     <label className="text-[7px] font-black text-slate-500 tracking-widest">Έδαφος</label>
-                     <select className="bg-slate-900/50 border border-slate-800 text-[10px] text-slate-300 rounded px-2 pr-6 py-1 outline-none focus:border-amber-500/30 transition-all cursor-pointer font-mono">
-                       <option>Ομαλό</option>
-                       <option>Κεκλιμένο</option>
-                     </select>
-                   </div>
+                  {/* Έδαφος */}
+                  <div className="flex flex-col gap-1 group">
+                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
+                      Έδαφος
+                    </label>
+                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
+                      <option>Ομαλό</option>
+                      <option>Κεκλιμένο</option>
+                    </select>
+                  </div>
 
-                   <div className="flex flex-col gap-1">
-                     <label className="text-[7px] font-black text-slate-500 tracking-widest">Κλίμακα</label>
-                     <select className="bg-slate-900/50 border border-slate-800 text-[10px] text-slate-300 rounded px-2 pr-6 py-1 outline-none focus:border-amber-500/30 transition-all cursor-pointer font-mono">
-                       <option>1:200</option>
-                       <option>1:500</option>
-                       <option>1:1000</option>
-                       <option>1:2000</option>
-                     </select>
-                   </div>
+                  {/* Κλίμακα */}
+                  <div className="flex flex-col gap-1 group">
+                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
+                      Κλίμακα
+                    </label>
+                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
+                      <option>1:200</option>
+                      <option>1:500</option>
+                      <option>1:1000</option>
+                      <option>1:2000</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -84,11 +117,11 @@ const Traverse = ({ data = [], metrics = {} }) => {
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                   <tr className="border-b border-slate-800/50">
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest uppercase">Station</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center uppercase">Hz [grad]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center uppercase">Slope_D [m]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right uppercase">X [m]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right uppercase">Y [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest">Station</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope_D [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">X [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">Y [m]</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">
@@ -122,7 +155,7 @@ const Traverse = ({ data = [], metrics = {} }) => {
           <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
               <Activity size={16} className="text-cyan-500" />
-              <span className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">Γεωδαιτικοί Έλεγχοι & Σφάλματα</span>
+              <span className="text-[10px] font-black text-slate-400 tracking-[0.2em]">Γεωδαιτικοί Έλεγχοι & Σφάλματα</span>
             </div>
             
             <div className="flex flex-row gap-4 items-stretch">
@@ -152,11 +185,11 @@ const Traverse = ({ data = [], metrics = {} }) => {
             <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
                <div className="grid grid-cols-2 gap-6">
                  <div className="flex flex-col gap-1">
-                   <span className="text-[8px] text-slate-500 font-black tracking-tighter uppercase">Μέγιστο Γωνιακό (Wβ Max)</span>
+                   <span className="text-[8px] text-slate-500 font-black tracking-tighter">Μέγιστο Γωνιακό (Wβ Max)</span>
                    <span className="text-xs font-mono font-bold text-amber-500">{metrics.Wb_max || "---"} grad</span>
                  </div>
                  <div className="flex flex-col gap-1 border-l border-slate-800/50 px-6">
-                   <span className="text-[8px] text-slate-500 font-black tracking-tighter uppercase">Μέγιστο Γραμμικό (δs Max)</span>
+                   <span className="text-[8px] text-slate-500 font-black tracking-tighter">Μέγιστο Γραμμικό (δs Max)</span>
                    <span className="text-xs font-mono font-bold text-emerald-500">{metrics.ds_max || "---"} m</span>
                  </div>
                </div>
@@ -196,7 +229,7 @@ const CompactStat = ({ label, value, unit, icon, color }) => (
   <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
     <div className="text-slate-500">{icon}</div>
     <div className="flex flex-col">
-      <span className="text-[8px] font-black text-slate-500 tracking-widest uppercase">{label}</span>
+      <span className="text-[8px] font-black text-slate-500 tracking-widest">{label}</span>
       <span className={`text-sm font-mono font-bold ${color}`}>{value || "0"}{unit}</span>
     </div>
   </div>
@@ -204,33 +237,33 @@ const CompactStat = ({ label, value, unit, icon, color }) => (
 
 const DetailedAngleGroup = ({ title, target, actual, error, wbi, labels }) => (
   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1 uppercase">{title}</span>
+    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1">{title}</span>
     <div className="grid grid-cols-2 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{target || "---"}</span></div>
-      <div className="flex flex-col border-l border-slate-800/50"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{actual || "---"}</span></div>
+      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{target || "---"}</span></div>
+      <div className="flex flex-col border-l border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{actual || "---"}</span></div>
     </div>
     <div className="grid grid-cols-2 gap-2 text-center pt-1">
-      <div className="flex justify-between items-center px-4"><span className="text-[7px] text-amber-500/70 font-black uppercase">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{error || "---"}</span></div>
-      <div className="flex justify-between items-center px-4 border-l border-slate-800/50"><span className="text-[7px] text-amber-500/70 font-black uppercase">{labels[3]}</span><span className="text-[10px] font-mono text-amber-500/90">{wbi || "---"}</span></div>
+      <div className="flex justify-between items-center px-4"><span className="text-[7px] text-amber-500/70 font-black">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{error || "---"}</span></div>
+      <div className="flex justify-between items-center px-4 border-l border-slate-800/50"><span className="text-[7px] text-amber-500/70 font-black">{labels[3]}</span><span className="text-[10px] font-mono text-amber-500/90">{wbi || "---"}</span></div>
     </div>
   </div>
 );
 
 const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual, yError, ds, labels }) => (
   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 flex flex-col gap-2 h-full">
-    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1 uppercase">{title}</span>
+    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1">{title}</span>
     <div className="grid grid-cols-3 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{xTarget || "---"}</span></div>
-      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{xActual || "---"}</span></div>
-      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black uppercase">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{xError || "---"}</span></div>
+      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{xTarget || "---"}</span></div>
+      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{xActual || "---"}</span></div>
+      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{xError || "---"}</span></div>
     </div>
     <div className="grid grid-cols-3 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[3]}</span><span className="text-[10px] font-mono text-slate-300">{yTarget || "---"}</span></div>
-      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black uppercase">{labels[4]}</span><span className="text-[10px] font-mono text-slate-300">{yActual || "---"}</span></div>
-      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black uppercase">{labels[5]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{yError || "---"}</span></div>
+      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black ">{labels[3]}</span><span className="text-[10px] font-mono text-slate-300">{yTarget || "---"}</span></div>
+      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[4]}</span><span className="text-[10px] font-mono text-slate-300">{yActual || "---"}</span></div>
+      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black">{labels[5]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{yError || "---"}</span></div>
     </div>
     <div className="flex justify-between items-center px-4 mt-auto">
-      <span className="text-[8px] font-black text-slate-500 tracking-widest uppercase">{labels[6]}</span>
+      <span className="text-[8px] font-black text-slate-500 tracking-widest">{labels[6]}</span>
       <span className="text-[11px] font-mono font-black text-emerald-400">{ds || "---"} m</span>
     </div>
   </div>
