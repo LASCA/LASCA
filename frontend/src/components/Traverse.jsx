@@ -185,11 +185,11 @@ const Traverse = ({ data = [], metrics = {} }) => {
             <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
                <div className="grid grid-cols-2 gap-6">
                  <div className="flex flex-col gap-1">
-                   <span className="text-[8px] text-slate-500 font-black tracking-tighter">Μέγιστο Γωνιακό (Wβ Max)</span>
+                   <span className="text-[10px] text-slate-500 font-black tracking-tighter">Μέγιστο Γωνιακό (Wβ Max)</span>
                    <span className="text-xs font-mono font-bold text-amber-500">{metrics.Wb_max || "---"} grad</span>
                  </div>
                  <div className="flex flex-col gap-1 border-l border-slate-800/50 px-6">
-                   <span className="text-[8px] text-slate-500 font-black tracking-tighter">Μέγιστο Γραμμικό (δs Max)</span>
+                   <span className="text-[10px] text-slate-500 font-black tracking-tighter">Μέγιστο Γραμμικό (δs Max)</span>
                    <span className="text-xs font-mono font-bold text-emerald-500">{metrics.ds_max || "---"} m</span>
                  </div>
                </div>
@@ -236,37 +236,70 @@ const CompactStat = ({ label, value, unit, icon, color }) => (
 );
 
 const DetailedAngleGroup = ({ title, target, actual, error, wbi, labels }) => (
-  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1">{title}</span>
-    <div className="grid grid-cols-2 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{target || "---"}</span></div>
-      <div className="flex flex-col border-l border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{actual || "---"}</span></div>
+  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3">
+    <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
+    
+    <div className="grid grid-cols-2 gap-4 text-center border-b border-slate-800/30 pb-3">
+      {/* Labels από [7px] σε [9px] και Τιμές από [10px] σε [12px] */}
+      <div className="flex flex-col gap-1">
+        <span className="text-[9px] text-slate-500 font-bold">{labels[0]}</span>
+        <span className="text-[12px] font-mono text-slate-200">{target || "---"}</span>
+      </div>
+      <div className="flex flex-col gap-1 border-l border-slate-800/50">
+        <span className="text-[9px] text-slate-500 font-bold">{labels[1]}</span>
+        <span className="text-[12px] font-mono text-slate-200">{actual || "---"}</span>
+      </div>
     </div>
-    <div className="grid grid-cols-2 gap-2 text-center pt-1">
-      <div className="flex justify-between items-center px-4"><span className="text-[7px] text-amber-500/70 font-black">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{error || "---"}</span></div>
-      <div className="flex justify-between items-center px-4 border-l border-slate-800/50"><span className="text-[7px] text-amber-500/70 font-black">{labels[3]}</span><span className="text-[10px] font-mono text-amber-500/90">{wbi || "---"}</span></div>
+
+    <div className="grid grid-cols-2 gap-4 pt-1">
+      <div className="flex justify-between items-center px-2">
+        <span className="text-[9px] text-amber-500/70 font-bold">{labels[2]}</span>
+        <span className="text-[13px] font-mono text-amber-500 font-bold">{error || "---"}</span>
+      </div>
+      <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
+        <span className="text-[9px] text-amber-500/70 font-bold">{labels[3]}</span>
+        <span className="text-[13px] font-mono text-amber-500/90">{wbi || "---"}</span>
+      </div>
     </div>
   </div>
 );
 
 const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual, yError, ds, labels }) => (
-  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 flex flex-col gap-2 h-full">
-    <span className="text-[9px] font-bold text-slate-500 italic border-b border-slate-800 pb-1">{title}</span>
-    <div className="grid grid-cols-3 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black">{labels[0]}</span><span className="text-[10px] font-mono text-slate-300">{xTarget || "---"}</span></div>
-      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[1]}</span><span className="text-[10px] font-mono text-slate-300">{xActual || "---"}</span></div>
-      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black">{labels[2]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{xError || "---"}</span></div>
-    </div>
-    <div className="grid grid-cols-3 gap-2 text-center border-b border-slate-800/30 pb-2">
-      <div className="flex flex-col"><span className="text-[7px] text-slate-600 font-black ">{labels[3]}</span><span className="text-[10px] font-mono text-slate-300">{yTarget || "---"}</span></div>
-      <div className="flex flex-col border-x border-slate-800/50"><span className="text-[7px] text-slate-600 font-black">{labels[4]}</span><span className="text-[10px] font-mono text-slate-300">{yActual || "---"}</span></div>
-      <div className="flex flex-col"><span className="text-[7px] text-amber-500/70 font-black">{labels[5]}</span><span className="text-[10px] font-mono text-amber-500 font-bold">{yError || "---"}</span></div>
-    </div>
-    <div className="flex justify-between items-center px-4 mt-auto">
-      <span className="text-[8px] font-black text-slate-500 tracking-widest">{labels[6]}</span>
-      <span className="text-[11px] font-mono font-black text-emerald-400">{ds || "---"} m</span>
+  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3 h-full">
+    <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
+    
+    {/* Grid με αυξημένα μεγέθη */}
+    {[0, 3].map((startIndex) => {
+      const targetVal = startIndex === 0 ? xTarget : yTarget;
+      const actualVal = startIndex === 0 ? xActual : yActual;
+      const errorVal = startIndex === 0 ? xError : yError;
+
+      return (
+        <div 
+          key={startIndex} 
+          // Εδώ είναι η διόρθωση: Γραμμή ΜΟΝΟ στην πρώτη σειρά (ΔΧ)
+          className={`grid grid-cols-3 gap-2 text-center ${startIndex === 0 ? 'border-b border-slate-800/30 pb-3' : ''}`}
+        >
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex]}</span>
+            <span className="text-[12px] font-mono text-slate-200">{targetVal || "---"}</span>
+          </div>
+          <div className="flex flex-col gap-1 border-x border-slate-800/50">
+            <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex+1]}</span>
+            <span className="text-[12px] font-mono text-slate-200">{actualVal || "---"}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-amber-500/70 font-bold">{labels[startIndex+2]}</span>
+            <span className="text-[12px] font-mono text-amber-500 font-bold">{errorVal || "---"}</span>
+          </div>
+        </div>
+      );
+    })}
+
+    <div className="flex justify-between items-center px-2 mt-auto pt-4 border-t border-slate-800/50">
+      <span className="text-[10px] font-bold text-slate-500 tracking-wider">{labels[6]}</span>
+      <span className="text-[14px] font-mono font-black text-emerald-400">{ds || "---"} m</span>
     </div>
   </div>
 );
-
 export default Traverse;
