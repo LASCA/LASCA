@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Map as MapIcon, 
   Info, 
@@ -6,11 +6,28 @@ import {
   Activity, 
   Target, 
   Ruler,
-  Settings2
+  Settings2,
+  Play // Προσθέσαμε το εικονίδιο Zap
 } from 'lucide-react';
 
-const Traverse = ({ data = [], metrics = {} }) => {
+const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
   
+  const [tableData, setTableData] = useState(data);
+
+  useEffect(() => {
+    setTableData(data);
+  }, [data]);
+
+  const handleInputChange = (index, field, value) => {
+    const newData = [...tableData];
+    newData[index] = { ...newData[index], [field]: value };
+    setTableData(newData);
+    
+    if (onDataUpdate) {
+      onDataUpdate(newData);
+    }
+  };
+
   const formatVal = (val, decimals = 4) => {
     if (val === "" || val === undefined || val === null) return "-";
     const num = parseFloat(val);
@@ -26,26 +43,22 @@ const Traverse = ({ data = [], metrics = {} }) => {
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-          /* Custom Select Styling */
          select {
             appearance: none;
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
             background-repeat: no-repeat;
             background-position: right 0.4rem center;
             background-size: 0.7em;
-            /* Force dark theme for the dropdown popup on some browsers */
             color-scheme: dark; 
           }
 
-          /* Βελτίωση της εμφάνισης των επιλογών */
           select option {
-            background-color: #0b1120; /* Ίδιο με το card background σου */
+            background-color: #0b1120;
             color: #94a3b8;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             padding: 12px;
           }
 
-          /* Hover effect στο select box */
           select:hover {
             border-color: rgba(251, 191, 36, 0.4);
             background-color: rgba(15, 23, 42, 0.8);
@@ -69,7 +82,6 @@ const Traverse = ({ data = [], metrics = {} }) => {
                   <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200 uppercase">Δεδομένα Όδευσης</span>
                 </div>
 
-                {/* --- ΝΕΕΣ ΕΠΙΛΟΓΕΣ ΠΑΡΑΜΕΤΡΩΝ --- */}
                 <div className="flex items-center gap-5 border-l border-slate-800/60 pl-6">
                   {/* Τάξη */}
                   <div className="flex flex-col gap-1 group">
@@ -108,9 +120,15 @@ const Traverse = ({ data = [], metrics = {} }) => {
                 </div>
               </div>
 
-              <span className="text-[9px] text-amber-500/80 font-black bg-amber-500/5 px-3 py-1 rounded-full border border-amber-500/10 tracking-widest uppercase">
-                {data.length} Στάσεις
-              </span>
+              {/* ΚΟΥΜΠΙ όδευσης */}
+              <button 
+                onClick={() => console.log("Μελλοντική κλήση αλγορίθμου οδευσης...")}
+                title="Εκτέλεση"
+                className="group flex items-center justify-center w-8 h-8 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer"
+              >
+                {/* Το ml-0.5 βοηθάει να φαίνεται οπτικά κεντραρισμένο το τρίγωνο */}
+                <Play size={14} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
+              </button>
             </div>
 
             <div className="flex-1">
@@ -125,17 +143,57 @@ const Traverse = ({ data = [], metrics = {} }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">
-                  {data.length > 0 ? (
-                    data.map((row, idx) => (
+                  {tableData.length > 0 ? (
+                    tableData.map((row, idx) => (
                       <tr key={idx} className="hover:bg-blue-500/5 transition-colors group">
-                        <td className="p-4 font-bold text-slate-300 flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse' : 'bg-slate-800 group-hover:bg-slate-600'}`} />
-                          <span className="tracking-tight text-sm">{row.name || "-"}</span>
+                        <td className="p-2">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full flex-none ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse' : 'bg-slate-800 group-hover:bg-slate-600'}`} />
+                            <input 
+                              type="text"
+                              value={row.name || ""}
+                              onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
+                              className="bg-transparent w-full font-bold text-slate-300 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
+                              placeholder="Name"
+                            />
+                          </div>
                         </td>
-                        <td className="p-4 font-mono text-amber-400/90 text-center text-sm">{formatVal(row.hz, 4)}</td>
-                        <td className="p-4 font-mono text-slate-400 text-center text-sm">{formatVal(row.sd, 3)}</td>
-                        <td className="p-4 font-mono text-cyan-400/80 text-right tabular-nums text-sm">{formatVal(row.x, 3)}</td>
-                        <td className="p-4 font-mono text-cyan-400/80 text-right tabular-nums text-sm">{formatVal(row.y, 3)}</td>
+                        <td className="p-2">
+                          <input 
+                            type="text"
+                            value={row.hz || ""}
+                            onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
+                            className="bg-transparent w-full font-mono text-amber-400/90 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            type="text"
+                            value={row.sd || ""}
+                            onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
+                            className="bg-transparent w-full font-mono text-slate-400 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            type="text"
+                            value={row.x || ""}
+                            onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
+                            className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            type="text"
+                            value={row.y || ""}
+                            onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
+                            className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
+                            placeholder="-"
+                          />
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -161,7 +219,7 @@ const Traverse = ({ data = [], metrics = {} }) => {
             <div className="flex flex-row gap-4 items-stretch">
               <div className="flex-1 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <CompactStat label="Κορυφές (n)" value={data.length} icon={<Target size={12}/>} color="text-slate-200" />
+                  <CompactStat label="Κορυφές (n)" value={tableData.length} icon={<Target size={12}/>} color="text-slate-200" />
                   <CompactStat label="Μήκος (L)" value={metrics.totalLength} unit="m" icon={<Ruler size={12}/>} color="text-slate-200" />
                 </div>
                 <DetailedAngleGroup 
@@ -240,7 +298,6 @@ const DetailedAngleGroup = ({ title, target, actual, error, wbi, labels }) => (
     <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
     
     <div className="grid grid-cols-2 gap-4 text-center border-b border-slate-800/30 pb-3">
-      {/* Labels από [7px] σε [9px] και Τιμές από [10px] σε [12px] */}
       <div className="flex flex-col gap-1">
         <span className="text-[9px] text-slate-500 font-bold">{labels[0]}</span>
         <span className="text-[12px] font-mono text-slate-200">{target || "---"}</span>
@@ -268,7 +325,6 @@ const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual
   <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3 h-full">
     <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
     
-    {/* Grid με αυξημένα μεγέθη */}
     {[0, 3].map((startIndex) => {
       const targetVal = startIndex === 0 ? xTarget : yTarget;
       const actualVal = startIndex === 0 ? xActual : yActual;
@@ -277,7 +333,6 @@ const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual
       return (
         <div 
           key={startIndex} 
-          // Εδώ είναι η διόρθωση: Γραμμή ΜΟΝΟ στην πρώτη σειρά (ΔΧ)
           className={`grid grid-cols-3 gap-2 text-center ${startIndex === 0 ? 'border-b border-slate-800/30 pb-3' : ''}`}
         >
           <div className="flex flex-col gap-1">
@@ -302,4 +357,5 @@ const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual
     </div>
   </div>
 );
+
 export default Traverse;
