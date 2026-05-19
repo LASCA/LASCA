@@ -7,7 +7,7 @@ import {
   Target, 
   Ruler,
   Settings2,
-  Play // Προσθέσαμε το εικονίδιο Zap
+  Play 
 } from 'lucide-react';
 
 const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
@@ -161,7 +161,7 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                         <td className="p-2">
                           <input 
                             type="text"
-                            value={row.hz || ""}
+                            value={row.hz !== "" ? formatVal(row.hz, 4) : ""}
                             onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
                             className="bg-transparent w-full font-mono text-amber-400/90 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
@@ -170,7 +170,7 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                         <td className="p-2">
                           <input 
                             type="text"
-                            value={row.sd || ""}
+                            value={row.sd !== "" ? formatVal(row.sd, 3) : ""} /* 3 δεκαδικά μόνο για τη στήλη Slope_D */
                             onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
                             className="bg-transparent w-full font-mono text-slate-400 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
@@ -264,7 +264,7 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
               <div className="p-2 bg-pink-500/10 rounded-lg">
                 <MapIcon size={18} className="text-pink-500" />
               </div>
-              <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200 uppercase">Οπτικοποίηση</span>
+              <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200">Οπτικοποίηση</span>
             </div>
           </div>
           
