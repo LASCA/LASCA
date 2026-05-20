@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Adjustment from './components/Adjustment';
 import Traverse from './components/Traverse';
+import Tachymetry from './components/Tachymetry'; // Διορθώθηκε το import
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,6 +17,9 @@ function App() {
   // States για την Όδευση
   const [traverseData, setTraverseData] = useState([]); 
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
+
+  // States για την Ταχυμετρία
+  const [tachymetryData, setTachymetryData] = useState([]); 
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
@@ -36,15 +40,14 @@ function App() {
         <main className={`flex-1 p-8 pl-12 overflow-y-auto ${activeTab === 'dashboard' ? 'pt-12' : ''}`}>
           <div className="max-w-[1800px] mx-auto h-full">
             
-            {/* DASHBOARD: Περνάμε και τους δύο setters για το Import του Excel */}
             {activeTab === 'dashboard' && (
               <Dashboard 
                 setObservations={setObservations} 
-                setTraverseData={setTraverseData} 
+                setTraverseData={setTraverseData}
+                setTachymetryData={setTachymetryData} 
               />
             )}
             
-            {/* ADJUSTMENT: Παραμένει ως είχε για τη συνορθώση */}
             {activeTab === 'adjustment' && (
               <Adjustment 
                 observations={observations} 
@@ -52,7 +55,6 @@ function App() {
               />
             )}
             
-            {/* TRAVERSE: Περνάμε τα δεδομένα και τα metrics για εμφάνιση */}
             {activeTab === 'traverse' && (
               <Traverse 
                 data={traverseData} 
@@ -60,10 +62,11 @@ function App() {
               />
             )}
             
+            {/* Η σωστή κλήση του component */}
             {activeTab === 'mapping' && (
-              <div className="h-full border-2 border-dashed border-slate-800 rounded-[3rem] flex items-center justify-center">
-                  <p className="uppercase tracking-[0.3em] text-slate-700 font-black">Module Under Construction</p>
-              </div>
+              <Tachymetry 
+                data={tachymetryData} 
+              />
             )}
           </div>
         </main>
