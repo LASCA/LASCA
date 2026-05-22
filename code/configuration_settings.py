@@ -31,7 +31,7 @@ SYN_STATHMOY_INPUT = "SAMPLEINPUTFILE_HZ.csv"
 TRIG_LEVEL_INPUT = "sample_trig_level.xlsx"
 TAXYMETRIA_INPUT = "sample_taxymetria.xlsx"
 
-INPUT = "format.xlsx"
+INPUT = "format_new.xlsx"
 
 def setup_project_structure():
     # Ελέγχω αν υπάρχουν τα directories αν οχι τα δημιουργω στην θέση που πρέπει 

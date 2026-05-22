@@ -8,22 +8,22 @@ def run_app_logic(excel_path):
     xls = pd.ExcelFile(excel_path)
     results = {}
 
-    # # 1. Module: Συνόρθωση Σταθμού
-    # if 'synorthosi_stathmou' in xls.sheet_names:
-    #     print("processing: Adjustment...")
-    #     df_adj = pd.read_excel(xls, 'synorthosi_stathmou')
-    #     df_adj[['From', 'To', 'Period']] = df_adj[['From', 'To', 'Period']].ffill()
+    # 1. Module: Συνόρθωση Σταθμού
+    if 'synorthosi_stathmou' in xls.sheet_names:
+        print("processing: Adjustment...")
+        df_adj = pd.read_excel(xls, 'synorthosi_stathmou')
+        df_adj[['From', 'To', 'Period']] = df_adj[['From', 'To', 'Period']].ffill()
         
-    #     # Εκτέλεση υπολογισμών
-    #     adj_df, adj_meta = dpr.process_network_data(df_adj)
-    #     results['adjustment'] = adj_df
+        # Εκτέλεση υπολογισμών
+        adj_df, adj_meta = dpr.process_network_data(df_adj)
+        results['adjustment'] = adj_df
         
-    #     # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
-    #     print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
-    #     vis.plot_std_dev_lollipop_df(adj_df)
-    #     plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
+        # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
+        print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
+        vis.plot_std_dev_lollipop_df(adj_df)
+        plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
 
-    # 2. Module: Όδευση
+    #2. Module: Όδευση
     if 'traverse' in xls.sheet_names:
         print("processing: Traverse...")
         df_trav = pd.read_excel(xls, 'traverse')
@@ -71,12 +71,32 @@ def run_app_logic(excel_path):
         # Καλούμε τη συνάρτηση (υποθέτοντας ότι στο data_proccessing.py είναι όπως την κάναμε πριν)
         df_tax, st_name, coords = dpr.tachymetry(excel_path) 
         results['points'] = df_tax
+
+        print("\n" + "="*75)
+        print(f"📍 ΑΠΟΤΕΛΕΣΜΑΤΑ ΤΑΧΥΜΕΤΡΙΑΣ - ΣΤΑΣΗ: {st_name}")
+        print(f"   Συντεταγμένες Στάσης: X={coords[0]:.3f}, Y={coords[1]:.3f}, Z={coords[2]:.3f}")
+        print("-" * 75)
         
+        if not df_tax.empty:
+            # Χρησιμοποιούμε ΤΑ ΑΚΡΙΒΗ ΟΝΟΜΑΤΑ που δίνει η tachymetry σου:
+            # 'Σημείο', 'X', 'Y', 'Z'
+            cols_to_print = ['Σημείο', 'X', 'Y', 'Z']
+            
+            # Εκτύπωση όλων των σημείων με στοίχιση
+            print(df_tax[cols_to_print].to_string(index=False, justify='center'))
+        else:
+            print("⚠️ Το DataFrame είναι άδειο!")
+            
+        print("-" * 75)
+        print(f"✅ Συνολικά σημεία λεπτομέρειας: {len(df_tax)}")
+        print("="*75 + "\n")
+    
         # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΤΑΧΥΜΕΤΡΙΑΣ ---
         print(f"📊 Εμφάνιση χάρτη σημείων για τη στάση {st_name}...")
         vis.plot_survey_points(df_tax, coords[0], coords[1], station_name=st_name)
     else:
         print("⚠️ ΠΡΟΣΟΧΗ: Δεν βρέθηκαν τα φύλλα 'Station' και 'Measurements' για την Ταχυμετρία!")
+
 # 4. Module: Τριγωνομετρική Υψομετρία
     if 'trig_leveling' in xls.sheet_names:
         print("processing: Trigonometric Leveling...")
@@ -102,7 +122,7 @@ if __name__ == "__main__":
     
     # 2. Ορισμός του Master Excel (π.χ. data/format.xlsx)
     # Χρησιμοποιούμε το όνομα που έχεις ορίσει στο configuration_settings
-    master_file = cs.DATA_DIR / "format.xlsx" 
+    master_file = cs.DATA_DIR / "format_new.xlsx" 
     
     if not master_file.exists():
         print(f"❌ Το αρχείο {master_file} δεν βρέθηκε!")

@@ -127,35 +127,72 @@ def tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C):
     return xm, ym
 
 def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
-    # 1. Διάβασμα των 2 ξεχωριστών Sheets
+    # 1. Φόρτωση των 2 ξεχωριστών Sheets
     df_st = pd.read_excel(excel_path, sheet_name='stations_taxymetria')
     df_meas = pd.read_excel(excel_path, sheet_name='measurements_taxymetria')
 
-    # 2. Τράβηγμα των δεδομένων της στάσης (από το sheet Station)
-    st = df_st.iloc[0]
+    # 2. Προσαρμογή Ονομάτων Στηλών (Δυναμική Αναζήτηση)
+    # Ελέγχει πώς έχεις ονομάσει τις στήλες στο Excel (π.χ. 'From' ή 'Station', 'O' ή 'Orientation')
+    col_st = 'From' if 'From' in df_meas.columns else 'Station'
+    col_or = 'O' if 'O' in df_meas.columns else 'Orientation'
 
-    # Εδώ είναι το κρίσιμο σημείο: Πρέπει να γράφεται ΑΚΡΙΒΩΣ όπως στο Excel
-    st_name = st['Station_Name'] 
-    
-    xs, ys, zs, i = st['XS'], st['YS'], st['ZS'], st['Station_Height']
-    xo, yo, zo, hz_o = st['XO'], st['YO'], st['ZO'], st['HZ_O']
+    # 3. Αυτόματη συμπλήρωση κενών κελιών (Forward Fill)
+    # Κατεβάζει τον μηδενισμό (HZ_O) και το ύψος οργάνου σε όλες τις γραμμές.
+    cols_to_fill = [col_st, col_or, 'HZ_O', 'Station_Height']
+    for col in cols_to_fill:
+        if col in df_meas.columns:
+            df_meas[col] = df_meas[col].ffill()
 
-    # Υπολογισμός Γωνίας Διεύθυνσης Προσανατολισμού
-    g_so, S_dist = deutero_them(xs, ys, xo, yo)
-    
+    # 4. Δημιουργία Λεξικού (Lookup) για τις Στάσεις
+    st_lookup = df_st.set_index('Station_Name').to_dict('index')
+
     results = []
-    # 3. Επεξεργασία των μετρήσεων (από το sheet Measurements)
+    first_station = None
+    first_coords = None
+
+    # 5. Επεξεργασία των μετρήσεων γραμμή-γραμμή
     for index, row in df_meas.iterrows():
-        p_id, hz, z, sd, t = row['Point_ID'], row['Hz'], row['Z'], row['SD'], row['TargetHeight']
-        
-        # Έλεγχος για κενές γραμμές ή μηδενικές αποστάσεις
+        st_id = row[col_st]
+        bs_id = row[col_or]
+
+        # Προσπέραση αν οι στήλες παραμένουν κενές
+        if pd.isna(st_id) or pd.isna(bs_id):
+            continue
+
+        # Έλεγχος ύπαρξης στο φύλλο Σταθμών
+        if st_id not in st_lookup or bs_id not in st_lookup:
+            print(f"⚠️ Προειδοποίηση (Γραμμή {index + 2}): Η στάση '{st_id}' ή ο προσανατολισμός '{bs_id}' δεν βρέθηκε. Αγνόηση.")
+            continue
+
+        # Ανάκτηση των συντεταγμένων
+        xs, ys, zs = st_lookup[st_id]['XS'], st_lookup[st_id]['YS'], st_lookup[st_id]['ZS']
+        xo, yo = st_lookup[bs_id]['XS'], st_lookup[bs_id]['YS']
+
+        if first_station is None:
+            first_station = st_id
+            first_coords = (xs, ys, zs)
+
+        # Ανάκτηση μετρήσεων γραμμής
+        hz_o = row['HZ_O']
+        i = row['Station_Height']
+        p_id = row['Point_ID']
+        hz = row['Hz']
+        z = row['Z']
+        sd = row['SD']
+        t = row['TargetHeight']
+
         if pd.isna(sd) or sd <= 0: 
             continue
+
+        # --- ΤΟΠΟΓΡΑΦΙΚΟΙ ΥΠΟΛΟΓΙΣΜΟΙ ---
+        g_so, _ = deutero_them(xs, ys, xo, yo)
 
         z_rad = g2r(z)
         hd = sd * math.sin(z_rad)
         vd = sd * math.cos(z_rad)
-        if apply_scale: hd *= scale_factor
+        
+        if apply_scale: 
+            hd *= scale_factor
 
         hz_diff = norm400(hz - hz_o)
         g_sp = norm400(g_so + hz_diff)
@@ -163,10 +200,25 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
         xp, yp = proto_themeliodes(xs, ys, hd, g_sp)
         zp = zs + i + vd - t
 
-        results.append({'Σημείο': p_id, 'X': round(xp, 3), 'Y': round(yp, 3), 'Z': round(zp, 3)})
+        # Καθαρισμός Point_ID (αφαίρεση δεκαδικών αν είναι αριθμός)
+        point_name = int(p_id) if not pd.isna(p_id) and isinstance(p_id, (int, float)) else p_id
+
+        results.append({
+            'Στάση': st_id,
+            'Σημείο': point_name, 
+            'X': round(xp, 3), 
+            'Y': round(yp, 3), 
+            'Z': round(zp, 3)
+        })
     
     results_df = pd.DataFrame(results)
-    return results_df, st_name, (xs, ys, zs)
+    
+    if first_station is None:
+        first_station = "Άγνωστη"
+        first_coords = (0.0, 0.0, 0.0)
+
+    return results_df, first_station, first_coords
+#NEW
 #ODEUSI
     #metatropes
 def small_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:
