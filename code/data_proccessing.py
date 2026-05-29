@@ -210,7 +210,7 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
             'Y': round(yp, 3), 
             'Z': round(zp, 3)
         })
-    
+ 
     results_df = pd.DataFrame(results)
     
     if first_station is None:
@@ -218,7 +218,7 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
         first_coords = (0.0, 0.0, 0.0)
 
     return results_df, first_station, first_coords
-#NEW
+
 #ODEUSI
     #metatropes
 def small_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:

@@ -21,12 +21,55 @@ const Adjustment = ({ observations, setObservations }) => {
       }));
       setObservations(initialRows);
     }
-  }, []); // Τρέχει μόνο μία φορά όταν φορτώνει το component
+  }, []);
 
   const handleInputChange = (id, field, value) => {
     setObservations(prev => prev.map(obs => 
       obs.id === id ? { ...obs, [field]: value } : obs
     ));
+  };
+
+  // --- Logic Πλοήγησης με Βελάκια & Enter ---
+  const handleKeyDown = (e, index, colName) => {
+    const columns = ['station', 'target', 'Period', 'Face_I', 'Face_II'];
+    const colIndex = columns.indexOf(colName);
+    
+    let nextRow = index;
+    let nextCol = colIndex;
+    let shouldMove = false;
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextRow = index + 1;
+      shouldMove = true;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextRow = index - 1;
+      shouldMove = true;
+    } else if (e.key === 'ArrowLeft') {
+      if (e.target.selectionStart === 0) {
+        e.preventDefault();
+        nextCol = colIndex - 1;
+        shouldMove = true;
+      }
+    } else if (e.key === 'ArrowRight') {
+      if (e.target.selectionEnd === e.target.value.length) {
+        e.preventDefault();
+        nextCol = colIndex + 1;
+        shouldMove = true;
+      }
+    }
+
+    if (shouldMove) {
+      if (nextRow >= 0 && nextRow < observations.length && nextCol >= 0 && nextCol < columns.length) {
+        const nextColName = columns[nextCol];
+        const nextInput = document.getElementById(`input-${nextRow}-${nextColName}`);
+        if (nextInput) {
+          nextInput.focus();
+          setTimeout(() => nextInput.select(), 0); 
+        }
+      }
+    }
   };
 
   const addRowAt = (index) => {
@@ -62,7 +105,6 @@ const Adjustment = ({ observations, setObservations }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden">
-      {/* Scrollbar styling */}
       <style>
         {`
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -79,7 +121,6 @@ const Adjustment = ({ observations, setObservations }) => {
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col min-h-0">
             <div className="overflow-y-auto custom-scrollbar flex-1">
               <table className="w-full text-left border-collapse table-auto relative">
-                {/* Καρφιτσωμένη κεφαλίδα (Sticky Head) */}
                 <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
                   <tr className="border-b border-slate-800/50">
                     <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
@@ -94,7 +135,6 @@ const Adjustment = ({ observations, setObservations }) => {
                         <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">σ (St)</th>
                       </>
                     )}
-                    {/* ΝΕΟ ΚΟΥΜΠΙ PLAY ΣΤΟ ΑΚΡΟ */}
                     <th className="p-3 w-16">
                       <div className="flex justify-end pr-2">
                         <button 
@@ -122,24 +162,57 @@ const Adjustment = ({ observations, setObservations }) => {
                     <React.Fragment key={obs.id}>
                       <tr className="group hover:bg-blue-600/[0.03] transition-all">
                         <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
+                        
                         <td className="p-2">
-                          <input className="w-full bg-transparent p-2 text-sm text-amber-300/80 outline-none focus:text-amber-300 focus:bg-slate-800/50 rounded" value={obs.station} onChange={(e) => handleInputChange(obs.id, 'station', e.target.value)} />
+                          <input 
+                            id={`input-${index}-station`}
+                            className="w-full bg-transparent p-2 text-sm text-amber-300/80 outline-none focus:text-amber-300 focus:bg-slate-800/50 rounded" 
+                            value={obs.station} 
+                            onChange={(e) => handleInputChange(obs.id, 'station', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'station')}
+                          />
                         </td>
+                        
                         <td className="p-2">
-                          <input className="w-full bg-transparent p-2 text-sm text-amber-300/80 outline-none focus:text-amber-300 focus:bg-slate-800/50 rounded" value={obs.target} onChange={(e) => handleInputChange(obs.id, 'target', e.target.value)} />
+                          <input 
+                            id={`input-${index}-target`}
+                            className="w-full bg-transparent p-2 text-sm text-amber-300/80 outline-none focus:text-amber-300 focus:bg-slate-800/50 rounded" 
+                            value={obs.target} 
+                            onChange={(e) => handleInputChange(obs.id, 'target', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'target')}
+                          />
                         </td>
+                        
                         <td className="p-2">
-                          <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-400 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" value={obs.Period} onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} />
+                          <input 
+                            id={`input-${index}-Period`}
+                            className="w-full bg-transparent p-2 text-sm font-mono text-slate-400 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
+                            value={obs.Period} 
+                            onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'Period')}
+                          />
                         </td>
+                        
+                        {/* ΕΠΑΝΑΦΟΡΑ 4 ΔΕΚΑΔΙΚΩΝ ΣΤΟ FACE I */}
                         <td className="p-2">
-                          <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
-                                 value={Number(obs.Face_I || 0).toFixed(4)} 
-                                 onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)} />
+                          <input 
+                            id={`input-${index}-Face_I`}
+                            className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
+                            value={Number(obs.Face_I || 0).toFixed(4)} 
+                            onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'Face_I')}
+                          />
                         </td>
+                        
+                        {/* ΕΠΑΝΑΦΟΡΑ 4 ΔΕΚΑΔΙΚΩΝ ΣΤΟ FACE II */}
                         <td className="p-2">
-                          <input className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
-                                 value={Number(obs.Face_II || 0).toFixed(4)} 
-                                 onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} />
+                          <input 
+                            id={`input-${index}-Face_II`}
+                            className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
+                            value={Number(obs.Face_II || 0).toFixed(4)} 
+                            onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'Face_II')}
+                          />
                         </td>
 
                         {isAdjusted && (
@@ -178,7 +251,7 @@ const Adjustment = ({ observations, setObservations }) => {
           </div>
         </div>
 
-        {/* ΔΕΞΙΑ ΣΤΗΛΗ: ΟΠΤΙΚΟΠΟΙΗΣΗ (Σταθερή/Sticky) */}
+        {/* ΔΕΞΙΑ ΣΤΗΛΗ: ΟΠΤΙΚΟΠΟΙΗΣΗ */}
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative group">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">

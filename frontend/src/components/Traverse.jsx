@@ -28,6 +28,52 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
     }
   };
 
+  // Βελτιωμένη Συνάρτηση για πλοήγηση με τα Βελάκια & Enter
+  const handleKeyDown = (e, rowIndex, colName) => {
+    const columns = ['name', 'hz', 'sd', 'x', 'y', 'h'];
+    const colIndex = columns.indexOf(colName);
+    
+    let nextRow = rowIndex;
+    let nextCol = colIndex;
+    let shouldMove = false;
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextRow = rowIndex + 1;
+      shouldMove = true;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextRow = rowIndex - 1;
+      shouldMove = true;
+    } else if (e.key === 'ArrowLeft') {
+      // Προχωράει αριστερά μόνο αν ο κέρσορας είναι στην αρχή του κειμένου
+      if (e.target.selectionStart === 0) {
+        e.preventDefault();
+        nextCol = colIndex - 1;
+        shouldMove = true;
+      }
+    } else if (e.key === 'ArrowRight') {
+      // Προχωράει δεξιά μόνο αν ο κέρσορας είναι στο τέλος του κειμένου
+      if (e.target.selectionEnd === e.target.value.length) {
+        e.preventDefault();
+        nextCol = colIndex + 1;
+        shouldMove = true;
+      }
+    }
+
+    if (shouldMove) {
+      if (nextRow >= 0 && nextRow < tableData.length && nextCol >= 0 && nextCol < columns.length) {
+        const nextColName = columns[nextCol];
+        const nextInput = document.getElementById(`input-${nextRow}-${nextColName}`);
+        if (nextInput) {
+          nextInput.focus();
+          // Το setTimeout διασφαλίζει ότι η επιλογή κειμένου γίνεται αφού εστιάσει το κελί
+          setTimeout(() => nextInput.select(), 0); 
+        }
+      }
+    }
+  };
+
   const formatVal = (val, decimals = 4) => {
     if (val === "" || val === undefined || val === null) return "-";
     const num = parseFloat(val);
@@ -126,7 +172,6 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                 title="Εκτέλεση"
                 className="group flex items-center justify-center w-8 h-8 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer"
               >
-                {/* Το ml-0.5 βοηθάει να φαίνεται οπτικά κεντραρισμένο το τρίγωνο */}
                 <Play size={14} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
               </button>
             </div>
@@ -135,11 +180,12 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                   <tr className="border-b border-slate-800/50">
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest">Station</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope_D [m]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">X [m]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">Y [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest">Station</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope_D [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">X [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">Y [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">H [m]</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">
@@ -150,9 +196,11 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full flex-none ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse' : 'bg-slate-800 group-hover:bg-slate-600'}`} />
                             <input 
+                              id={`input-${idx}-name`}
                               type="text"
                               value={row.name || ""}
                               onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, idx, 'name')}
                               className="bg-transparent w-full font-bold text-slate-300 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
                               placeholder="Name"
                             />
@@ -160,37 +208,56 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                         </td>
                         <td className="p-2">
                           <input 
+                            id={`input-${idx}-hz`}
                             type="text"
                             value={row.hz !== "" ? formatVal(row.hz, 4) : ""}
                             onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
                             className="bg-transparent w-full font-mono text-amber-400/90 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
                         <td className="p-2">
                           <input 
+                            id={`input-${idx}-sd`}
                             type="text"
-                            value={row.sd !== "" ? formatVal(row.sd, 3) : ""} /* 3 δεκαδικά μόνο για τη στήλη Slope_D */
+                            value={row.sd !== "" ? formatVal(row.sd, 3) : ""}
                             onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
                             className="bg-transparent w-full font-mono text-slate-400 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
                         <td className="p-2">
                           <input 
+                            id={`input-${idx}-x`}
                             type="text"
                             value={row.x || ""}
                             onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'x')}
                             className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
                         <td className="p-2">
                           <input 
+                            id={`input-${idx}-y`}
                             type="text"
                             value={row.y || ""}
                             onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'y')}
                             className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            id={`input-${idx}-h`}
+                            type="text"
+                            value={row.h || ""}
+                            onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
+                            className="bg-transparent w-full font-mono text-emerald-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -198,7 +265,7 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5" className="p-24 text-center">
+                      <td colSpan="6" className="p-24 text-center">
                         <Info size={30} className="text-slate-700 mx-auto mb-3" />
                         <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest">Αναμονή Δεδομένων</p>
                       </td>
