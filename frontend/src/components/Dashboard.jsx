@@ -2,20 +2,18 @@ import React from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { 
-  PlusCircle, FolderOpen, Save, Upload, 
+  Plus, FolderOpen, Save, Upload, 
   Settings2, Globe2, Ruler, Beaker,
   ChevronRight, HardDrive, FileSpreadsheet,
-  Activity
+  Activity, LayoutGrid
 } from 'lucide-react';
 
 const Dashboard = ({ setObservations, setTraverseData }) => {
 
-  // ΣΥΝΑΡΤΗΣΗ ΓΙΑ ΤΟ IMPORT ΤΟΥ EXCEL
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Έλεγχος αν είναι όντως αρχείο Excel
     if (!file.name.match(/\.(xlsx|xls)$/)) {
       toast.error('Παρακαλώ επιλέξτε αρχείο μορφής .xlsx ή .xls');
       return;
@@ -29,7 +27,6 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
 
-        // --- 1. ΔΙΑΧΕΙΡΙΣΗ ΣΥΝΟΡΘΩΣΗΣ (Πρώτο Φύλλο) ---
         const wsAdjustment = wb.Sheets[wb.SheetNames[0]];
         const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
         
@@ -47,13 +44,11 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
           setObservations(formattedAdj);
         }
 
-        // --- 2. ΔΙΑΧΕΙΡΙΣΗ ΟΔΕΥΣΗΣ (Φύλλο "traverse") ---
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          // Mapping βάσει της δομής του πίνακα σου
           const formattedTraverse = dataTraverse.map(row => ({
             name: row['Stations'] || row['Station'] || "",
             hz: row['Hz [grad]'] || "",
@@ -67,140 +62,203 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
 
         toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
       } catch (err) {
-        console.error(err);
         toast.error('Σφάλμα κατά την επεξεργασία του αρχείου.', { id: loadingToast });
       }
     };
 
     reader.readAsBinaryString(file);
-    e.target.value = null; // Reset για επόμενη χρήση
+    e.target.value = null;
   };
 
   return (
-    <div className="flex flex-col h-full gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="min-h-screen bg-[#030712] text-slate-200 flex flex-col font-sans">
       
-      {/* HEADER SECTION */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter">Project Setup</h2>
-          <p className="text-slate-500 font-medium mt-1 text-sm uppercase tracking-widest">Διαχείριση και Παραμετροποίηση Μελέτης</p>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-slate-800 rounded-2xl">
-          <HardDrive size={16} className="text-blue-500" />
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Local Workspace: Active</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-12 gap-8 flex-1">
-        
-        {/* PANEL 1: FILE OPERATIONS */}
-        <div className="col-span-3 flex flex-col gap-4">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">File Operations</h3>
-          <div className="bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 space-y-3 shadow-2xl text-slate-200">
-            <ProjectButton icon={<PlusCircle size={20}/>} title="Create New" desc="Νέο αρχείο .lasca" primary />
-            <ProjectButton icon={<FolderOpen size={20}/>} title="Open Project" desc="Ανάκτηση από δίσκο" />
-            <ProjectButton icon={<Save size={20}/>} title="Save Current" desc="Αποθήκευση αλλαγών" />
+      {/* HEADER (Όπως ακριβώς το σχεδιάσαμε) */}
+      <header className="h-20 flex items-center justify-between px-10 border-b border-slate-800/80 bg-[#030712]">
+        <div className="flex flex-col items-start gap-1">
+          <div className="flex items-center gap-2">
+            <LayoutGrid size={14} className="text-blue-500" strokeWidth={2.5}/>
+            <h1 className="text-[11px] font-bold uppercase text-blue-500 tracking-[0.2em]">
+              SURVEYING CORE V2.0
+            </h1>
           </div>
-          <div className="mt-auto p-6 bg-blue-600/5 border border-blue-600/10 rounded-[2rem]">
-            <p className="text-[10px] font-bold text-blue-400 uppercase mb-2">Auto-Save</p>
-            <p className="text-xs text-slate-400 leading-relaxed">Η τελευταία αποθήκευση έγινε πριν από 2 λεπτά.</p>
-          </div>
+          <h2 className="text-3xl font-black text-white tracking-tight -mt-1 flex items-baseline gap-1">
+            <span>Project</span>
+            <span className="text-blue-500">Setup</span>
+          </h2>
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mt-1">
+            ΔΙΑΧΕΙΡΙΣΗ ΚΑΙ ΠΑΡΑΜΕΤΡΟΠΟΙΗΣΗ ΜΕΛΕΤΗΣ
+          </span>
         </div>
 
-        {/* PANEL 2: DATA INGESTION */}
-        <div className="col-span-5 flex flex-col gap-4">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">Data Ingestion</h3>
+        <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-900 border border-slate-800 rounded-full">
+          <HardDrive size={14} className="text-blue-500" />
+          <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+            LOCAL WORKSPACE: ACTIVE
+          </span>
+        </div>
+      </header>
+
+      {/* MAIN DASHBOARD GRID */}
+      <main className="flex-1 p-10">
+        <div className="grid grid-cols-12 gap-8 max-w-[1600px] mx-auto h-full">
           
-          <div className="flex-1 flex flex-col gap-4 text-slate-200">
-            <div className="grid grid-cols-2 gap-4 h-3/5">
-              
+          {/* LEFT PANEL: FILE OPERATIONS */}
+          <div className="col-span-3 flex flex-col gap-4">
+            <SectionTitle title="FILE OPERATIONS" />
+            
+            {/* Actions Card */}
+            <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-4 flex flex-col gap-3">
+              <ActionButton 
+                icon={<Plus size={20} />} 
+                title="CREATE NEW" 
+                subtitle="Νέο αρχείο .lasca" 
+                variant="primary" 
+              />
+              <ActionButton 
+                icon={<FolderOpen size={20} />} 
+                title="OPEN PROJECT" 
+                subtitle="Ανάκτηση από δίσκο" 
+              />
+              <ActionButton 
+                icon={<Save size={20} />} 
+                title="SAVE CURRENT" 
+                subtitle="Αποθήκευση αλλαγών" 
+              />
+            </div>
+
+            {/* Auto-save Widget */}
+            <div className="mt-auto bg-[#0B1221] border border-slate-800/80 rounded-[1.5rem] p-6">
+              <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">AUTO-SAVE</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Η τελευταία αποθήκευση έγινε πριν από 2 λεπτά.
+              </p>
+            </div>
+          </div>
+
+          {/* CENTER PANEL: DATA INGESTION */}
+          <div className="col-span-5 flex flex-col gap-4">
+            <SectionTitle title="DATA INGESTION" />
+            
+            <div className="grid grid-cols-2 gap-4">
               {/* IMPORT DATA CARD */}
-              <div className="bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 flex flex-col items-center justify-center border-dashed group hover:border-blue-500/40 transition-all bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-600/10 via-transparent to-transparent text-center">
-                <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-slate-800 group-hover:scale-110 transition-transform">
-                  <Upload size={20} className="text-blue-500 group-hover:animate-bounce" />
+              <label className="relative cursor-pointer bg-[#0B1221] border border-slate-800/80 hover:border-blue-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
+                <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all">
+                  <Upload size={20} className="text-blue-500" />
                 </div>
-                <h4 className="text-sm font-bold text-white mb-2">Import Data</h4>
-                <p className="text-slate-500 text-[10px] leading-tight mb-4 px-2"> Εισαγωγή δεδομένων μορφής .xlsx </p>
-                
-                <label className="w-full py-2.5 bg-white text-slate-950 rounded-xl font-black text-[9px] uppercase tracking-wider hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+                <h3 className="text-base font-bold text-white mb-2">Import Data</h3>
+                <p className="text-[11px] text-slate-500 mb-8">Εισαγωγή δεδομένων μορφής .xlsx</p>
+                <div className="px-8 py-2.5 bg-white text-black text-[11px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-200 transition-colors w-full">
                   SELECT FILES
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    accept=".xlsx, .xls" 
-                    onChange={handleFileUpload}
-                  />
-                </label>
-              </div>
+                </div>
+                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+              </label>
 
               {/* EXCEL TEMPLATE CARD */}
-              <div className="bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 flex flex-col items-center justify-center border-dashed group hover:border-emerald-500/40 transition-all bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-emerald-600/10 via-transparent to-transparent text-center">
-                <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-slate-800 group-hover:scale-110 transition-transform">
+              <button className="bg-[#0B1221] border border-slate-800/80 hover:border-emerald-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
+                <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all">
                   <FileSpreadsheet size={20} className="text-emerald-500" />
                 </div>
-                <h4 className="text-sm font-bold text-white mb-2">Excel Template</h4>
-                <p className="text-slate-500 text-[10px] leading-tight mb-4 px-2">Λήψη κενού αρχείου με την προκαθορισμένη δομή.</p>
-                <button className="w-full py-2.5 bg-slate-950 text-emerald-500 border border-emerald-500/20 rounded-xl font-black text-[9px] uppercase tracking-wider hover:bg-emerald-600 hover:text-white transition-all">
-                  Download
-                </button>
-              </div>
-
+                <h3 className="text-base font-bold text-white mb-2">Excel Template</h3>
+                <p className="text-[11px] text-slate-500 mb-8">Λήψη κενού αρχείου με την προκαθορισμένη δομή.</p>
+                <div className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mt-auto py-2.5">
+                  DOWNLOAD
+                </div>
+              </button>
             </div>
 
-            {/* LOGS SECTION */}
-            <div className="flex-1 bg-slate-900/20 border border-slate-800/40 rounded-[2rem] p-6 flex flex-col">
-              <div className="flex items-center gap-2 mb-4 opacity-50">
-                <Activity size={14} className="text-slate-400" />
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Recent Activity Log</span>
+            {/* ACTIVITY LOG */}
+            <div className="flex-1 bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 flex flex-col">
+              <div className="flex items-center gap-2 mb-6 text-slate-500">
+                <Activity size={14} />
+                <h4 className="text-[10px] font-bold uppercase tracking-widest">RECENT ACTIVITY LOG</h4>
               </div>
-              <div className="flex-1 flex flex-col justify-center items-center">
-                  <p className="text-slate-600 text-[10px] font-medium italic">No ingestion events recorded yet.</p>
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-xs text-slate-600 italic">No ingestion events recorded yet.</span>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* PANEL 3: GLOBAL SETTINGS */}
-        <div className="col-span-4 flex flex-col gap-4">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">Global Settings</h3>
-          <div className="bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-8 space-y-6 shadow-2xl text-slate-200">
-            <ConfigItem icon={<Globe2 size={18}/>} label="Coordinate System" value="ΕΓΣΑ '87 / EPSG:2100" />
-            <ConfigItem icon={<Ruler size={18}/>} label="Measurement Units" value="Meters / Grads" />
-            <ConfigItem icon={<Beaker size={18}/>} label="Adjustment Method" value="Least Squares (Rigorous)" />
-            <hr className="border-slate-800 my-4 opacity-50" />
-            <div className="flex items-center justify-between p-4 bg-slate-950/50 rounded-2xl border border-slate-800/40 group cursor-pointer hover:border-slate-600 transition-all text-slate-300">
-              <div className="flex items-center gap-3">
-                <Settings2 size={18} className="text-slate-500" />
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-tighter">Advanced Params</span>
-              </div>
-              <ChevronRight size={14} className="text-slate-600 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
+
+          {/* RIGHT PANEL: GLOBAL SETTINGS */}
+          <div className="col-span-4 flex flex-col gap-4">
+            <SectionTitle title="GLOBAL SETTINGS" />
+            
+            <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 space-y-6">
+              
+              <SettingItem 
+                icon={<Globe2 />} 
+                label="COORDINATE SYSTEM" 
+                value="ΕΓΣΑ '87 / EPSG:2100" 
+              />
+              
+              <SettingItem 
+                icon={<Ruler />} 
+                label="MEASUREMENT UNITS" 
+                value="Meters / Grads" 
+              />
+              
+              <SettingItem 
+                icon={<Beaker />} 
+                label="ADJUSTMENT METHOD" 
+                value="Least Squares (Rigorous)" 
+              />
+
+              <button className="w-full mt-4 flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all group">
+                <div className="flex items-center gap-3">
+                  <Settings2 size={16} className="text-slate-500 group-hover:text-white transition-colors" />
+                  <span className="text-[11px] font-bold text-white uppercase tracking-widest">ADVANCED PARAMS</span>
+                </div>
+                <ChevronRight size={14} className="text-slate-600 group-hover:text-white transition-colors" />
+              </button>
+              
+            </div>
+          </div>
+
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
-// HELPER COMPONENTS
-const ProjectButton = ({ icon, title, desc, primary }) => (
-  <button className={`w-full p-5 rounded-2xl flex items-center gap-4 transition-all text-left group ${
-    primary ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-950/40 text-slate-300 hover:bg-slate-900 border border-slate-800/50 hover:border-slate-700'
-  }`}>
-    <div className={`${primary ? 'text-white' : 'text-blue-500'} group-hover:scale-110 transition-transform`}>{icon}</div>
-    <div>
-      <p className="text-sm font-bold uppercase tracking-tight">{title}</p>
-      <p className={`text-[10px] font-medium ${primary ? 'text-blue-100' : 'text-slate-500'}`}>{desc}</p>
-    </div>
-  </button>
+/* --- ΕΠΙΜΕΡΟΥΣ COMPONENTS ΓΙΑ ΚΑΘΑΡΟΤΕΡΟ ΚΩΔΙΚΑ --- */
+
+const SectionTitle = ({ title }) => (
+  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.15em] ml-2">
+    {title}
+  </h3>
 );
 
-const ConfigItem = ({ icon, label, value }) => (
-  <div className="space-y-2">
-    <label className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
-      {icon} {label}
-    </label>
-    <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs font-bold text-slate-200 shadow-inner">
+const ActionButton = ({ icon, title, subtitle, variant }) => {
+  const isPrimary = variant === 'primary';
+  return (
+    <button className={`
+      w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border text-left
+      ${isPrimary 
+        ? 'bg-blue-600 border-blue-500 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.2)]' 
+        : 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-slate-700 text-slate-300'}
+    `}>
+      <div className={`flex items-center justify-center ${isPrimary ? 'text-white' : 'text-slate-400'}`}>
+        {icon}
+      </div>
+      <div>
+        <h4 className={`text-[13px] font-bold uppercase tracking-wide ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
+          {title}
+        </h4>
+        <p className={`text-[11px] mt-0.5 ${isPrimary ? 'text-blue-100' : 'text-slate-500'}`}>
+          {subtitle}
+        </p>
+      </div>
+    </button>
+  );
+};
+
+const SettingItem = ({ icon, label, value }) => (
+  <div className="space-y-3">
+    <div className="flex items-center gap-2 text-slate-500">
+      {React.cloneElement(icon, { size: 14 })}
+      <span className="text-[10px] font-bold uppercase tracking-[0.15em]">{label}</span>
+    </div>
+    <div className="w-full px-4 py-3.5 bg-[#030712] border border-slate-800 rounded-xl text-sm font-semibold text-slate-200">
       {value}
     </div>
   </div>
