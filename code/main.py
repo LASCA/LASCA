@@ -17,7 +17,7 @@ def run_app_logic(excel_path):
         # Εκτέλεση υπολογισμών
         adj_df, adj_meta = dpr.process_network_data(df_adj)
         results['adjustment'] = adj_df
-        
+        print(results)
         # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
         print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
         vis.plot_std_dev_lollipop_df(adj_df)

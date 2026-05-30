@@ -1,12 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play } from 'lucide-react';
 import axios from 'axios';
 
 const Adjustment = ({ observations, setObservations }) => {
   const [isAdjusted, setIsAdjusted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Ref για να αποτρέψουμε το infinite loop κατά το αυτόματο φορμάρισμα
+  const isFormattingRef = useRef(false);
 
-  // Αρχικοποίηση με 3 κενές γραμμές αν ο πίνακας είναι άδειος κατά τη φόρτωση
+  // Βοηθητική συνάρτηση για μετατροπή σε 4 δεκαδικά (για Face I & II)
+  const to4 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(4);
+  };
+
+  // Βοηθητική συνάρτηση για μετατροπή σε 2 δεκαδικά (για Τυπική Απόκλιση)
+  const to2 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(2);
+  };
+
+  // ΑΥΤΟΜΑΤΟ ΦΟΡΜΑΡΙΣΜΑ ΜΟΛΙΣ ΜΠΟΥΝ ΤΑ ΔΕΔΟΜΕΝΑ (π.χ. από Import)
+  useEffect(() => {
+    if (isFormattingRef.current) {
+      isFormattingRef.current = false;
+      return;
+    }
+
+    // Ελέγχει αν υπάρχει έστω και ένα κελί που θέλει μετατροπή σε 4 δεκαδικά
+    const needsFormatting = observations.some(obs => {
+      const f1 = String(obs.Face_I || "");
+      const f2 = String(obs.Face_II || "");
+      return (f1 !== "" && (!f1.includes('.') || f1.split('.')[1].length !== 4)) ||
+             (f2 !== "" && (!f2.includes('.') || f2.split('.')[1].length !== 4));
+    });
+
+    if (needsFormatting) {
+      isFormattingRef.current = true;
+      const formatted = observations.map(obs => ({
+        ...obs,
+        Face_I: to4(obs.Face_I),
+        Face_II: to4(obs.Face_II)
+      }));
+      setObservations(formatted);
+    }
+  }, [observations, setObservations]);
+
   useEffect(() => {
     if (observations && observations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
@@ -14,10 +56,10 @@ const Adjustment = ({ observations, setObservations }) => {
         station: "", 
         target: "", 
         Period: "1", 
-        Face_I: "0.0000", 
-        Face_II: "0.0000", 
-        adj_hz: "0.0000", 
-        std_dev: "0.0000"
+        Face_I: "", 
+        Face_II: "", 
+        adj_hz: "", 
+        std_dev: ""
       }));
       setObservations(initialRows);
     }
@@ -29,7 +71,13 @@ const Adjustment = ({ observations, setObservations }) => {
     ));
   };
 
-  // --- Logic Πλοήγησης με Βελάκια & Enter ---
+  // Μορφοποίηση κατά την έξοδο από το κελί
+  const handleBlur = (id, field, value) => {
+    if (field === 'Face_I' || field === 'Face_II') {
+      handleInputChange(id, field, to4(value));
+    }
+  };
+
   const handleKeyDown = (e, index, colName) => {
     const columns = ['station', 'target', 'Period', 'Face_I', 'Face_II'];
     const colIndex = columns.indexOf(colName);
@@ -42,21 +90,25 @@ const Adjustment = ({ observations, setObservations }) => {
       e.preventDefault();
       nextRow = index + 1;
       shouldMove = true;
+      e.target.blur(); 
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       nextRow = index - 1;
       shouldMove = true;
+      e.target.blur();
     } else if (e.key === 'ArrowLeft') {
       if (e.target.selectionStart === 0) {
         e.preventDefault();
         nextCol = colIndex - 1;
         shouldMove = true;
+        e.target.blur();
       }
     } else if (e.key === 'ArrowRight') {
       if (e.target.selectionEnd === e.target.value.length) {
         e.preventDefault();
         nextCol = colIndex + 1;
         shouldMove = true;
+        e.target.blur();
       }
     }
 
@@ -76,8 +128,8 @@ const Adjustment = ({ observations, setObservations }) => {
     const newId = Date.now();
     const newRow = { 
         id: newId, station: "", target: "", Period: "1", 
-        Face_I: "0.0000", Face_II: "0.0000", 
-        adj_hz: "0.0000", std_dev: "0.0000" 
+        Face_I: "", Face_II: "", 
+        adj_hz: "", std_dev: "" 
     };
     const updated = [...observations];
     updated.splice(index + 1, 0, newRow);
@@ -87,17 +139,49 @@ const Adjustment = ({ observations, setObservations }) => {
   const runAdjustment = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/adjustment', {
-        measurements: observations
+      const validObservations = observations.filter(obs => 
+        String(obs.station || "").trim() !== "" && String(obs.target || "").trim() !== ""
+      );
+
+      if (validObservations.length === 0) {
+        alert("Συμπληρώστε τουλάχιστον μία έγκυρη μέτρηση.");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await axios.post('http://127.0.0.1:5000/api/adjustment', {
+        measurements: observations 
       });
 
-      if (response.data) {
-        setObservations(response.data.results);
-        setIsAdjusted(true);
+      if (response.data && response.data.results) {
+        const resultsFromPython = response.data.results;
+
+        const updatedObservations = observations.map(obs => {
+          const match = resultsFromPython.find(
+            res => String(res.station) === String(obs.station) && 
+                   String(res.target) === String(obs.target)
+          );
+
+          if (match) {
+            return {
+              ...obs,
+              // Εδώ επιβάλλουμε τη μορφοποίηση στα αποτελέσματα
+              adj_hz: to4(match.adj_hz),
+              std_dev: to2(match.std_dev),
+              // Μορφοποιούμε και τα αρχικά Face I/II σε περίπτωση που δεν είχαν 4 δεκαδικά
+              Face_I: to4(obs.Face_I),
+              Face_II: to4(obs.Face_II)
+            };
+          }
+          return obs; 
+        });
+
+        setObservations(updatedObservations);
+        setIsAdjusted(true); 
       }
     } catch (error) {
       console.error("Σφάλμα στη συνόρθωση:", error);
-      alert("Αποτυχία σύνδεσης με το backend. Ελέγξτε αν ο server είναι ανοιχτός.");
+      alert("Αποτυχία σύνδεσης με το backend.");
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +200,6 @@ const Adjustment = ({ observations, setObservations }) => {
 
       <div className="flex flex-1 gap-6 min-h-0">
         
-        {/* ΑΡΙΣΤΕΡΗ ΣΤΗΛΗ: ΠΙΝΑΚΑΣ (Ανεξάρτητο Scroll) */}
         <div className="flex-[1.6] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col min-h-0">
             <div className="overflow-y-auto custom-scrollbar flex-1">
@@ -140,10 +223,9 @@ const Adjustment = ({ observations, setObservations }) => {
                         <button 
                           onClick={runAdjustment}
                           disabled={isLoading}
-                          title="Εκτέλεση Συνορθώσης"
-                          className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer ${
+                          className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
                             isLoading 
-                              ? 'opacity-50 cursor-not-allowed bg-slate-800 border border-slate-700' 
+                              ? 'opacity-50 bg-slate-800 border border-slate-700' 
                               : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50'
                           }`}
                         >
@@ -162,7 +244,6 @@ const Adjustment = ({ observations, setObservations }) => {
                     <React.Fragment key={obs.id}>
                       <tr className="group hover:bg-blue-600/[0.03] transition-all">
                         <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
-                        
                         <td className="p-2">
                           <input 
                             id={`input-${index}-station`}
@@ -172,7 +253,6 @@ const Adjustment = ({ observations, setObservations }) => {
                             onKeyDown={(e) => handleKeyDown(e, index, 'station')}
                           />
                         </td>
-                        
                         <td className="p-2">
                           <input 
                             id={`input-${index}-target`}
@@ -182,7 +262,6 @@ const Adjustment = ({ observations, setObservations }) => {
                             onKeyDown={(e) => handleKeyDown(e, index, 'target')}
                           />
                         </td>
-                        
                         <td className="p-2">
                           <input 
                             id={`input-${index}-Period`}
@@ -192,25 +271,23 @@ const Adjustment = ({ observations, setObservations }) => {
                             onKeyDown={(e) => handleKeyDown(e, index, 'Period')}
                           />
                         </td>
-                        
-                        {/* ΕΠΑΝΑΦΟΡΑ 4 ΔΕΚΑΔΙΚΩΝ ΣΤΟ FACE I */}
                         <td className="p-2">
                           <input 
                             id={`input-${index}-Face_I`}
                             className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
-                            value={Number(obs.Face_I || 0).toFixed(4)} 
+                            value={obs.Face_I} 
                             onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)}
+                            onBlur={(e) => handleBlur(obs.id, 'Face_I', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'Face_I')}
                           />
                         </td>
-                        
-                        {/* ΕΠΑΝΑΦΟΡΑ 4 ΔΕΚΑΔΙΚΩΝ ΣΤΟ FACE II */}
                         <td className="p-2">
                           <input 
                             id={`input-${index}-Face_II`}
                             className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:text-blue-400 focus:bg-slate-800/50 rounded" 
-                            value={Number(obs.Face_II || 0).toFixed(4)} 
+                            value={obs.Face_II} 
                             onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)}
+                            onBlur={(e) => handleBlur(obs.id, 'Face_II', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'Face_II')}
                           />
                         </td>
@@ -219,12 +296,12 @@ const Adjustment = ({ observations, setObservations }) => {
                           <>
                             <td className="p-2 animate-in fade-in slide-in-from-left-2 duration-500">
                               <div className="w-full p-2 text-sm font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center shadow-[0_0_10px_rgba(16,185,129,0.05)]">
-                                {Number(obs.adj_hz || 0).toFixed(4)}
+                                {obs.adj_hz || "-"}
                               </div>
                             </td>
                             <td className="p-2 animate-in fade-in slide-in-from-left-4 duration-700">
                               <div className="w-full p-2 text-[11px] font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center shadow-[0_0_10px_rgba(16,185,129,0.05)]">
-                                {Number(obs.std_dev || 0).toFixed(4)}
+                                {obs.std_dev || "-"}
                               </div>
                             </td>
                           </>
@@ -251,7 +328,7 @@ const Adjustment = ({ observations, setObservations }) => {
           </div>
         </div>
 
-        {/* ΔΕΞΙΑ ΣΤΗΛΗ: ΟΠΤΙΚΟΠΟΙΗΣΗ */}
+        {/* Δεξιά Πλευρά: Visualizer */}
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative group">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -263,13 +340,13 @@ const Adjustment = ({ observations, setObservations }) => {
           </div>
           
           <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
-             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"></div>
-             <div className="text-center z-10">
+              <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"></div>
+              <div className="text-center z-10">
                 <Target className={`mx-auto transition-all duration-1000 ${isAdjusted ? 'text-emerald-500 scale-110 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-slate-800 group-hover:text-blue-500/40'}`} size={60} strokeWidth={1} />
                 <p className={`text-[9px] font-black uppercase tracking-[0.3em] mt-6 transition-colors duration-700 ${isAdjusted ? 'text-emerald-400' : 'text-slate-700'}`}>
                   {isAdjusted ? "Solution Computed" : "Interactive Map View"}
                 </p>
-             </div>
+              </div>
           </div>
         </div>
 

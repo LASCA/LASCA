@@ -5,7 +5,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Adjustment from './components/Adjustment';
 import Traverse from './components/Traverse';
-import Tachymetry from './components/Tachymetry'; // Διορθώθηκε το import
+import Tachymetry from './components/Tachymetry'; 
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');

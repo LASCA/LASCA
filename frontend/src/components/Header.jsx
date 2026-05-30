@@ -31,8 +31,6 @@ const Header = ({ activeTab }) => {
           bgAccentSubtle: "bg-emerald-500/5 border-emerald-500/20",
           stats: [
             { label: "ALGORITHM", value: "LEAST_SQ", valColor: "text-emerald-400" },
-            { label: "TOLERANCE", value: "0.1mm", valColor: "text-slate-300" },
-            { label: "ITERATIONS", value: "MAX_10", valColor: "text-amber-500" }
           ],
           statusText: "ENGINE_READY"
         };
