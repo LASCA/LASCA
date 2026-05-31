@@ -7,9 +7,9 @@ import {
   Activity, 
   Target, 
   Ruler,
-  Settings2,
   Play,
-  Cpu
+  Cpu,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const Traverse = ({ data = [], onDataUpdate }) => {
@@ -17,6 +17,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
   const [tableData, setTableData] = useState(data);
   const [metrics, setMetrics] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [plotImage, setPlotImage] = useState(null); 
   
   // States για τις παραμέτρους
   const [klass, setKlass] = useState("Πρωτεύουσα");
@@ -102,6 +103,9 @@ const Traverse = ({ data = [], onDataUpdate }) => {
         }
         if (response.data.metrics) {
           setMetrics(response.data.metrics);
+        }
+        if (response.data.plot) {
+          setPlotImage(response.data.plot);
         }
       }
     } catch (error) {
@@ -389,13 +393,23 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             </div>
           </div>
           
-          <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:30px_30px]"></div>
-              <div className="text-center z-10">
-                 <MapIcon size={32} className="mx-auto mb-3 text-slate-800 group-hover:text-pink-500/40 transition-all duration-700" />
-                 <p className="text-[8px] tracking-[0.4em] text-slate-700 font-black uppercase">Visual Engine Ready</p>
-              </div>
-          </div>
+          {plotImage ? (
+             <div className="flex-1 w-full h-full flex items-center justify-center bg-[#121212] overflow-hidden">
+               <img 
+                 src={plotImage} 
+                 alt="Διάγραμμα Όδευσης" 
+                 className="max-w-full max-h-full object-contain p-4"
+               />
+             </div>
+          ) : (
+             <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:30px_30px]"></div>
+                <div className="text-center z-10">
+                   <ImageIcon size={32} className="mx-auto mb-3 text-slate-800 group-hover:text-pink-500/40 transition-all duration-700" />
+                   <p className="text-[8px] tracking-[0.4em] text-slate-700 font-black uppercase">Visual Engine Ready</p>
+                </div>
+             </div>
+          )}
         </div>
 
       </div>

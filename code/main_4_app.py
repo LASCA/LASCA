@@ -44,8 +44,12 @@ def run_adjustment():
         # ΚΛΗΣΗ ΤΟΥ ΑΛΓΟΡΙΘΜΟΥ ΣΥΝΟΡΘΩΣΗΣ
         adj_df, adj_meta = dpr.process_network_data(df)
         
-        # Δημιουργία του Γραφήματος
-        plot_base64 = vis.plot_std_dev_lollipop_df(adj_df)
+        # Δημιουργία του Γραφήματος (ΑΣΦΑΛΗΣ ΕΚΤΕΛΕΣΗ)
+        plot_base64 = None
+        try:
+            plot_base64 = vis.plot_std_dev_lollipop_df(adj_df)
+        except Exception as e:
+            print(f"Σφάλμα γραφήματος συνόρθωσης: {e}")
         
         # Μετατροπή του adj_df σε JSON-friendly λίστα για το React
         results = []
@@ -163,9 +167,18 @@ def run_traverse():
             else:
                 updated_measurements.append(m)
 
+        # 5. ΔΗΜΙΟΥΡΓΙΑ ΓΡΑΦΗΜΑΤΟΣ (ΑΣΦΑΛΗΣ ΕΚΤΕΛΕΣΗ)
+        plot_base64 = None
+        try:
+            plot_base64 = vis.plot_traverse_base64(results_rr)
+        except Exception as e:
+            print(f"Σφάλμα γραφήματος όδευσης: {e}")
+
+        # 6. Επιστροφή JSON στο React (συμπεριλαμβάνεται το plot_base64)
         return jsonify({
             "results": updated_measurements,
-            "metrics": react_metrics
+            "metrics": react_metrics,
+            "plot": plot_base64
         })
 
     except Exception as e:
