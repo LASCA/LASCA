@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
   Map as MapIcon, 
   Info, 
@@ -85,7 +86,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
   };
 
   const formatVal = (val, decimals = 4) => {
-    if (val === "" || val === undefined || val === null) return "-";
+    if (val === "" || val === undefined || val === null) return "";
     const num = parseFloat(val);
     return isNaN(num) ? val : num.toFixed(decimals);
   };
@@ -132,8 +133,8 @@ const Traverse = ({ data = [], onDataUpdate }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden relative">
-      <style>
-        {`
+      <style dangerouslySetInnerHTML={{
+        __html: `
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
@@ -159,8 +160,8 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             border-color: rgba(251, 191, 36, 0.4);
             background-color: rgba(15, 23, 42, 0.8);
           }
-        `}
-      </style>
+        `
+      }} />
 
       <div className="flex flex-1 gap-6 min-h-0">
         
@@ -270,7 +271,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             <input 
                               id={`input-${idx}-name`}
                               type="text"
-                              value={row.name || ""}
+                              value={row.name ?? ""}
                               onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, idx, 'name')}
                               className="bg-transparent w-full font-bold text-slate-300 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
@@ -282,8 +283,9 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                           <input 
                             id={`input-${idx}-hz`}
                             type="text"
-                            value={row.hz !== "" ? formatVal(row.hz, 4) : ""}
+                            value={row.hz ?? ""}
                             onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
+                            onBlur={(e) => handleInputChange(idx, 'hz', formatVal(e.target.value, 4))}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
                             className="bg-transparent w-full font-mono text-amber-400/90 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
@@ -293,8 +295,9 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                           <input 
                             id={`input-${idx}-sd`}
                             type="text"
-                            value={row.sd !== "" ? formatVal(row.sd, 3) : ""}
+                            value={row.sd ?? ""}
                             onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
+                            onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
                             className="bg-transparent w-full font-mono text-slate-400 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
@@ -304,7 +307,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                           <input 
                             id={`input-${idx}-x`}
                             type="text"
-                            value={row.x || ""}
+                            value={row.x ?? ""}
                             onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'x')}
                             className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
@@ -315,7 +318,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                           <input 
                             id={`input-${idx}-y`}
                             type="text"
-                            value={row.y || ""}
+                            value={row.y ?? ""}
                             onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'y')}
                             className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
@@ -326,7 +329,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                           <input 
                             id={`input-${idx}-h`}
                             type="text"
-                            value={row.h || ""}
+                            value={row.h ?? ""}
                             onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
                             className="bg-transparent w-full font-mono text-emerald-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
@@ -358,7 +361,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             <div className="flex flex-row gap-4 items-stretch">
               <div className="flex-1 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <CompactStat label="Κορυφές (n)" value={tableData.length} icon={<Target size={12}/>} color="text-slate-200" />
+                  <CompactStat label="Κορυφές (n)" value={metrics.n} icon={<Target size={12}/>} color="text-slate-200" />
                   <CompactStat label="Μήκος (L)" value={metrics.totalLength} unit="m" icon={<Ruler size={12}/>} color="text-slate-200" />
                 </div>
                 <DetailedAngleGroup 
@@ -409,14 +412,24 @@ const Traverse = ({ data = [], onDataUpdate }) => {
           
           {plotImage ? (
              <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden group">
-               <img 
-                 src={plotImage} 
-                 alt="Διάγραμμα Όδευσης" 
-                 className="max-w-full max-h-full object-contain p-4"
-               />
+               <TransformWrapper
+                 initialScale={1}
+                 minScale={1}
+                 maxScale={10}
+                 centerOnInit={true}
+                 wheel={{ step: 0.03 }}
+                 pinch={{ step: 1 }}
+               >
+                 <TransformComponent wrapperStyle={{ width: "100%", height: "100%", cursor: "move" }}>
+                   <img 
+                     src={plotImage} 
+                     alt="Διάγραμμα Όδευσης" 
+                     className="max-w-full max-h-full object-contain p-4 pointer-events-none"
+                   />
+                 </TransformComponent>
+               </TransformWrapper>
                
-               {/* Overlay Buttons for Hover */}
-               <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+               <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                  <button
                    onClick={() => setIsFullscreen(true)}
                    className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg"
@@ -449,7 +462,6 @@ const Traverse = ({ data = [], onDataUpdate }) => {
       {/* FULLSCREEN OVERLAY MODAL */}
       {isFullscreen && plotImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md">
-          {/* Close Button */}
           <button
             onClick={() => setIsFullscreen(false)}
             className="absolute top-6 right-6 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
@@ -458,7 +470,6 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             <X size={24} className="group-hover:text-pink-500 transition-colors" />
           </button>
 
-          {/* Download Button */}
           <button
             onClick={handleDownload}
             className="absolute top-6 right-24 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
@@ -467,11 +478,28 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             <Download size={24} className="group-hover:text-emerald-500 transition-colors" />
           </button>
 
-          <img
-            src={plotImage}
-            alt="Διάγραμμα Όδευσης Fullscreen"
-            className="max-w-[95vw] max-h-[95vh] object-contain p-4 rounded-lg"
-          />
+          <div className="w-full h-full flex items-center justify-center cursor-move">
+            <TransformWrapper
+              initialScale={1}
+              minScale={1} 
+              maxScale={8}
+              centerOnInit={true}
+              wheel={{ step: 0.02 }}
+              pinch={{ step: 1 }}
+            >
+              <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
+                <img
+                  src={plotImage}
+                  alt="Διάγραμμα Όδευσης Fullscreen"
+                  className="max-w-[95vw] max-h-[95vh] object-contain p-4 rounded-lg pointer-events-none"
+                />
+              </TransformComponent>
+            </TransformWrapper>
+          </div>
+          
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-400 text-xs tracking-widest uppercase bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800/50 backdrop-blur-sm pointer-events-none">
+            Scroll για Zoom • Drag για Περιήγηση
+          </div>
         </div>
       )}
     </div>
@@ -484,7 +512,9 @@ const CompactStat = ({ label, value, unit, icon, color }) => (
     <div className="text-slate-500">{icon}</div>
     <div className="flex flex-col">
       <span className="text-[8px] font-black text-slate-500 tracking-widest">{label}</span>
-      <span className={`text-sm font-mono font-bold ${color}`}>{value || "0"}{unit}</span>
+      <span className={`text-sm font-mono font-bold ${color}`}>
+        {value !== undefined && value !== null ? value : "0"}{unit || ""}
+      </span>
     </div>
   </div>
 );
