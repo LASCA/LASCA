@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
   Map as MapIcon, 
   Info, 
@@ -7,12 +8,20 @@ import {
   Target, 
   Ruler,
   Settings2,
-  Play 
+  Play,
+  Cpu
 } from 'lucide-react';
 
-const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
+const Traverse = ({ data = [], onDataUpdate }) => {
   
   const [tableData, setTableData] = useState(data);
+  const [metrics, setMetrics] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // States για τις παραμέτρους
+  const [klass, setKlass] = useState("Πρωτεύουσα");
+  const [terrain, setTerrain] = useState("Ομαλό");
+  const [scale, setScale] = useState("1:1000");
 
   useEffect(() => {
     setTableData(data);
@@ -28,7 +37,6 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
     }
   };
 
-  // Βελτιωμένη Συνάρτηση για πλοήγηση με τα Βελάκια & Enter
   const handleKeyDown = (e, rowIndex, colName) => {
     const columns = ['name', 'hz', 'sd', 'x', 'y', 'h'];
     const colIndex = columns.indexOf(colName);
@@ -46,14 +54,12 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
       nextRow = rowIndex - 1;
       shouldMove = true;
     } else if (e.key === 'ArrowLeft') {
-      // Προχωράει αριστερά μόνο αν ο κέρσορας είναι στην αρχή του κειμένου
       if (e.target.selectionStart === 0) {
         e.preventDefault();
         nextCol = colIndex - 1;
         shouldMove = true;
       }
     } else if (e.key === 'ArrowRight') {
-      // Προχωράει δεξιά μόνο αν ο κέρσορας είναι στο τέλος του κειμένου
       if (e.target.selectionEnd === e.target.value.length) {
         e.preventDefault();
         nextCol = colIndex + 1;
@@ -67,7 +73,6 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
         const nextInput = document.getElementById(`input-${nextRow}-${nextColName}`);
         if (nextInput) {
           nextInput.focus();
-          // Το setTimeout διασφαλίζει ότι η επιλογή κειμένου γίνεται αφού εστιάσει το κελί
           setTimeout(() => nextInput.select(), 0); 
         }
       }
@@ -78,6 +83,33 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
     if (val === "" || val === undefined || val === null) return "-";
     const num = parseFloat(val);
     return isNaN(num) ? val : num.toFixed(decimals);
+  };
+
+  const handleRunTraverse = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/api/traverse', {
+        measurements: tableData,
+        scale: scale,
+        terrain: terrain,
+        klass: klass
+      });
+
+      if (response.data) {
+        if (response.data.results) {
+          setTableData(response.data.results);
+          if (onDataUpdate) onDataUpdate(response.data.results);
+        }
+        if (response.data.metrics) {
+          setMetrics(response.data.metrics);
+        }
+      }
+    } catch (error) {
+      console.error("Σφάλμα κατά την Όδευση:", error);
+      alert("Αποτυχία υπολογισμού όδευσης.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -134,9 +166,13 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                     <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
                       Τάξη
                     </label>
-                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
-                      <option value="1">Ι</option>
-                      <option value="2">ΙΙ</option>
+                    <select 
+                      value={klass}
+                      onChange={(e) => setKlass(e.target.value)}
+                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
+                    >
+                      <option value="Πρωτεύουσα">Ι (Πρωτεύουσα)</option>
+                      <option value="Δευτερεύουσα">ΙΙ (Δευτερεύουσα)</option>
                     </select>
                   </div>
 
@@ -145,9 +181,14 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                     <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
                       Έδαφος
                     </label>
-                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
-                      <option>Ομαλό</option>
-                      <option>Κεκλιμένο</option>
+                    <select 
+                      value={terrain}
+                      onChange={(e) => setTerrain(e.target.value)}
+                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
+                    >
+                      <option value="Ομαλό">Ομαλό</option>
+                      <option value="Κεκλιμένο">Κεκλιμένο</option>
+                      <option value="Ανώμαλο">Ανώμαλο</option> 
                     </select>
                   </div>
 
@@ -156,11 +197,15 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
                     <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
                       Κλίμακα
                     </label>
-                    <select className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700">
-                      <option>1:200</option>
-                      <option>1:500</option>
-                      <option>1:1000</option>
-                      <option>1:2000</option>
+                    <select 
+                      value={scale}
+                      onChange={(e) => setScale(e.target.value)}
+                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
+                    >
+                      <option value="1:200">1:200</option>
+                      <option value="1:500">1:500</option>
+                      <option value="1:1000">1:1000</option>
+                      <option value="1:2000">1:2000</option>
                     </select>
                   </div>
                 </div>
@@ -168,11 +213,20 @@ const Traverse = ({ data = [], metrics = {}, onDataUpdate }) => {
 
               {/* ΚΟΥΜΠΙ όδευσης */}
               <button 
-                onClick={() => console.log("Μελλοντική κλήση αλγορίθμου οδευσης...")}
-                title="Εκτέλεση"
-                className="group flex items-center justify-center w-8 h-8 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer"
+                onClick={handleRunTraverse}
+                disabled={isLoading}
+                title="Εκτέλεση Όδευσης"
+                className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] ${
+                  isLoading 
+                    ? 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer'
+                }`}
               >
-                <Play size={14} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
+                {isLoading ? (
+                   <Cpu size={14} className="animate-spin text-emerald-500" />
+                ) : (
+                   <Play size={14} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
+                )}
               </button>
             </div>
 
