@@ -9,7 +9,10 @@ import {
   Ruler,
   Play,
   Cpu,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Maximize2,
+  Download,
+  X
 } from 'lucide-react';
 
 const Traverse = ({ data = [], onDataUpdate }) => {
@@ -18,6 +21,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
   const [metrics, setMetrics] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [plotImage, setPlotImage] = useState(null); 
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // States για τις παραμέτρους
   const [klass, setKlass] = useState("Πρωτεύουσα");
@@ -116,8 +120,18 @@ const Traverse = ({ data = [], onDataUpdate }) => {
     }
   };
 
+  const handleDownload = () => {
+    if (!plotImage) return;
+    const a = document.createElement('a');
+    a.href = plotImage;
+    a.download = 'traverse_plot.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden relative">
       <style>
         {`
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -126,13 +140,13 @@ const Traverse = ({ data = [], onDataUpdate }) => {
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
 
          select {
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 0.4rem center;
-            background-size: 0.7em;
-            color-scheme: dark; 
-          }
+           appearance: none;
+           background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+           background-repeat: no-repeat;
+           background-position: right 0.4rem center;
+           background-size: 0.7em;
+           color-scheme: dark; 
+         }
 
           select option {
             background-color: #0b1120;
@@ -394,12 +408,30 @@ const Traverse = ({ data = [], onDataUpdate }) => {
           </div>
           
           {plotImage ? (
-             <div className="flex-1 w-full h-full flex items-center justify-center bg-[#121212] overflow-hidden">
+             <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden group">
                <img 
                  src={plotImage} 
                  alt="Διάγραμμα Όδευσης" 
                  className="max-w-full max-h-full object-contain p-4"
                />
+               
+               {/* Overlay Buttons for Hover */}
+               <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                 <button
+                   onClick={() => setIsFullscreen(true)}
+                   className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg"
+                   title="Πλήρης Οθόνη"
+                 >
+                   <Maximize2 size={16} />
+                 </button>
+                 <button
+                   onClick={handleDownload}
+                   className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg"
+                   title="Λήψη"
+                 >
+                   <Download size={16} />
+                 </button>
+               </div>
              </div>
           ) : (
              <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
@@ -413,6 +445,35 @@ const Traverse = ({ data = [], onDataUpdate }) => {
         </div>
 
       </div>
+
+      {/* FULLSCREEN OVERLAY MODAL */}
+      {isFullscreen && plotImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md">
+          {/* Close Button */}
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="absolute top-6 right-6 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
+            title="Κλείσιμο"
+          >
+            <X size={24} className="group-hover:text-pink-500 transition-colors" />
+          </button>
+
+          {/* Download Button */}
+          <button
+            onClick={handleDownload}
+            className="absolute top-6 right-24 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
+            title="Λήψη"
+          >
+            <Download size={24} className="group-hover:text-emerald-500 transition-colors" />
+          </button>
+
+          <img
+            src={plotImage}
+            alt="Διάγραμμα Όδευσης Fullscreen"
+            className="max-w-[95vw] max-h-[95vh] object-contain p-4 rounded-lg"
+          />
+        </div>
+      )}
     </div>
   );
 };
