@@ -1,36 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trash2, PlusCircle, Activity, Target, Cpu, Play } from 'lucide-react';
+// ΝΕΟ: Προσθήκη των Maximize2, Download, X
+import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X } from 'lucide-react';
 import axios from 'axios';
 
 const Adjustment = ({ observations, setObservations }) => {
   const [isAdjusted, setIsAdjusted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [plotImage, setPlotImage] = useState(null);
   
-  // Ref για να αποτρέψουμε το infinite loop κατά το αυτόματο φορμάρισμα
+  // ΝΕΟ: State για την πλήρη οθόνη
+  const [isFullscreen, setIsFullscreen] = useState(false); 
+  
   const isFormattingRef = useRef(false);
 
-  // Βοηθητική συνάρτηση για μετατροπή σε 4 δεκαδικά (για Face I & II)
   const to4 = (val) => {
     if (val === "" || val === null || val === undefined) return "";
     const num = parseFloat(String(val).replace(',', '.'));
     return isNaN(num) ? val : num.toFixed(4);
   };
 
-  // Βοηθητική συνάρτηση για μετατροπή σε 2 δεκαδικά (για Τυπική Απόκλιση)
   const to2 = (val) => {
     if (val === "" || val === null || val === undefined) return "";
     const num = parseFloat(String(val).replace(',', '.'));
     return isNaN(num) ? val : num.toFixed(2);
   };
 
-  // ΑΥΤΟΜΑΤΟ ΦΟΡΜΑΡΙΣΜΑ ΜΟΛΙΣ ΜΠΟΥΝ ΤΑ ΔΕΔΟΜΕΝΑ (π.χ. από Import)
   useEffect(() => {
     if (isFormattingRef.current) {
       isFormattingRef.current = false;
       return;
     }
 
-    // Ελέγχει αν υπάρχει έστω και ένα κελί που θέλει μετατροπή σε 4 δεκαδικά
     const needsFormatting = observations.some(obs => {
       const f1 = String(obs.Face_I || "");
       const f2 = String(obs.Face_II || "");
@@ -71,7 +71,6 @@ const Adjustment = ({ observations, setObservations }) => {
     ));
   };
 
-  // Μορφοποίηση κατά την έξοδο από το κελί
   const handleBlur = (id, field, value) => {
     if (field === 'Face_I' || field === 'Face_II') {
       handleInputChange(id, field, to4(value));
@@ -138,6 +137,8 @@ const Adjustment = ({ observations, setObservations }) => {
 
   const runAdjustment = async () => {
     setIsLoading(true);
+    setPlotImage(null);
+    
     try {
       const validObservations = observations.filter(obs => 
         String(obs.station || "").trim() !== "" && String(obs.target || "").trim() !== ""
@@ -165,10 +166,8 @@ const Adjustment = ({ observations, setObservations }) => {
           if (match) {
             return {
               ...obs,
-              // Εδώ επιβάλλουμε τη μορφοποίηση στα αποτελέσματα
               adj_hz: to4(match.adj_hz),
               std_dev: to2(match.std_dev),
-              // Μορφοποιούμε και τα αρχικά Face I/II σε περίπτωση που δεν είχαν 4 δεκαδικά
               Face_I: to4(obs.Face_I),
               Face_II: to4(obs.Face_II)
             };
@@ -178,6 +177,10 @@ const Adjustment = ({ observations, setObservations }) => {
 
         setObservations(updatedObservations);
         setIsAdjusted(true); 
+
+        if (response.data.plot) {
+          setPlotImage(response.data.plot);
+        }
       }
     } catch (error) {
       console.error("Σφάλμα στη συνόρθωση:", error);
@@ -187,8 +190,19 @@ const Adjustment = ({ observations, setObservations }) => {
     }
   };
 
+  // ΝΕΟ: Συνάρτηση για Λήψη της εικόνας
+  const handleDownload = () => {
+    if (!plotImage) return;
+    const link = document.createElement('a');
+    link.href = `data:image/png;base64,${plotImage}`;
+    link.download = 'Network_Preview_Plot.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden relative">
       <style>
         {`
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -200,6 +214,7 @@ const Adjustment = ({ observations, setObservations }) => {
 
       <div className="flex flex-1 gap-6 min-h-0">
         
+        {/* Αριστερή Πλευρά: Πίνακας */}
         <div className="flex-[1.6] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col min-h-0">
             <div className="overflow-y-auto custom-scrollbar flex-1">
@@ -329,28 +344,89 @@ const Adjustment = ({ observations, setObservations }) => {
         </div>
 
         {/* Δεξιά Πλευρά: Visualizer */}
-        <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative group">
+        <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500/10 rounded-lg">
                 <Activity size={18} className="text-blue-500" />
               </div>
-              <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200 ">Προεπισκόπηση Δικτύου</span>
+              <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200">Προεπισκόπηση Δικτύου</span>
             </div>
           </div>
           
-          <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"></div>
-              <div className="text-center z-10">
-                <Target className={`mx-auto transition-all duration-1000 ${isAdjusted ? 'text-emerald-500 scale-110 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-slate-800 group-hover:text-blue-500/40'}`} size={60} strokeWidth={1} />
-                <p className={`text-[9px] font-black uppercase tracking-[0.3em] mt-6 transition-colors duration-700 ${isAdjusted ? 'text-emerald-400' : 'text-slate-700'}`}>
-                  {isAdjusted ? "Solution Computed" : "Interactive Map View"}
-                </p>
-              </div>
+          <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden group">
+            <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"></div>
+            
+            <div className="w-full h-full flex items-center justify-center p-2 z-10 relative">
+              {isAdjusted && plotImage ? (
+                <>
+                  <img 
+                    src={`data:image/png;base64,${plotImage}`} 
+                    alt="Standard Deviations Plot" 
+                    className="max-w-full max-h-full object-contain animate-in fade-in zoom-in duration-700 drop-shadow-[0_0_15px_rgba(0,255,255,0.2)]"
+                  />
+                  
+                  {/* ΝΕΟ: Toolbar Πάνω Δεξιά στην Εικόνα */}
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                    <button 
+                      onClick={handleDownload}
+                      className="bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-400 p-2 rounded-lg backdrop-blur border border-slate-700/50 hover:border-emerald-500/50 transition-all cursor-pointer shadow-lg"
+                      title="Λήψη Γραφήματος"
+                    >
+                      <Download size={16} />
+                    </button>
+                    <button 
+                      onClick={() => setIsFullscreen(true)}
+                      className="bg-slate-900/80 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 p-2 rounded-lg backdrop-blur border border-slate-700/50 hover:border-cyan-500/50 transition-all cursor-pointer shadow-lg"
+                      title="Πλήρης Οθόνη"
+                    >
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center z-10">
+                  <Target className={`mx-auto transition-all duration-1000 ${isAdjusted ? 'text-emerald-500 scale-110 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-slate-800 group-hover:text-blue-500/40'}`} size={60} strokeWidth={1} />
+                  <p className={`text-[9px] font-black uppercase tracking-[0.3em] mt-6 transition-colors duration-700 ${isAdjusted ? 'text-emerald-400' : 'text-slate-700'}`}>
+                    {isAdjusted ? "Solution Computed" : "Interactive Map View"}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
       </div>
+
+      {/* ΝΕΟ: Fullscreen Overlay */}
+      {isFullscreen && plotImage && (
+        <div className="fixed inset-0 z-50 bg-[#030712]/95 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-300">
+          
+          {/* Κουμπί Κλεισίματος */}
+          <button 
+            onClick={() => setIsFullscreen(false)} 
+            className="absolute top-8 right-8 bg-slate-900/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 p-3 rounded-xl border border-slate-800 hover:border-red-500/50 transition-all cursor-pointer shadow-2xl"
+          >
+            <X size={24} />
+          </button>
+
+          {/* Η Εικόνα σε Μεγάλο Μέγεθος */}
+          <img 
+            src={`data:image/png;base64,${plotImage}`} 
+            alt="Standard Deviations Plot Fullscreen" 
+            className="max-w-[90vw] max-h-[90vh] object-contain drop-shadow-[0_0_40px_rgba(0,255,255,0.15)] rounded-lg"
+          />
+
+          {/* Κουμπί Λήψης (Κάτω Δεξιά στο Fullscreen) */}
+          <button 
+            onClick={handleDownload} 
+            className="absolute bottom-8 right-8 flex items-center gap-2 bg-slate-900/80 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 px-5 py-3 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition-all cursor-pointer shadow-2xl"
+          >
+            <Download size={20} />
+            <span className="text-xs font-bold tracking-wider uppercase">Λήψη</span>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };
