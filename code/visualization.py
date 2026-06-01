@@ -93,6 +93,11 @@ def traverse_plot(results: list) -> str:
     return ""
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import MultipleLocator
+
 def traverse_plot2(results: list) -> str:
     valid_points = [p for p in results if p.X is not None and p.Y is not None]
     if not valid_points: return ""
@@ -116,9 +121,19 @@ def traverse_plot2(results: list) -> str:
     
     n = len(valid_points)
     
-    # Ανίχνευση σημείων εξάρτησης
-    orient_indices = [i for i, p in enumerate(valid_points) if i == 0 or i == n-1 or "Σ" in p.name]
+    # --- ΝΕΑ ΔΙΟΡΘΩΜΕΝΗ ΛΟΓΙΚΗ ΑΝΙΧΝΕΥΣΗΣ ΣΗΜΕΙΩΝ ΕΞΑΡΤΗΣΗΣ (ΤΡΙΓΩΝΑ) ---
+    orient_indices = []
+    fixed_indices = [0, 1, n-2, n-1] if n >= 4 else [0, n-1]
+
+    for i, p in enumerate(valid_points):
+        name_str = str(p.name).upper().strip()
+        # Έλεγχος θέσης (βάσει standard όδευσης 4 σημείων) ή ονομασίας με 'Σ'
+        if i in fixed_indices or "Σ" in name_str:
+            orient_indices.append(i)
+            
+    # Οι πραγματικές ενδιάμεσες στάσεις (Κύκλος με +)
     station_indices = [i for i in range(n) if i not in orient_indices]
+    # -------------------------------------------------------------------
 
     for i in range(n - 1):
         dist = np.sqrt((X[i+1]-X[i])**2 + (Y[i+1]-Y[i])**2)
@@ -136,8 +151,9 @@ def traverse_plot2(results: list) -> str:
             rotation_mode='anchor')
         
     # Σχεδίαση Τριγώνων (Σημεία Εξάρτησης)
-    ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
-               marker='^', s=100, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
+    if orient_indices:
+        ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
+                   marker='^', s=100, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
     
     # Σχεδίαση Στάσεων
     if station_indices:
@@ -154,9 +170,10 @@ def traverse_plot2(results: list) -> str:
         ax.plot(X[0:2], Y[0:2], color='gray', linestyle='--', linewidth=1.2)
         ax.plot(X[1:n-1], Y[1:n-1], color="#FF00BB", linestyle='-', linewidth=1.5)
         ax.plot(X[n-2:n], Y[n-2:n], color='gray', linestyle='--')
+    else:
+        ax.plot(X, Y, color="#FF00BB", linestyle='-', linewidth=1.5)
     
     # --- ΡΥΘΜΙΣΗ ΚΑΝΝΑΒΟΥ ΜΕ ΙΔΙΟ ΒΗΜΑ ---
-    # Μπορείς να αλλάξεις το 25 σε 50 ή 100 ανάλογα με την έκταση της όδευσης
     grid_interval = 50 
     ax.xaxis.set_major_locator(MultipleLocator(grid_interval))
     ax.yaxis.set_major_locator(MultipleLocator(grid_interval))

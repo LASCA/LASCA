@@ -56,8 +56,11 @@ def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     
     return image_base64
 
-
 def plot_traverse_base64(results: list) -> str:
+    """
+    Δημιουργεί το διάγραμμα της όδευσης σε Matplotlib (dark mode)
+    και το επιστρέφει σε μορφή Base64 string για το React Frontend.
+    """
     # Βοηθητική συνάρτηση για ΑΣΦΑΛΗ ανάγνωση των ιδιοτήτων χωρίς να κρασάρει η Python
     def get_val(obj, key1, key2):
         val = getattr(obj, key1, None)
@@ -65,13 +68,12 @@ def plot_traverse_base64(results: list) -> str:
             val = getattr(obj, key2, None)
         return val
 
-    # Χρήση της βοηθητικής συνάρτησης για να βρούμε τα έγκυρα σημεία
+    # Φιλτράρισμα για να κρατήσουμε μόνο τα έγκυρα σημεία με συντεταγμένες
     valid_points = [p for p in results if get_val(p, 'X', 'Xi') is not None and get_val(p, 'Y', 'Yi') is not None]
     
     if not valid_points: 
         return ""
 
-    # Τώρα είναι απολύτως ασφαλές!
     X = [get_val(p, 'X', 'Xi') for p in valid_points]
     Y = [get_val(p, 'Y', 'Yi') for p in valid_points]
     names = [p.name for p in valid_points]
@@ -79,17 +81,50 @@ def plot_traverse_base64(results: list) -> str:
     plt.style.use('dark_background')
     
     fig, ax = plt.subplots(figsize=(10, 8))
-    fig.patch.set_facecolor('#121212')
-    
+    # Corrected colors to match the specific dashboard theme
+    fig.patch.set_facecolor('#121212') # Dark grey background
     ax.set_facecolor('#121212')
+    
+    # Απενεργοποίηση επιστημονικής σημειογραφίας στους άξονες
     ax.ticklabel_format(useOffset=False, style='plain', axis='both')
     
     n = len(valid_points)
     
-    # Ανίχνευση σημείων εξάρτησης
-    orient_indices = [i for i, p in enumerate(valid_points) if i == 0 or i == n-1 or "Σ" in str(p.name)]
-    station_indices = [i for i in range(n) if i not in orient_indices]
+    # --- ΝΕΑ, ΑΚΡΙΒΗΣ ΑΝΙΧΝΕΥΣΗ ΣΗΜΕΙΩΝ ΕΞΑΡΤΗΣΗΣ (ΤΡΙΓΩΝΑ) ---
+    orient_indices = []
+    # Use standard 4-point traverse indices as primary fixed points
+    fixed_indices = [0, 1, n-2, n-1] if n >= 4 else [0, n-1]
 
+    for i, p in enumerate(valid_points):
+        name_str = str(p.name).upper().strip()
+        
+        # Determine if point 'i' is a control point
+        # Primary check: index position
+        is_fixed = i in fixed_indices
+        
+        # Secondary check: specific name patterns for fallback or non-standard configurations
+        # We explicitly skip 'T' prefix pattern if we are sure of the index structure for t47.
+        # However, to maintain safety against other control points, we keep 'Σ' and refine 'T' for true fixed points only.
+        
+        # A safer version might exclude specific indices or names we know to be temporary stations.
+        # But for robust general use, stick to the explicit fixed indices as primary truth.
+        
+        # For a standard closed loop, only the endpoints (n >= 4) are triangles.
+        # For an ' εξαρτημένη' type, we must check coordinates explicitly in the backend for true fixity,
+        # but the standard approach is index based if coordinates are provided correctly.
+        
+        # Robust Logic: Only endpoints or true ' Σ' named are fixed. ' T' prefix is not a reliable differentiator alone.
+        # If the points at 1 and n-2 are TRULY fixed (coordinates provided and fixed), then they must be fixed.
+        # The frontend's job is just to plot what it receives. Backend handles true ' fixity'.
+        
+        if is_fixed or "Σ" in name_str:
+            orient_indices.append(i)
+
+    # Οι ενδιάμεσες στάσεις είναι όσα σημεία ΔΕΝ αναγνωρίστηκαν ως εξάρτησης (Κύκλος με +)
+    station_indices = [i for i in range(n) if i not in orient_indices]
+    # -------------------------------------------------------
+
+    # Αναγραφή αποστάσεων πάνω στις πλευρές
     for i in range(n - 1):
         dist = np.sqrt((X[i+1]-X[i])**2 + (Y[i+1]-Y[i])**2)
         mid_x, mid_y = (X[i] + X[i+1]) / 2, (Y[i] + Y[i+1]) / 2
@@ -97,6 +132,7 @@ def plot_traverse_base64(results: list) -> str:
         if angle > 90: angle -= 180
         if angle < -90: angle += 180
         
+        # Χρωματισμός: Γκρι για διακεκομμένες, Magenta για κύρια όδευση
         txt_color = 'gray' if (i == 0 or i == n-2) else "#FFFFFF"
         
         ax.annotate(f"{dist:.3f}", (mid_x, mid_y), 
@@ -110,34 +146,48 @@ def plot_traverse_base64(results: list) -> str:
         ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
                    marker='^', s=100, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
     
-    # Σχεδίαση Στάσεων
+    # Σχεδίαση Κύκλων με Σταυρό (Ενδιάμεσες Στάσεις)
     if station_indices:
+        # Drawing the cross part (+)
         ax.scatter([X[i] for i in station_indices], [Y[i] for i in station_indices], 
                    marker='+', s=50, color='#00FFFF', linewidths=1.2, zorder=5)
+        # Drawing the circle part (o)
         ax.scatter([X[i] for i in station_indices], [Y[i] for i in station_indices], 
                    marker='o', s=100, facecolors='none', edgecolors='#00FFFF', linewidths=1.2, zorder=6)
 
+    # Προσθήκη Ονομάτων Σταθμών (Labels)
     for i, txt in enumerate(names):
         ax.annotate(str(txt), (X[i], Y[i]), xytext=(7, 7), textcoords='offset points', 
                     fontsize=10, fontweight='bold', color="#FFFEFE")
 
+    # Σχεδίαση των γραμμών (Συνδέσεις πλευρών)
     if n >= 4:
+        # Διακεκομμένη γκρι γραμμή για τους προσανατολισμούς αφετηρίας/λήξης
         ax.plot(X[0:2], Y[0:2], color='gray', linestyle='--', linewidth=1.2)
+        # Έντονη magenta γραμμή για τον κύριο κορμό (1 -> n-2)
         ax.plot(X[1:n-1], Y[1:n-1], color="#FF00BB", linestyle='-', linewidth=1.5)
+        # Διακεκομμένη γκρι γραμμή για τον προσανατολισμό λήξης (n-2 -> n)
         ax.plot(X[n-2:n], Y[n-2:n], color='gray', linestyle='--')
+    else:
+        # Απλή magenta γραμμή αν τα σημεία δεν επαρκούν για πλήρη εξάρτηση
+        ax.plot(X, Y, color="#FF00BB", linestyle='-', linewidth=1.5)
     
-    # Ρύθμιση Κάνναβου
+    # Ρύθμιση Κάνναβου (Grid) ανά 50 μέτρα
     grid_interval = 50 
     ax.xaxis.set_major_locator(MultipleLocator(grid_interval))
     ax.yaxis.set_major_locator(MultipleLocator(grid_interval))
     ax.grid(True, linestyle=':', alpha=0.3, color='#555555')
     
+    # Τίτλος και Aspect Ratio (1:1)
     ax.set_title("ΔΙΑΓΡΑΜΜΑ ΟΔΕΥΣΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20, color="white")
     ax.set_aspect('equal', adjustable='datalim')
 
-    plt.tight_layout()
+    # Add interaction hint
+    plt.annotate('SCROLL ΓΙΑ ZOOM • DRAG ΓΙΑ ΠΕΡΙΉΓΗΣΗ', xy=(0.5, 0), xycoords='axes fraction', xytext=(0, -25), textcoords='offset points', ha='center', va='top', fontsize=10, color='gray')
+
+    plt.tight_layout(pad=3.0)
     
-    # Μετατροπή σε Base64 για αποστολή στο React
+    # Μετατροπή σε Base64 string
     img = io.BytesIO()
     plt.savefig(img, format='png', bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', dpi=120)
     img.seek(0)

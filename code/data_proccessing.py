@@ -293,45 +293,64 @@ class TraversePoint:
     X: float = None
     Y: float = None
 
-def load_traverse_from_dataframe(df):
+
+def load_traverse_from_dataframe(df) -> list:
     """
-    Διαβάζει το DataFrame της όδευσης και επιστρέφει λίστα με TraversePoint.
-    Διαβάζει τις στήλες βάσει της θέσης τους (0, 1, 2, 3, 4) για να αποφύγει 
-    προβλήματα με Ελληνικούς χαρακτήρες (Χ, Υ) ή κρυφά κενά στους τίτλους!
+    Φορτώνει και καθαρίζει τα δεδομένα της όδευσης από ένα pandas DataFrame,
+    προστατεύοντας την εφαρμογή από κρυφούς χαρακτήρες όπως tabs (\\t) ή spaces.
     """
+   
+    def safe_float(val):
+        """Βοηθητική συνάρτηση για ασφαλή μετατροπή σε float."""
+        if val is None or pd.isna(val):
+            return None
+        # Καθαρισμός από tabs, αλλαγές γραμμής και ακραία κενά
+        clean_val = str(val).strip().replace('\t', '')
+        if clean_val == "":
+            return None
+        try:
+            # Αντικατάσταση του κόμματος με τελεία για δεκαδικά
+            clean_val = clean_val.replace(',', '.')
+            return float(clean_val)
+        except ValueError:
+            return None
+
     points = []
     
-    # Παίρνουμε τα ακριβή ονόματα των στηλών βάσει της θέσης τους
-    col_name = df.columns[0]  # 1η στήλη (Στάσεις)
-    col_hz = df.columns[1]    # 2η στήλη (Γωνίες)
-    col_dist = df.columns[2]  # 3η στήλη (Αποστάσεις)
-    col_x = df.columns[3]     # 4η στήλη (Χ)
-    col_y = df.columns[4]     # 5η στήλη (Υ)
-    
-    for index, row in df.iterrows():
-        # Διαβάζουμε την τιμή του ονόματος
-        name_val = row[col_name]
-        
-        if pd.isna(name_val): 
-            continue # Προσπερνάμε τις κενές γραμμές
-            
-        # Διαβάζουμε τις υπόλοιπες τιμές
-        angle_val = row[col_hz]
-        dist_val = row[col_dist]
-        x_val = row[col_x]
-        y_val = row[col_y]
-        
-        # Μετατροπή σε float όπου υπάρχει τιμή, αλλιώς None
-        pt = TraversePoint(
-            name=str(name_val).strip() if pd.notna(name_val) else "",
-            angle=float(angle_val) if pd.notna(angle_val) else None,
-            dist=float(dist_val) if pd.notna(dist_val) else None,
-            X=float(x_val) if pd.notna(x_val) else None,
-            Y=float(y_val) if pd.notna(y_val) else None
+    # Υποθέτουμε ότι το DataFrame έχει στήλες: 'Stations', 'Hz [grad]', 'Slope_D [m]', 'X [m]', 'Y [m]'
+    # Αν οι στήλες σου έχουν ελαφρώς διαφορετικά ονόματα, προσάρμοσε τα keys στο df[...]
+    for idx, row in df.iterrows():
+        # Ανάγνωση ονόματος στάσης (αν είναι κενό, το προσπερνάμε)
+        name_val = row.get('Stations') or row.get('Stations ')
+        if pd.isna(name_val) or str(name_val).strip() == "":
+            continue
+        name = str(name_val).strip()
+
+        # Ασφαλής ανάγνωση και καθαρισμός των αριθμητικών τιμών
+        ang_val  = row.get('Hz [grad]') or row.get('Hz')
+        dist_val = row.get('Slope_D [m]') or row.get('Slope_D')
+        x_val    = row.get('X [m]') or row.get('X')
+        y_val    = row.get('Y [m]') or row.get('Y')
+
+        angle = safe_float(ang_val)
+        dist  = safe_float(dist_val)
+        X     = safe_float(x_val)
+        Y     = safe_float(y_val)
+
+        # Δημιουργία του αντικειμένου TraversePoint
+        # Σημείωση: Αν η κλάση TraversePoint δέχεται τα ορίσματα με διαφορετικά ονόματα,
+        # προσάρμοσε τα (π.χ. name=name, angle=angle, dist=dist, X=X, Y=Y)
+        point = TraversePoint(
+            name=name,
+            angle=angle,
+            dist=dist,
+            X=X,
+            Y=Y
         )
-        points.append(pt)
-        
+        points.append(point)
+
     return points
+
 
 def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool = True, scale: str = "1:1000",
     terrain: str = "Ομαλό", klass: str = "Πρωτεύουσα") -> Tuple[List[RR], Dict]:
@@ -480,8 +499,6 @@ def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool 
     }
 
     return results, {"metrics": metrics}
-
-
 
 # OPTIONAL: CSV LOADER
 def load_traverse_from_csv(filepath: str) -> List[TraversePoint]:
