@@ -59,7 +59,7 @@ def run_app_logic(excel_path):
 
         # 4. Εμφάνιση Γραφήματος Όδευσης
         print("📊 Εμφάνιση σχεδίου όδευσης...")
-        vis.traverse_plot2(trav_res)
+        vis.traverse_plot(trav_res)
 
 # #3. Module: Ταχυμετρία
 #     # Βάζουμε ένα print για να βλέπεις ποια φύλλα διαβάζει πραγματικά το Python
