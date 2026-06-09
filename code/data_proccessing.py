@@ -219,6 +219,7 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
 
     return results_df, first_station, first_coords
 
+
 #ODEUSI
     #metatropes
 def small_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:

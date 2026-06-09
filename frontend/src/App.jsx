@@ -8,18 +8,15 @@ import Traverse from './components/Traverse';
 import Tachymetry from './components/Tachymetry'; 
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('mapping'); // Το έβαλα default για να το βλέπεις κατευθείαν
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // States για τη Συνορθώση Σταθμού
   const [observations, setObservations] = useState([]);
-
-  // States για την Όδευση
   const [traverseData, setTraverseData] = useState([]); 
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
 
-  // States για την Ταχυμετρία
-  const [tachymetryData, setTachymetryData] = useState([]); 
+  // ΔΙΟΡΘΩΣΗ: Αρχικοποίηση ως Object, όχι ως Array
+  const [tachymetryData, setTachymetryData] = useState({ data: [], stationList: [] }); 
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
@@ -27,12 +24,7 @@ function App() {
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
 
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isOpen={isSidebarOpen} 
-        setIsOpen={setIsSidebarOpen} 
-      />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         {activeTab !== 'dashboard' && <Header activeTab={activeTab} />}
@@ -48,24 +40,14 @@ function App() {
               />
             )}
             
-            {activeTab === 'adjustment' && (
-              <Adjustment 
-                observations={observations} 
-                setObservations={setObservations} 
-              />
-            )}
+            {activeTab === 'adjustment' && <Adjustment observations={observations} setObservations={setObservations} />}
+            {activeTab === 'traverse' && <Traverse data={traverseData} metrics={traverseMetrics} />}
             
-            {activeTab === 'traverse' && (
-              <Traverse 
-                data={traverseData} 
-                metrics={traverseMetrics} 
-              />
-            )}
-            
-            {/* Η σωστή κλήση του component */}
+            {/* ΔΙΟΡΘΩΣΗ: Περνάμε το .data και το .stationList ξεχωριστά */}
             {activeTab === 'mapping' && (
               <Tachymetry 
-                data={tachymetryData} 
+                data={tachymetryData.data || tachymetryData.results || tachymetryData} 
+                stationList={tachymetryData.stationList || []} 
               />
             )}
           </div>

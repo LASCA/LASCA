@@ -1,4 +1,5 @@
 import pandas as pd
+import math
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import data_proccessing as dpr  # Το αρχείο σου με τις συναρτήσεις
@@ -6,6 +7,15 @@ import vis_4_app as vis         # Το αρχείο για τα γραφήματ
 
 app = Flask(__name__)
 CORS(app) 
+
+# Helper functions για την Ταχυμετρία
+def g2r(gon):
+    return float(gon) * math.pi / 200.0
+
+def normalize_400(angle):
+    while angle < 0: angle += 400.0
+    while angle >= 400.0: angle -= 400.0
+    return angle
 
 # ==========================================
 # 1. ENDPOINT ΓΙΑ ΣΥΝΟΡΘΩΣΗ (ADJUSTMENT)
@@ -21,10 +31,7 @@ def run_adjustment():
         return jsonify({"results": []})
         
     try:
-        # Μετατροπή της λίστας JSON σε Pandas DataFrame
         df = pd.DataFrame(observations)
-        
-        # Μετονομασία στηλών
         df = df.rename(columns={
             'station': 'From',
             'target': 'To',
@@ -33,25 +40,20 @@ def run_adjustment():
             'Face_II': 'Face II'
         })
         
-        # Μετατροπή σε αριθμητικές τιμές
         for col in ['From', 'To', 'Period', 'Face I', 'Face II']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             
-        # Γέμισμα (forward fill) αν λείπουν From/To/Period
         df[['From', 'To', 'Period']] = df[['From', 'To', 'Period']].ffill()
 
-        # ΚΛΗΣΗ ΤΟΥ ΑΛΓΟΡΙΘΜΟΥ ΣΥΝΟΡΘΩΣΗΣ
         adj_df, adj_meta = dpr.process_network_data(df)
         
-        # Δημιουργία του Γραφήματος (ΑΣΦΑΛΗΣ ΕΚΤΕΛΕΣΗ)
         plot_base64 = None
         try:
             plot_base64 = vis.plot_std_dev_lollipop_df(adj_df)
         except Exception as e:
             print(f"Σφάλμα γραφήματος συνόρθωσης: {e}")
         
-        # Μετατροπή του adj_df σε JSON-friendly λίστα για το React
         results = []
         for _, row in adj_df.iterrows():
             try:
@@ -99,7 +101,6 @@ def run_traverse():
         return jsonify({"results": [], "metrics": {}})
         
     try:
-        # 1. Μετατροπή των λεξικών του React σε αντικείμενα TraversePoint
         points = []
         for m in measurements:
             def to_float(val):
@@ -114,10 +115,8 @@ def run_traverse():
                 X=to_float(m.get('x')),
                 Y=to_float(m.get('y'))
             )
-            # Αν η κλάση σου δέχεται και H (υψόμετρο), πρόσθεσέ το εδώ (πχ H=to_float(m.get('h')))
             points.append(pt)
 
-        # 2. Εκτέλεση της Όδευσης
         results_rr, meta = dpr.traverse(
             points=points, 
             scale=scale, 
@@ -125,7 +124,6 @@ def run_traverse():
             klass=klass
         )
         
-        # 3. Αντιστοίχιση των metrics του Python στα metrics που περιμένει το React
         py_metrics = meta.get("metrics", {})
         
         def fmt(val, decimals=4):
@@ -149,11 +147,9 @@ def run_traverse():
             "is_closed": py_metrics.get("is_closed", False)
         }
         
-        # 4. Ενημέρωση των γραμμών με τα υπολογισμένα X, Y
         updated_measurements = []
         for idx, m in enumerate(measurements):
             if idx < len(results_rr):
-                # Υποστήριξη για X/Y ή Xi/Yi ανάλογα πώς τα λέει το dataclass σου
                 calc_X = getattr(results_rr[idx], 'X', getattr(results_rr[idx], 'Xi', None))
                 calc_Y = getattr(results_rr[idx], 'Y', getattr(results_rr[idx], 'Yi', None))
                 calc_H = getattr(results_rr[idx], 'H', None)
@@ -167,14 +163,12 @@ def run_traverse():
             else:
                 updated_measurements.append(m)
 
-        # 5. ΔΗΜΙΟΥΡΓΙΑ ΓΡΑΦΗΜΑΤΟΣ (ΑΣΦΑΛΗΣ ΕΚΤΕΛΕΣΗ)
         plot_base64 = None
         try:
             plot_base64 = vis.plot_traverse_base64(results_rr)
         except Exception as e:
             print(f"Σφάλμα γραφήματος όδευσης: {e}")
 
-        # 6. Επιστροφή JSON στο React (συμπεριλαμβάνεται το plot_base64)
         return jsonify({
             "results": updated_measurements,
             "metrics": react_metrics,
@@ -184,6 +178,94 @@ def run_traverse():
     except Exception as e:
         import traceback
         print(f"Σφάλμα κατά την εκτέλεση της όδευσης:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY)
+# ==========================================
+@app.route('/api/tachymetry', methods=['POST'])
+def run_tachymetry():
+    data = request.json
+    measurements = data.get('measurements', [])
+    stations = data.get('stations', [])
+
+    if not measurements:
+        return jsonify({"results": []})
+
+    try:
+        # Δημιουργία lookup dictionary για τις συντεταγμένες των σταθμών
+        st_lookup = {}
+        for st in stations:
+            name = str(st.get('station_name', '')).strip()
+            if name:
+                st_lookup[name] = {
+                    'x': float(st.get('x', 0.0)),
+                    'y': float(st.get('y', 0.0)),
+                    'z': float(st.get('z', 0.0))
+                }
+
+        calculated_points = []
+
+        for m in measurements:
+            st_id = str(m.get('station', '')).strip()
+            bs_id = str(m.get('backsight', '')).strip()
+
+            if st_id not in st_lookup or bs_id not in st_lookup:
+                continue
+
+            # Συντεταγμένες Στάσης (S) και Προσανατολισμού (O)
+            xs, ys, zs = st_lookup[st_id]['x'], st_lookup[st_id]['y'], st_lookup[st_id]['z']
+            xo, yo = st_lookup[bs_id]['x'], st_lookup[bs_id]['y']
+
+            # 2ο Θεμελιώδες: Υπολογισμός Αζιμουθίου Στάσης-Προσανατολισμού (G_so)
+            dx_so = xo - xs
+            dy_so = yo - ys
+            g_so = math.atan2(dx_so, dy_so) * 200.0 / math.pi
+            g_so = normalize_400(g_so)
+
+            # Σφάλμα Προσανατολισμού Κύκλου (V0)
+            hz_o = float(m.get('hz_o', 0.0) or 0.0)
+            v0 = g_so - hz_o
+
+            # Πολικά Στοιχεία Σημείου Λεπτομέρειας
+            hz = float(m.get('hz', 0.0) or 0.0)
+            z_angle = float(m.get('z', 100.0) or 100.0)  # default 100 gon αν λείπει
+            sd = float(m.get('sd', 0.0) or 0.0)
+            ih = float(m.get('station_height', 0.0) or 0.0)
+            th = float(m.get('targetHeight', 0.0) or 0.0)
+
+            if sd <= 0:
+                continue
+
+            # Υπολογισμός Γωνίας Διεύθυνσης προς το Σημείο (G_sp)
+            g_sp = normalize_400(v0 + hz)
+
+            # Μετατροπές & 1ο Θεμελιώδες Πρόβλημα
+            z_rad = g2r(z_angle)
+            hd = sd * math.sin(z_rad)
+            vd = sd * math.cos(z_rad)
+
+            g_rad = g2r(g_sp)
+            xp = xs + hd * math.sin(g_rad)
+            yp = ys + hd * math.cos(g_rad)
+            zp = zs + ih + vd - th
+
+            calculated_points.append({
+                "station": st_id,
+                "backsight": bs_id,
+                "pointId": m.get('pointId', ''),
+                "x": round(xp, 3),
+                "y": round(yp, 3),
+                "z": round(zp, 3),
+                "code": m.get('code', 'DETAIL')
+            })
+
+        return jsonify({"results": calculated_points})
+
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τον υπολογισμό ταχυμετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 

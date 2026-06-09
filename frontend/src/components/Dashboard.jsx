@@ -8,7 +8,7 @@ import {
   Activity, LayoutGrid
 } from 'lucide-react';
 
-const Dashboard = ({ setObservations, setTraverseData }) => {
+const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -27,6 +27,7 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
 
+        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT (1ο Tab)
         const wsAdjustment = wb.Sheets[wb.SheetNames[0]];
         const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
         
@@ -44,6 +45,7 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
           setObservations(formattedAdj);
         }
 
+        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE (Όδευση)
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
@@ -60,8 +62,48 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
           setTraverseData(formattedTraverse);
         }
 
+        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ (measurements_taxymetria & stations_taxymetria)
+        const measSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'measurements_taxymetria');
+        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'stations_taxymetria');
+
+        if (measSheetName) {
+          const wsMeas = wb.Sheets[measSheetName];
+          const dataMeas = XLSX.utils.sheet_to_json(wsMeas);
+
+          const formattedTaxymetry = dataMeas.map(row => ({
+            station: String(row['Station_Name'] || row['Station'] || row['Στάση'] || "").trim(),
+            backsight: String(row['Backsight'] || row['BS'] || row['Target'] || row['Προσανατολισμός'] || "").trim(),
+            pointId: String(row['Point_ID'] || row['Id'] || row['Name'] || row['Σημείο'] || ""),
+            x: parseFloat(row['XS'] || row['X'] || row['X [m]'] || 0),
+            y: parseFloat(row['YS'] || row['Y'] || row['Y [m]'] || 0),
+            z: parseFloat(row['ZS'] || row['Z'] || row['Z [m]'] || 0),
+            code: row['Code'] || row['Κωδικός'] || "DETAIL"
+          }));
+
+          // Ανίχνευση λίστας σταθμών από το stations_taxymetria tab
+          let stationList = [];
+          if (stationsSheetName) {
+            const wsStations = wb.Sheets[stationsSheetName];
+            const dataStations = XLSX.utils.sheet_to_json(wsStations);
+            stationList = dataStations
+              .map(row => String(row['Station_Name'] || row['Station'] || row['Στάση'] || "").trim())
+              .filter(Boolean);
+          }
+
+          // Fallback αν το tab των σταθμών είναι άδειο, βγάλε τους μοναδικούς από τις μετρήσεις λεπτομέρειας
+          if (stationList.length === 0) {
+            stationList = [...new Set(formattedTaxymetry.map(p => String(p.station)))].filter(Boolean);
+          }
+
+          setTachymetryData({
+            data: formattedTaxymetry,
+            stationList: stationList
+          });
+        }
+
         toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
       } catch (err) {
+        console.error(err);
         toast.error('Σφάλμα κατά την επεξεργασία του αρχείου.', { id: loadingToast });
       }
     };
@@ -73,7 +115,7 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
   return (
     <div className="min-h-screen bg-[#030712] text-slate-200 flex flex-col font-sans">
       
-      {/* HEADER (Όπως ακριβώς το σχεδιάσαμε) */}
+      {/* HEADER */}
       <header className="h-20 flex items-center justify-between px-10 border-b border-slate-800/80 bg-[#030712]">
         <div className="flex flex-col items-start gap-1">
           <div className="flex items-center gap-2">
@@ -107,7 +149,6 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
           <div className="col-span-3 flex flex-col gap-4">
             <SectionTitle title="FILE OPERATIONS" />
             
-            {/* Actions Card */}
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-4 flex flex-col gap-3">
               <ActionButton 
                 icon={<Plus size={20} />} 
@@ -220,7 +261,7 @@ const Dashboard = ({ setObservations, setTraverseData }) => {
   );
 };
 
-/* --- ΕΠΙΜΕΡΟΥΣ COMPONENTS ΓΙΑ ΚΑΘΑΡΟΤΕΡΟ ΚΩΔΙΚΑ --- */
+/* --- ΕΠΙΜΕΡΟΥΣ COMPONENTS --- */
 
 const SectionTitle = ({ title }) => (
   <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.15em] ml-2">
