@@ -1,72 +1,91 @@
 import React, { useState, useMemo } from 'react';
+import axios from 'axios';
 import { 
-  Crosshair, Compass, Table as TableIcon, Map as MapIcon, Info, ChevronRight 
+  Crosshair, Compass, Table as TableIcon, Map as MapIcon, Info, ChevronRight, Play, Cpu, CheckCircle
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
-const Tachymetry = ({ data = [] }) => {
+const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
   const [selectedStation, setSelectedStation] = useState("");
   const [selectedOrientation, setSelectedOrientation] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Εξασφάλιση εγκυρότητας των δεδομένων εισόδου
-  const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
+  const measurements = tachymetryData.measurements || [];
+  const stationsData = tachymetryData.stations || [];
+  const computedResults = tachymetryData.results || [];
 
-  // 1. Διάβασμα των διαθέσιμων Στάσεων από τη στήλη "Station"
+  const filledMeasurements = useMemo(() => {
+    let lastSt = "";
+    let lastOr = "";
+    return measurements.map(row => {
+      const st = row.Station || row.From || row.station || row.Station_Name;
+      const or = row.Orientation || row.O || row.backsight;
+      if (st) lastSt = String(st).trim();
+      if (or) lastOr = String(or).trim();
+      return { ...row, _filledStation: lastSt, _filledOrientation: lastOr };
+    });
+  }, [measurements]);
+
   const stations = useMemo(() => {
-    const uniqueStations = safeData
-      .map(p => String(p.Station || p.From || p.station || "").trim())
-      .filter(Boolean);
-    return [...new Set(uniqueStations)].sort();
-  }, [safeData]);
+    const unique = filledMeasurements.map(p => p._filledStation).filter(Boolean);
+    return [...new Set(unique)].sort();
+  }, [filledMeasurements]);
 
-  // Ενεργή στάση (αν δεν έχει επιλεγεί χειροκίνητα, παίρνει την πρώτη διαθέσιμη)
   const activeStation = selectedStation || (stations.length > 0 ? stations[0] : "");
 
-  // 2. Διάβασμα των διαθέσιμων Προσανατολισμών για την επιλεγμένη Στάση από τη στήλη "Orientation" ή "O"
   const orientations = useMemo(() => {
     if (!activeStation) return [];
-    
-    // Φιλτράρουμε τις γραμμές που ανήκουν στην ενεργή στάση
-    const stationRows = safeData.filter(p => 
-      String(p.Station || p.From || p.station || "").toUpperCase() === activeStation.toUpperCase()
-    );
-    
-    const uniqueOrientations = stationRows
-      .map(p => String(p.Orientation || p.O || p.backsight || "").trim())
+    const unique = filledMeasurements
+      .filter(p => p._filledStation.toUpperCase() === activeStation.toUpperCase())
+      .map(p => p._filledOrientation)
       .filter(Boolean);
-      
-    return [...new Set(uniqueOrientations)].sort();
-  }, [safeData, activeStation]);
+    return [...new Set(unique)].sort();
+  }, [filledMeasurements, activeStation]);
 
-  // Ενεργός προσανατολισμός (αν δεν έχει επιλεγεί χειροκίνητα, παίρνει τον πρώτο διαθέσιμο της στάσης)
   const activeOrientation = selectedOrientation || (orientations.length > 0 ? orientations[0] : "");
 
-  // 3. Φιλτράρισμα των σημείων λεπτομέρειας για τον συγκεκριμένο συνδυασμό Στάσης + Προσανατολισμού
   const filteredPoints = useMemo(() => {
     if (!activeStation || !activeOrientation) return [];
+    return filledMeasurements.filter(p => 
+      p._filledStation.toUpperCase() === activeStation.toUpperCase() && 
+      p._filledOrientation.toUpperCase() === activeOrientation.toUpperCase()
+    );
+  }, [filledMeasurements, activeStation, activeOrientation]);
 
-    return safeData.filter(p => {
-      const rowStation = String(p.Station || p.From || p.station || "").toUpperCase().trim();
-      const rowOrientation = String(p.Orientation || p.O || p.backsight || "").toUpperCase().trim();
-      
-      return rowStation === activeStation.toUpperCase() && rowOrientation === activeOrientation.toUpperCase();
-    });
-  }, [safeData, activeStation, activeOrientation]);
+  const handleCalculate = async () => {
+    if (!measurements.length || !stationsData.length) {
+      toast.error("Λείπουν δεδομένα μετρήσεων ή στάσεων από το Excel.");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry', {
+        measurements: measurements,
+        stations: stationsData
+      });
 
-  // Αυτόματο scale για το σχεδιαστικό διάγραμμα (SVG)
+      if (response.data && response.data.results) {
+        setTachymetryData({
+          ...tachymetryData,
+          results: response.data.results
+        });
+        toast.success("Οι συντεταγμένες υπολογίστηκαν επιτυχώς!");
+      }
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error("Αποτυχία υπολογισμού. Ελέγξτε το Backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const svgBounds = useMemo(() => {
     if (filteredPoints.length === 0) return null;
-    
-    // Διάβασμα των τιμών (είτε έχουν υπολογιστεί ως X/Y είτε χρησιμοποιούμε τις πολικές Hz/SD για το γράφημα)
-    const xs = filteredPoints.map(p => Number(p.X || p.x || p.Hz || 0)).filter(v => !isNaN(v) && v !== 0);
-    const ys = filteredPoints.map(p => Number(p.Y || p.y || p.SD || 0)).filter(v => !isNaN(v) && v !== 0);
-    
+    const xs = filteredPoints.map(p => Number(p.Hz || 0)).filter(v => !isNaN(v) && v !== 0);
+    const ys = filteredPoints.map(p => Number(p.SD || 0)).filter(v => !isNaN(v) && v !== 0);
     if (xs.length === 0 || ys.length === 0) return null;
-
-    const minX = Math.min(...xs); const maxX = Math.max(...xs);
-    const minY = Math.min(...ys); const maxY = Math.max(...ys);
-    const padX = (maxX - minX) * 0.15 || 15; const padY = (maxY - minY) * 0.15 || 15;
-
-    return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY };
+    return true; 
   }, [filteredPoints]);
 
   return (
@@ -83,24 +102,19 @@ const Tachymetry = ({ data = [] }) => {
       `}</style>
 
       <div className="flex flex-1 gap-6 min-h-0 pt-2">
-        {/* ΑΡΙΣΤΕΡΟ PANEL: ΠΙΝΑΚΑΣ ΜΕΤΡΗΣΕΩΝ / ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
-        <div className="flex-[1.4] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
+        <div className="flex-[1.6] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
           <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3 min-w-max">
               <TableIcon size={16} className="text-emerald-500" />
-              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">Δεδομένα Ταχυμετρίας</span>
+              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">Ταχυμετρια</span>
             </div>
 
             <div className="flex items-center gap-3">
-              {/* 1ος Ελεγκτής: Επιλογή Στάσης */}
               <div className="relative">
                 <select 
                   value={activeStation}
-                  onChange={(e) => { 
-                    setSelectedStation(e.target.value); 
-                    setSelectedOrientation(""); // Reset του προσανατολισμού όταν αλλάζει η στάση
-                  }}
-                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-emerald-500/50 transition-all min-w-[145px] font-mono cursor-pointer hover:bg-slate-900"
+                  onChange={(e) => { setSelectedStation(e.target.value); setSelectedOrientation(""); }}
+                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-emerald-500/50 transition-all min-w-[120px] font-mono cursor-pointer hover:bg-slate-900"
                 >
                   {stations.length === 0 && <option value="">Χωρίς Στάσεις</option>}
                   {stations.map(s => <option key={s} value={s}>Στάση: {s}</option>)}
@@ -110,13 +124,12 @@ const Tachymetry = ({ data = [] }) => {
 
               <ChevronRight size={12} className="text-slate-700" />
 
-              {/* 2ος Ελεγκτής: Επιλογή Προσανατολισμού */}
               <div className="relative">
                 <select 
                   value={activeOrientation} 
                   disabled={!activeStation}
                   onChange={(e) => setSelectedOrientation(e.target.value)}
-                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-cyan-500/50 transition-all min-w-[145px] font-mono cursor-pointer hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-cyan-500/50 transition-all min-w-[120px] font-mono cursor-pointer hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   {orientations.length === 0 && <option value="">Χωρίς Προσ.</option>}
                   {orientations.map(o => <option key={o} value={o}>Προσ.: {o}</option>)}
@@ -124,11 +137,21 @@ const Tachymetry = ({ data = [] }) => {
                 <Compass size={12} className="absolute right-2.5 top-2.5 text-slate-600 pointer-events-none" />
               </div>
 
-              {filteredPoints.length > 0 && (
-                <div className="ml-2 px-3 py-1 bg-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center">
-                  <span className="text-[9px] font-black tracking-widest text-emerald-500">{filteredPoints.length} ΣΗΜΕΙΑ</span>
-                </div>
-              )}
+              <div className="border-l border-slate-800 pl-3 ml-1 flex items-center gap-2">
+                {computedResults.length > 0 && <CheckCircle size={14} className="text-emerald-500" title="Έχει Υπολογιστεί" />}
+                <button 
+                  onClick={handleCalculate}
+                  disabled={isLoading || measurements.length === 0}
+                  className={`group flex items-center gap-2 px-4 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase ${
+                    isLoading 
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50'
+                  }`}
+                >
+                  {isLoading ? <Cpu size={12} className="animate-spin" /> : <Play size={12} className="group-hover:text-emerald-300" />}
+                  Επιλυση
+                </button>
+              </div>
             </div>
           </div>
           
@@ -136,36 +159,40 @@ const Tachymetry = ({ data = [] }) => {
             <table className="w-full text-left border-collapse table-fixed">
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                 <tr className="border-b border-slate-800/50">
-                  <th className="w-[15%] p-4 text-[10px] font-black text-slate-500 tracking-widest">Point ID</th>
-                  <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Hz [gon]</th>
-                  <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">V / Z [gon]</th>
-                  <th className="w-[20%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">SD [m]</th>
-                  <th className="w-[25%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">Υψ. Στόχου</th>
+                  <th className="w-[10%] p-3 text-[9px] font-black text-slate-500 tracking-widest">P.ID</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [gon]</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [gon]</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">SD [m]</th>
+                  <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">X [m]</th>
+                  <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Y [m]</th>
+                  <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Z [m]</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/30">
                 {filteredPoints.length > 0 ? (
                   filteredPoints.map((p, i) => {
-                    // Ανάγνωση των τιμών από το Excel αρχείο σου
                     const ptId = p.Point_ID || p.pointId || p.PointID || (i + 1);
                     const hzVal = p.Hz || p.HZ || p.hz || 0;
                     const zVal = p.Z || p.z || p.V || 0;
                     const sdVal = p.SD || p.sd || p.Sd || 0;
-                    const tgHeight = p.TargetHeight || p.Target_Height || p.targetHeight || "-";
+
+                    const resPoint = computedResults.find(r => String(r['Σημείο']) === String(ptId) && String(r['Στάση']) === String(p._filledStation));
 
                     return (
                       <tr key={i} className="hover:bg-emerald-500/5 transition-colors group">
-                        <td className="p-3 pl-5"><span className="text-[12px] font-bold text-slate-400">#{ptId}</span></td>
-                        <td className="p-3 font-mono text-[13px] text-slate-300 text-center">{Number(hzVal).toFixed(4)}</td>
-                        <td className="p-3 font-mono text-[13px] text-slate-300 text-center">{Number(zVal).toFixed(4)}</td>
-                        <td className="p-3 font-mono text-[13px] text-cyan-500 text-center font-bold">{Number(sdVal).toFixed(3)}</td>
-                        <td className="p-3 pr-6 text-right"><span className="bg-slate-900/80 px-2 py-1 rounded border border-slate-800 text-[10px] font-mono text-slate-400">{tgHeight} m</span></td>
+                        <td className="p-2 pl-4"><span className="text-[11px] font-bold text-slate-400">#{ptId}</span></td>
+                        <td className="p-2 font-mono text-[12px] text-slate-400 text-center">{Number(hzVal).toFixed(4)}</td>
+                        <td className="p-2 font-mono text-[12px] text-slate-400 text-center">{Number(zVal).toFixed(4)}</td>
+                        <td className="p-2 font-mono text-[12px] text-cyan-500/70 text-center">{Number(sdVal).toFixed(3)}</td>
+                        <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide">{resPoint ? Number(resPoint.X).toFixed(3) : "-"}</td>
+                        <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide">{resPoint ? Number(resPoint.Y).toFixed(3) : "-"}</td>
+                        <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide pr-4">{resPoint ? Number(resPoint.Z).toFixed(3) : "-"}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="p-24 text-center">
+                    <td colSpan="7" className="p-24 text-center">
                       <div className="flex flex-col items-center opacity-20">
                          <Info size={40} className="mb-4" />
                          <p className="text-[10px] font-black uppercase tracking-[0.3em]">
@@ -180,7 +207,6 @@ const Tachymetry = ({ data = [] }) => {
           </div>
         </div>
 
-        {/* ΔΕΞΙ PANEL: ΔΙΑΓΡΑΜΜΑ ΣΤΑΘΜΟΥ (SVG CANVAS) */}
         <div className="flex-1 bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col relative group">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -199,18 +225,12 @@ const Tachymetry = ({ data = [] }) => {
                 {filteredPoints.map((p, i) => {
                   const hzVal = Number(p.Hz || p.HZ || 0);
                   const sdVal = Number(p.SD || p.sd || 0);
-                  
-                  // Μετατροπή gon σε ακτίνια (rad) για τη σχεδίαση στο SVG
                   const angleRad = (hzVal * Math.PI) / 200;
-                  
-                  // Κανονικοποίηση της απόστασης για να χωράει όμορφα στο γράφημα
                   const maxDistance = Math.max(...filteredPoints.map(pt => Number(pt.SD || 1)));
                   const scaledRadius = (sdVal / maxDistance) * 130;
                   
-                  // Υπολογισμός τοπικών X, Y θέσεων γύρω από το κέντρο (200, 200)
                   const cx = 200 + scaledRadius * Math.sin(angleRad);
                   const cy = 200 - scaledRadius * Math.cos(angleRad);
-                  
                   const ptId = p.Point_ID || p.pointId || (i + 1);
 
                   return (
@@ -222,7 +242,6 @@ const Tachymetry = ({ data = [] }) => {
                   );
                 })}
                 
-                {/* Κέντρο (Θέση Οργάνου / Στάση) */}
                 <circle cx="200" cy="200" r="8" fill="#10b981" fillOpacity="0.1" stroke="#10b981" strokeWidth="1.5" />
                 <circle cx="200" cy="200" r="2" fill="#10b981" />
               </svg>

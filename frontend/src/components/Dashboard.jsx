@@ -32,7 +32,7 @@ const Dashboard = ({
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
 
-        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT (1ο Tab)
+        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT
         const wsAdjustment = wb.Sheets[wb.SheetNames[0]];
         const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
         
@@ -50,8 +50,8 @@ const Dashboard = ({
           setObservations(formattedAdj);
         }
 
-        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE (Όδευση)
-        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
+        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
@@ -61,48 +61,32 @@ const Dashboard = ({
             hz: row['Hz [grad]'] || "",
             sd: row['Slope_D [m]'] || "",
             x: row['X [m]'] || "",
-            y: row['Y [m]'] || ""
+            y: row['Y [m]'] || "",
+            h: row['H [m]'] || ""
           }));
 
           setTraverseData(formattedTraverse);
         }
 
-        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ (measurements_taxymetria & stations_taxymetria)
-        const measSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'measurements_taxymetria');
-        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'stations_taxymetria');
+        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ (measurements & stations)
+        const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_taxymetria'));
+        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
+
+        let rawMeasurements = [];
+        let rawStations = [];
 
         if (measSheetName) {
-          const wsMeas = wb.Sheets[measSheetName];
-          const dataMeas = XLSX.utils.sheet_to_json(wsMeas);
-
-          const formattedTaxymetry = dataMeas.map(row => ({
-            station: String(row['Station_Name'] || row['Station'] || row['Στάση'] || "").trim(),
-            backsight: String(row['Backsight'] || row['BS'] || row['Target'] || row['Προσανατολισμός'] || "").trim(),
-            pointId: String(row['Point_ID'] || row['Id'] || row['Name'] || row['Σημείο'] || ""),
-            x: parseFloat(row['XS'] || row['X'] || row['X [m]'] || 0),
-            y: parseFloat(row['YS'] || row['Y'] || row['Y [m]'] || 0),
-            z: parseFloat(row['ZS'] || row['Z'] || row['Z [m]'] || 0),
-            code: row['Code'] || row['Κωδικός'] || "DETAIL"
-          }));
-
-          let stationList = [];
-          if (stationsSheetName) {
-            const wsStations = wb.Sheets[stationsSheetName];
-            const dataStations = XLSX.utils.sheet_to_json(wsStations);
-            stationList = dataStations
-              .map(row => String(row['Station_Name'] || row['Station'] || row['Στάση'] || "").trim())
-              .filter(Boolean);
-          }
-
-          if (stationList.length === 0) {
-            stationList = [...new Set(formattedTaxymetry.map(p => String(p.station)))].filter(Boolean);
-          }
-
-          setTachymetryData({
-            data: formattedTaxymetry,
-            stationList: stationList
-          });
+          rawMeasurements = XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]);
         }
+        if (stationsSheetName) {
+          rawStations = XLSX.utils.sheet_to_json(wb.Sheets[stationsSheetName]);
+        }
+
+        setTachymetryData({
+          measurements: rawMeasurements,
+          stations: rawStations,
+          results: [] 
+        });
 
         toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
       } catch (err) {
@@ -118,7 +102,6 @@ const Dashboard = ({
   return (
     <div className="min-h-screen bg-[#030712] text-slate-200 flex flex-col font-sans">
       
-      {/* HEADER */}
       <header className="h-20 flex items-center justify-between px-10 border-b border-slate-800/80 bg-[#030712]">
         <div className="flex flex-col items-start gap-1">
           <div className="flex items-center gap-2">
@@ -137,11 +120,9 @@ const Dashboard = ({
         </div>
       </header>
 
-      {/* MAIN DASHBOARD GRID */}
       <main className="flex-1 p-10">
         <div className="grid grid-cols-12 gap-8 max-w-[1600px] mx-auto h-full">
           
-          {/* LEFT PANEL: FILE OPERATIONS */}
           <div className="col-span-3 flex flex-col gap-4">
             <SectionTitle title="FILE OPERATIONS" />
             
@@ -166,21 +147,18 @@ const Dashboard = ({
               />
             </div>
 
-            {/* Auto-save Widget */}
             <div className="mt-auto bg-[#0B1221] border border-slate-800/80 rounded-[1.5rem] p-6">
               <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">AUTO-SAVE</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Η τελευταία αποθήκευση έγινε πριν από 2 λεπτά.
+                Το σύστημα αποθηκεύει αυτόματα τις αλλαγές.
               </p>
             </div>
           </div>
 
-          {/* CENTER PANEL: DATA INGESTION */}
           <div className="col-span-5 flex flex-col gap-4">
             <SectionTitle title="DATA INGESTION" />
             
             <div className="grid grid-cols-2 gap-4">
-              {/* IMPORT DATA CARD */}
               <label className="relative cursor-pointer bg-[#0B1221] border border-slate-800/80 hover:border-blue-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
                 <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all">
                   <Upload size={20} className="text-blue-500" />
@@ -193,7 +171,6 @@ const Dashboard = ({
                 <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
               </label>
 
-              {/* EXCEL TEMPLATE CARD */}
               <button className="bg-[#0B1221] border border-slate-800/80 hover:border-emerald-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
                 <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all">
                   <FileSpreadsheet size={20} className="text-emerald-500" />
@@ -206,7 +183,6 @@ const Dashboard = ({
               </button>
             </div>
 
-            {/* ACTIVITY LOG */}
             <div className="flex-1 bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 flex flex-col">
               <div className="flex items-center gap-2 mb-6 text-slate-500">
                 <Activity size={14} />
@@ -218,7 +194,6 @@ const Dashboard = ({
             </div>
           </div>
 
-          {/* RIGHT PANEL: GLOBAL SETTINGS */}
           <div className="col-span-4 flex flex-col gap-4">
             <SectionTitle title="GLOBAL SETTINGS" />
             
@@ -258,8 +233,6 @@ const Dashboard = ({
     </div>
   );
 };
-
-/* --- ΕΠΙΜΕΡΟΥΣ COMPONENTS --- */
 
 const SectionTitle = ({ title }) => (
   <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.15em] ml-2">

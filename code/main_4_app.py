@@ -7,7 +7,7 @@ import os
 
 import data_proccessing as dpr  # Το αρχείο σου με τις συναρτήσεις
 import vis_4_app as vis         # Το αρχείο για τα γραφήματα
-from project_manager import TopoProject  # <--- Προσθήκη της κλάσης των Projects
+from project_manager import TopoProject  # Η κλάση των Projects
 
 app = Flask(__name__)
 CORS(app) 
@@ -239,7 +239,7 @@ def run_traverse():
 
 
 # ==========================================
-# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY)
+# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) - ΕΝΗΜΕΡΩΜΕΝΟ & ΔΙΟΡΘΩΜΕΝΟ
 # ==========================================
 @app.route('/api/tachymetry', methods=['POST'])
 def run_tachymetry():
@@ -251,66 +251,97 @@ def run_tachymetry():
         return jsonify({"results": []})
 
     try:
+        # 1. Χαρτογράφηση γνωστών συντεταγμένων στάσεων (υποστηρίζει κεφαλαία XS, YS, ZS από Excel)
         st_lookup = {}
         for st in stations:
-            name = str(st.get('station_name', '')).strip()
+            name = str(st.get('Station_Name', st.get('station_name', ''))).strip()
             if name:
                 st_lookup[name] = {
-                    'x': float(st.get('x', 0.0)),
-                    'y': float(st.get('y', 0.0)),
-                    'z': float(st.get('z', 0.0))
+                    'x': float(st.get('XS', st.get('x', 0.0)) or 0.0),
+                    'y': float(st.get('YS', st.get('y', 0.0)) or 0.0),
+                    'z': float(st.get('ZS', st.get('z', 0.0)) or 0.0)
+                }
+
+        # 2. Συλλογή των setups οργάνων (από τις στήλες Station, Orientation, HZ_O, Station_Height)
+        setups = {}
+        for m in measurements:
+            st = m.get('Station')
+            ori = m.get('Orientation')
+            if st and ori:
+                st_key = (str(st).strip(), str(ori).strip())
+                setups[st_key] = {
+                    'hz_o': float(m.get('HZ_O', m.get('hz_o', 0.0)) or 0.0),
+                    'station_height': float(m.get('Station_Height', m.get('station_height', 0.0)) or 0.0)
                 }
 
         calculated_points = []
 
+        # 3. Επεξεργασία των πολικών μετρήσεων λεπτομέρειας
         for m in measurements:
-            st_id = str(m.get('station', '')).strip()
-            bs_id = str(m.get('backsight', '')).strip()
+            # Διαβάζουμε τις στήλες From και O που προσδιορίζουν τη γραμμή μέτρησης
+            st_id = str(m.get('From', m.get('station', ''))).strip()
+            bs_id = str(m.get('O', m.get('backsight', ''))).strip()
+            point_id = m.get('Point_ID', m.get('pointId', ''))
 
+            # Αν δεν είναι έγκυρη γραμμή μέτρησης σημείου, προσπέρνα την
+            if not st_id or not bs_id or not point_id:
+                continue
+
+            # Έλεγχος αν υπάρχουν οι στάσεις στο lookup συντεταγμένων
             if st_id not in st_lookup or bs_id not in st_lookup:
                 continue
 
+            # Συντεταγμένες Στάσης (S) και Προσανατολισμού (O)
             xs, ys, zs = st_lookup[st_id]['x'], st_lookup[st_id]['y'], st_lookup[st_id]['z']
             xo, yo = st_lookup[bs_id]['x'], st_lookup[bs_id]['y']
 
+            # Υπολογισμός γωνίας διεύθυνσης (αζιμούθιο) στάσης-προσανατολισμού (G_so)
             dx_so = xo - xs
             dy_so = yo - ys
             g_so = math.atan2(dx_so, dy_so) * 200.0 / math.pi
             g_so = normalize_400(g_so)
 
-            hz_o = float(m.get('hz_o', 0.0) or 0.0)
+            # Ανάκτηση HZ_O και ύψους οργάνου από το setup
+            setup_info = setups.get((st_id, bs_id), {'hz_o': 0.0, 'station_height': 0.0})
+            hz_o = setup_info['hz_o']
+            ih = setup_info['station_height']
+
+            # Σταθερά προσανατολισμού (V0)
             v0 = g_so - hz_o
 
-            hz = float(m.get('hz', 0.0) or 0.0)
-            z_angle = float(m.get('z', 100.0) or 100.0)
-            sd = float(m.get('sd', 0.0) or 0.0)
-            ih = float(m.get('station_height', 0.0) or 0.0)
-            th = float(m.get('targetHeight', 0.0) or 0.0)
+            # Δεδομένα μέτρησης σημείου (με υποστήριξη για κεφαλαία/μικρά κλειδιά)
+            hz = float(m.get('Hz', m.get('hz', 0.0)) or 0.0)
+            z_angle = float(m.get('Z', m.get('z', 100.0)) or 100.0)
+            sd = float(m.get('SD', m.get('sd', 0.0)) or 0.0)
+            th = float(m.get('TargetHeight', m.get('targetHeight', 0.0)) or 0.0)
 
             if sd <= 0:
                 continue
 
+            # Υπολογισμός τελικής γωνίας διεύθυνσης προς το σημείο (G_sp)
             g_sp = normalize_400(v0 + hz)
 
+            # Μετατροπή σε ακτίνια και υπολογισμός αποστάσεων
             z_rad = g2r(z_angle)
-            hd = sd * math.sin(z_rad)
-            vd = sd * math.cos(z_rad)
+            hd = sd * math.sin(z_rad)  # Οριζόντια απόσταση
+            vd = sd * math.cos(z_rad)  # Υψομετρική διαφορά
 
             g_rad = g2r(g_sp)
             xp = xs + hd * math.sin(g_rad)
             yp = ys + hd * math.cos(g_rad)
             zp = zs + ih + vd - th
 
+            # Προσθήκη στα αποτελέσματα με κλειδιά που ταιριάζουν ΑΚΡΙΒΩΣ με το React UI
             calculated_points.append({
-                "station": st_id,
-                "backsight": bs_id,
-                "pointId": m.get('pointId', ''),
-                "x": round(xp, 3),
-                "y": round(yp, 3),
-                "z": round(zp, 3),
-                "code": m.get('code', 'DETAIL')
+                "Στάση": st_id,
+                "Προσανατολισμός": bs_id,
+                "Σημείο": str(point_id),
+                "X": round(xp, 3),
+                "Y": round(yp, 3),
+                "Z": round(zp, 3)
             })
 
+        print(f"Successfully calculated {len(calculated_points)} detail points.")
         return jsonify({"results": calculated_points})
 
     except Exception as e:
