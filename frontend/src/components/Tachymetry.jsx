@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import axios from 'axios';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
-  Crosshair, Compass, Table as TableIcon, Map as MapIcon, Info, ChevronRight, Play, Cpu, CheckCircle
+  Crosshair, Compass, Table as TableIcon, Map as MapIcon, Info, ChevronRight, 
+  Play, Cpu, CheckCircle, RefreshCw, Maximize2, Download, X, Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -9,10 +11,13 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
   const [selectedStation, setSelectedStation] = useState("");
   const [selectedOrientation, setSelectedOrientation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('local'); 
+  const [isFullscreen, setIsFullscreen] = useState(false); // ΝΕΟ State για το Fullscreen
 
   const measurements = tachymetryData.measurements || [];
   const stationsData = tachymetryData.stations || [];
   const computedResults = tachymetryData.results || [];
+  const plotImage = tachymetryData.plot || null; 
 
   const filledMeasurements = useMemo(() => {
     let lastSt = "";
@@ -68,9 +73,11 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
       if (response.data && response.data.results) {
         setTachymetryData({
           ...tachymetryData,
-          results: response.data.results
+          results: response.data.results,
+          plot: response.data.plot
         });
         toast.success("Οι συντεταγμένες υπολογίστηκαν επιτυχώς!");
+        setViewMode('global'); 
       }
     } catch (error) {
       console.error("Σφάλμα:", error);
@@ -80,6 +87,17 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
     }
   };
 
+  // ΝΕΟ: Λειτουργία Λήψης (Download)
+  const handleDownload = () => {
+    if (!plotImage) return;
+    const a = document.createElement('a');
+    a.href = plotImage;
+    a.download = 'tachymetry_network_plot.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const svgBounds = useMemo(() => {
     if (filteredPoints.length === 0) return null;
     const xs = filteredPoints.map(p => Number(p.Hz || 0)).filter(v => !isNaN(v) && v !== 0);
@@ -87,6 +105,36 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
     if (xs.length === 0 || ys.length === 0) return null;
     return true; 
   }, [filteredPoints]);
+
+  // HELPER: Λειτουργία για καθαρό render του SVG (για να μην επαναλαμβάνουμε κώδικα)
+  const renderLocalSVG = (isFull = false) => (
+    <svg viewBox="0 0 400 400" className={`w-full h-full z-10 select-none ${isFull ? 'max-w-[95vw] max-h-[95vh]' : 'max-h-[380px]'}`}>
+      <circle cx="200" cy="200" r="140" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+      
+      {filteredPoints.map((p, i) => {
+        const hzVal = Number(p.Hz || p.HZ || 0);
+        const sdVal = Number(p.SD || p.sd || 0);
+        const angleRad = (hzVal * Math.PI) / 200;
+        const maxDistance = Math.max(...filteredPoints.map(pt => Number(pt.SD || 1)));
+        const scaledRadius = (sdVal / maxDistance) * 130;
+        
+        const cx = 200 + scaledRadius * Math.sin(angleRad);
+        const cy = 200 - scaledRadius * Math.cos(angleRad);
+        const ptId = p.Point_ID || p.pointId || (i + 1);
+
+        return (
+          <g key={i}>
+            <line x1="200" y1="200" x2={cx} y2={cy} stroke="#ec4899" strokeWidth="0.5" strokeOpacity="0.2" />
+            <circle cx={cx} cy={cy} r="3.5" className="fill-pink-500 stroke-slate-950 stroke-1" />
+            <text x={cx + 6} y={cy + 3} className="fill-slate-500 font-mono text-[9px] font-bold">{ptId}</text>
+          </g>
+        );
+      })}
+      
+      <circle cx="200" cy="200" r="8" fill="#10b981" fillOpacity="0.1" stroke="#10b981" strokeWidth="1.5" />
+      <circle cx="200" cy="200" r="2" fill="#10b981" />
+    </svg>
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] gap-6 overflow-hidden">
@@ -102,6 +150,7 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
       `}</style>
 
       <div className="flex flex-1 gap-6 min-h-0 pt-2">
+        {/* ΑΡΙΣΤΕΡΟ ΠΑΝΕΛ */}
         <div className="flex-[1.6] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
           <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3 min-w-max">
@@ -207,53 +256,169 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
           </div>
         </div>
 
+        {/* ΔΕΞΙ ΠΑΝΕΛ: ΔΥΝΑΜΙΚΟ ΣΚΑΡΙΦΗΜΑ & ZOOM EXTEND */}
         <div className="flex-1 bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col relative group">
-          <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
+          <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between z-20">
             <div className="flex items-center gap-3">
               <MapIcon size={16} className="text-pink-500" />
-              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">Σκαρίφημα Στάσης</span>
+              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">
+                {viewMode === 'local' ? "Σκαρίφημα Στάσης" : "Συνολικό Δίκτυο"}
+              </span>
             </div>
+
+            {plotImage && (
+              <div className="flex bg-slate-950/60 p-0.5 rounded-lg border border-slate-800">
+                <button
+                  onClick={() => setViewMode('local')}
+                  className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+                    viewMode === 'local' 
+                      ? 'bg-pink-500 text-white shadow-md' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Πολικό
+                </button>
+                <button
+                  onClick={() => setViewMode('global')}
+                  className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+                    viewMode === 'global' 
+                      ? 'bg-pink-500 text-white shadow-md' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Δίκτυο (Matplotlib)
+                </button>
+              </div>
+            )}
           </div>
           
           <div className="flex-1 bg-[#030712] m-5 rounded-xl border border-slate-800/50 relative overflow-hidden flex items-center justify-center p-4">
             <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]"></div>
 
-            {filteredPoints.length > 0 && svgBounds ? (
-              <svg viewBox="0 0 400 400" className="w-full h-full max-h-[380px] z-10 select-none">
-                <circle cx="200" cy="200" r="140" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-                
-                {filteredPoints.map((p, i) => {
-                  const hzVal = Number(p.Hz || p.HZ || 0);
-                  const sdVal = Number(p.SD || p.sd || 0);
-                  const angleRad = (hzVal * Math.PI) / 200;
-                  const maxDistance = Math.max(...filteredPoints.map(pt => Number(pt.SD || 1)));
-                  const scaledRadius = (sdVal / maxDistance) * 130;
-                  
-                  const cx = 200 + scaledRadius * Math.sin(angleRad);
-                  const cy = 200 - scaledRadius * Math.cos(angleRad);
-                  const ptId = p.Point_ID || p.pointId || (i + 1);
-
-                  return (
-                    <g key={i}>
-                      <line x1="200" y1="200" x2={cx} y2={cy} stroke="#ec4899" strokeWidth="0.5" strokeOpacity="0.2" />
-                      <circle cx={cx} cy={cy} r="3.5" className="fill-pink-500 stroke-slate-950 stroke-1" />
-                      <text x={cx + 6} y={cy + 3} className="fill-slate-500 font-mono text-[9px] font-bold">{ptId}</text>
-                    </g>
-                  );
-                })}
-                
-                <circle cx="200" cy="200" r="8" fill="#10b981" fillOpacity="0.1" stroke="#10b981" strokeWidth="1.5" />
-                <circle cx="200" cy="200" r="2" fill="#10b981" />
-              </svg>
+            {/* 1. Προβολή Πολικού SVG (Τοπικό) με Zoom/Pan */}
+            {viewMode === 'local' ? (
+              filteredPoints.length > 0 && svgBounds ? (
+                <TransformWrapper initialScale={1} minScale={1} maxScale={10} centerOnInit={true} wheel={{ step: 0.03 }} pinch={{ step: 1 }}>
+                  {({ resetTransform }) => (
+                    <>
+                      <TransformComponent wrapperStyle={{ width: "100%", height: "100%", cursor: "move" }}>
+                        {renderLocalSVG(false)}
+                      </TransformComponent>
+                      
+                      <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                        <button onClick={() => resetTransform()} className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg cursor-pointer" title="Επαναφορά Ζουμ">
+                          <RefreshCw size={16} />
+                        </button>
+                        <button onClick={() => setIsFullscreen(true)} className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg cursor-pointer" title="Πλήρης Οθόνη">
+                          <Maximize2 size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </TransformWrapper>
+              ) : (
+                <div className="text-center z-10 opacity-30">
+                   <MapIcon size={32} className="mx-auto mb-3 text-slate-700" />
+                   <p className="text-[8px] tracking-[0.4em] text-slate-600 font-black uppercase">Polar Engine Ready</p>
+                </div>
+              )
             ) : (
-              <div className="text-center z-10 opacity-30">
-                 <MapIcon size={32} className="mx-auto mb-3 text-slate-700" />
-                 <p className="text-[8px] tracking-[0.4em] text-slate-600 font-black uppercase">Polar Engine Ready</p>
-              </div>
+              /* 2. Προβολή Matplotlib (Συνολικό Δίκτυο) με Zoom/Pan */
+              plotImage ? (
+                <TransformWrapper initialScale={1} minScale={1} maxScale={10} centerOnInit={true} wheel={{ step: 0.03 }} pinch={{ step: 1 }}>
+                  {({ resetTransform }) => (
+                    <>
+                      <TransformComponent wrapperStyle={{ width: "100%", height: "100%", cursor: "move" }}>
+                        <img 
+                          src={plotImage} 
+                          alt="Τοπογραφικό Σκαρίφημα Δικτύου Matplotlib" 
+                          className="max-w-full max-h-full object-contain pointer-events-none rounded-lg"
+                        />
+                      </TransformComponent>
+                      
+                      <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                        <button onClick={() => resetTransform()} className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg cursor-pointer" title="Επαναφορά Ζουμ">
+                          <RefreshCw size={16} />
+                        </button>
+                        <button onClick={() => setIsFullscreen(true)} className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg cursor-pointer" title="Πλήρης Οθόνη">
+                          <Maximize2 size={16} />
+                        </button>
+                        <button onClick={handleDownload} className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg cursor-pointer" title="Λήψη">
+                          <Download size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </TransformWrapper>
+              ) : (
+                <div className="text-center z-10 opacity-30">
+                   <ImageIcon size={32} className="mx-auto mb-3 text-slate-700" />
+                   <p className="text-[8px] tracking-[0.4em] text-slate-600 font-black uppercase">Δεν έχει παραχθεί γράφημα δικτύου</p>
+                </div>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* FULLSCREEN OVERLAY MODAL */}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md">
+          <TransformWrapper initialScale={1} minScale={1} maxScale={8} centerOnInit={true} wheel={{ step: 0.02 }} pinch={{ step: 1 }}>
+            {({ resetTransform }) => (
+              <>
+                {/* Κουμπί Κλεισίματος */}
+                <button
+                  onClick={() => setIsFullscreen(false)}
+                  className="absolute top-6 right-6 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl cursor-pointer"
+                  title="Κλείσιμο"
+                >
+                  <X size={24} className="group-hover:text-pink-500 transition-colors" />
+                </button>
+
+                {/* Κουμπί Λήψης (Μόνο για το Global Matplotlib view) */}
+                {viewMode === 'global' && (
+                  <button
+                    onClick={handleDownload}
+                    className="absolute top-6 right-24 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl cursor-pointer"
+                    title="Λήψη"
+                  >
+                    <Download size={24} className="group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                )}
+
+                {/* Κουμπί Επαναφοράς */}
+                <button
+                  onClick={() => resetTransform()}
+                  className={`absolute top-6 ${viewMode === 'global' ? 'right-42' : 'right-24'} p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl cursor-pointer`}
+                  title="Επαναφορά Ζουμ (Zoom Extend)"
+                >
+                  <RefreshCw size={24} className="group-hover:text-amber-500 transition-colors" />
+                </button>
+
+                {/* Κύριο Container για Ζουμ */}
+                <div className="w-full h-full flex items-center justify-center cursor-move">
+                  <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
+                    {viewMode === 'local' ? (
+                      renderLocalSVG(true)
+                    ) : (
+                      <img
+                        src={plotImage}
+                        alt="Διάγραμμα Ταχυμετρίας Fullscreen"
+                        className="max-w-[95vw] max-h-[95vh] object-contain p-4 rounded-lg pointer-events-none"
+                      />
+                    )}
+                  </TransformComponent>
+                </div>
+              </>
+            )}
+          </TransformWrapper>
+          
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-400 text-xs tracking-widest uppercase bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800/50 backdrop-blur-sm pointer-events-none">
+            Scroll για Zoom • Drag για Περιήγηση
+          </div>
+        </div>
+      )}
     </div>
   );
 };

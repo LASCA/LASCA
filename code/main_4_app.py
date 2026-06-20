@@ -239,7 +239,7 @@ def run_traverse():
 
 
 # ==========================================
-# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) - ΕΝΗΜΕΡΩΜΕΝΟ & ΔΙΟΡΘΩΜΕΝΟ
+# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY)
 # ==========================================
 @app.route('/api/tachymetry', methods=['POST'])
 def run_tachymetry():
@@ -251,7 +251,7 @@ def run_tachymetry():
         return jsonify({"results": []})
 
     try:
-        # 1. Χαρτογράφηση γνωστών συντεταγμένων στάσεων (υποστηρίζει κεφαλαία XS, YS, ZS από Excel)
+        # 1. Χαρτογράφηση γνωστών συντεταγμένων στάσεων
         st_lookup = {}
         for st in stations:
             name = str(st.get('Station_Name', st.get('station_name', ''))).strip()
@@ -262,7 +262,7 @@ def run_tachymetry():
                     'z': float(st.get('ZS', st.get('z', 0.0)) or 0.0)
                 }
 
-        # 2. Συλλογή των setups οργάνων (από τις στήλες Station, Orientation, HZ_O, Station_Height)
+        # 2. Συλλογή των setups οργάνων
         setups = {}
         for m in measurements:
             st = m.get('Station')
@@ -278,38 +278,30 @@ def run_tachymetry():
 
         # 3. Επεξεργασία των πολικών μετρήσεων λεπτομέρειας
         for m in measurements:
-            # Διαβάζουμε τις στήλες From και O που προσδιορίζουν τη γραμμή μέτρησης
             st_id = str(m.get('From', m.get('station', ''))).strip()
             bs_id = str(m.get('O', m.get('backsight', ''))).strip()
             point_id = m.get('Point_ID', m.get('pointId', ''))
 
-            # Αν δεν είναι έγκυρη γραμμή μέτρησης σημείου, προσπέρνα την
             if not st_id or not bs_id or not point_id:
                 continue
 
-            # Έλεγχος αν υπάρχουν οι στάσεις στο lookup συντεταγμένων
             if st_id not in st_lookup or bs_id not in st_lookup:
                 continue
 
-            # Συντεταγμένες Στάσης (S) και Προσανατολισμού (O)
             xs, ys, zs = st_lookup[st_id]['x'], st_lookup[st_id]['y'], st_lookup[st_id]['z']
             xo, yo = st_lookup[bs_id]['x'], st_lookup[bs_id]['y']
 
-            # Υπολογισμός γωνίας διεύθυνσης (αζιμούθιο) στάσης-προσανατολισμού (G_so)
             dx_so = xo - xs
             dy_so = yo - ys
             g_so = math.atan2(dx_so, dy_so) * 200.0 / math.pi
             g_so = normalize_400(g_so)
 
-            # Ανάκτηση HZ_O και ύψους οργάνου από το setup
             setup_info = setups.get((st_id, bs_id), {'hz_o': 0.0, 'station_height': 0.0})
             hz_o = setup_info['hz_o']
             ih = setup_info['station_height']
 
-            # Σταθερά προσανατολισμού (V0)
             v0 = g_so - hz_o
 
-            # Δεδομένα μέτρησης σημείου (με υποστήριξη για κεφαλαία/μικρά κλειδιά)
             hz = float(m.get('Hz', m.get('hz', 0.0)) or 0.0)
             z_angle = float(m.get('Z', m.get('z', 100.0)) or 100.0)
             sd = float(m.get('SD', m.get('sd', 0.0)) or 0.0)
@@ -318,20 +310,17 @@ def run_tachymetry():
             if sd <= 0:
                 continue
 
-            # Υπολογισμός τελικής γωνίας διεύθυνσης προς το σημείο (G_sp)
             g_sp = normalize_400(v0 + hz)
 
-            # Μετατροπή σε ακτίνια και υπολογισμός αποστάσεων
             z_rad = g2r(z_angle)
-            hd = sd * math.sin(z_rad)  # Οριζόντια απόσταση
-            vd = sd * math.cos(z_rad)  # Υψομετρική διαφορά
+            hd = sd * math.sin(z_rad)
+            vd = sd * math.cos(z_rad)
 
             g_rad = g2r(g_sp)
             xp = xs + hd * math.sin(g_rad)
             yp = ys + hd * math.cos(g_rad)
             zp = zs + ih + vd - th
 
-            # Προσθήκη στα αποτελέσματα με κλειδιά που ταιριάζουν ΑΚΡΙΒΩΣ με το React UI
             calculated_points.append({
                 "Στάση": st_id,
                 "Προσανατολισμός": bs_id,
@@ -341,8 +330,18 @@ def run_tachymetry():
                 "Z": round(zp, 3)
             })
 
+        # 4. Παραγωγή του Matplotlib Διαγράμματος
+        plot_base64 = None
+        try:
+            plot_base64 = vis.plot_tachymetry_base64(calculated_points, st_lookup)
+        except Exception as plot_err:
+            print(f"❌ Σφάλμα κατά τη δημιουργία του σκαριφήματος ταχυμετρίας: {plot_err}")
+
         print(f"Successfully calculated {len(calculated_points)} detail points.")
-        return jsonify({"results": calculated_points})
+        return jsonify({
+            "results": calculated_points,
+            "plot": plot_base64
+        })
 
     except Exception as e:
         import traceback

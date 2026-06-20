@@ -10,6 +10,11 @@ from adjustText import adjust_text
 from matplotlib.lines import Line2D 
 matplotlib.use('Agg') # ΚΡΙΣΙΜΟ: Λέει στη matplotlib να μην προσπαθήσει να ανοίξει GUI
 
+try:
+    from adjustText import adjust_text
+    HAS_ADJUST_TEXT = True
+except ImportError:
+    HAS_ADJUST_TEXT = False
 
 def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     # 1. Επεξεργασία του DataFrame
@@ -199,44 +204,68 @@ def plot_traverse_base64(results: list) -> str:
     
     return f"data:image/png;base64,{plot_url}"
 
-def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
-    plt.style.use('dark_background')
-    plt.rcParams['font.family'] = 'Segoe UI'
+def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
+    """
+    Δημιουργεί το τοπογραφικό σκαρίφημα της ταχυμετρίας σε Matplotlib (dark mode)
+    και το επιστρέφει σε μορφή Base64 string για το React Frontend.
+    """
+    if not calculated_points:
+        return ""
+
+    # Μετατροπή των αποτελεσμάτων σε DataFrame για εύκολο χειρισμό
+    df = pd.DataFrame(calculated_points)
     
+    plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 9))
+    
+    # Χρώματα που ταιριάζουν με το dashboard theme σου
     fig.patch.set_facecolor('#121212')
     ax.set_facecolor('#121212')
     
-    # Plain style για να μην έχουμε εκθέτες
+    # Plain style για να μην έχουμε εκθέτες (scientific notation) στους άξονες
     ax.ticklabel_format(useOffset=False, style='plain', axis='both')
 
-    # 1. Σημεία Λεπτομερείας
-    ax.scatter(results_df['X'], results_df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
-    ax.scatter(results_df['X'], results_df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
+    # 1. Σχεδίαση Σημείων Λεπτομερείας (Σταυρός + Κύκλος)
+    ax.scatter(df['X'], df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
+    ax.scatter(df['X'], df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
 
-    # 2. Στάση
-    ax.scatter(xs, ys, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, label=f'Στάση: {station_name}', zorder=10)
+    # 2. Σχεδίαση όλων των Στάσεων που χρησιμοποιήθηκαν στις μετρήσεις
+    unique_stations = df['Στάση'].unique()
+    for st_name in unique_stations:
+        if st_name in st_lookup:
+            xs = st_lookup[st_name]['x']
+            ys = st_lookup[st_name]['y']
+            # Σχεδίαση κυανού τριγώνου στάσης
+            ax.scatter(xs, ys, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, zorder=10)
+            # Label ονόματος στάσης
+            ax.text(xs, ys, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
 
-    # 3. Δυναμικά Labels χωρίς δεκαδικά (Με βελτιωμένη τοποθέτηση)
+    # 3. Δυναμικά Labels Σημείων χωρίς δεκαδικά
     texts = []
-    for i, row in results_df.iterrows():
-        point_id = str(int(row['Σημείο']))
-        # Δίνουμε ένα μικρό αρχικό offset (π.χ. 0.3 μέτρα) για να μην πέφτει στο κέντρο του σταυρού
+    for i, row in df.iterrows():
+        try:
+            # Μετατροπή σε ακέραιο αν είναι καθαρός αριθμός (π.χ. '1.0' -> '1')
+            point_id = str(int(float(row['Σημείο'])))
+        except Exception:
+            point_id = str(row['Σημείο'])
+            
+        # Αρχικό μικρό offset 0.3μ για να μην πέφτει πάνω στο κέντρο
         texts.append(ax.text(row['X'] + 0.3, row['Y'] + 0.3, point_id, color="#FFFEFE", fontsize=9, fontweight='bold'))
 
-    # Αφήνουμε την adjust_text να κινηθεί ελεύθερα (χωρίς το only_move)
-    # Της περνάμε τα x, y των σημείων για να ξέρει τι να αποφύγει
-    adjust_text(texts, 
-                x=results_df['X'].values,
-                y=results_df['Y'].values,
-                ax=ax,
-                expand_points=(1.5, 1.5)) # Της δίνουμε "χώρο" να σπρώξει τα labels
+    # Εφαρμογή adjust_text για την αυτόματη αποφυγή επικαλύψεων στα labels
+    if HAS_ADJUST_TEXT and texts:
+        try:
+            adjust_text(texts, 
+                        x=df['X'].values,
+                        y=df['Y'].values,
+                        ax=ax,
+                        expand_points=(1.5, 1.5))
+        except Exception as e:
+            print(f"Σφάλμα κατά την εκτέλεση του adjust_text: {e}")
 
-    # 4. Label Στάσης
-    ax.text(xs, ys, f"  {station_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
-
-    # 5. Αισθητική & Άξονες
-    ax.set_title(f"ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ - {station_name}", loc='left', fontsize=14, fontweight='bold', pad=20)
+    # 4. Αισθητική & Άξονες
+    title_suffix = unique_stations[0] if len(unique_stations) == 1 else "ΔΙΚΤΥΟ"
+    ax.set_title(f"ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ - {title_suffix}", loc='left', fontsize=14, fontweight='bold', pad=20)
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
     ax.set_aspect('equal', adjustable='datalim')
@@ -245,19 +274,28 @@ def plot_survey_points(results_df, xs, ys, station_name="Στάση"):
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
 
-    # 6. Διόρθωση Υπομνήματος με Line2D (Όπως το είχες)
+    # 5. Δημιουργία Custom Υπομνήματος με Line2D (Συνδυασμός Σταυρού + Κύκλου)
     detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
                           markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
     cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
                          markersize=6, markeredgewidth=1.2)
+    station_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
+                           markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
     
-    handles, labels = ax.get_legend_handles_labels()
-    # Εδώ βάζουμε τα δύο σύμβολα μαζί στο υπόμνημα
-    handles.insert(0, (detail_proxy, cross_proxy))
-    labels.insert(0, 'Σημεία Λεπτομερείας')
+    handles = [(detail_proxy, cross_proxy), station_proxy]
+    labels = ['Σημεία Λεπτομερείας', 'Στάσεις / Σταθμοί']
 
     legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#1e1e1e', edgecolor='none')
-    for text in legend.get_texts(): text.set_color("white")
+    for text in legend.get_texts(): 
+        text.set_color("white")
 
     plt.tight_layout()
-    plt.show()
+    
+    # 6. Μετατροπή του γραφήματος σε Base64 string
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', dpi=120)
+    img.seek(0)
+    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
+    plt.close(fig)
+    
+    return f"data:image/png;base64,{plot_url}"
