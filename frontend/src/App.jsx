@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { FolderKanban } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -15,25 +15,65 @@ function App() {
 
   // --- PROJECT MANAGEMENT STATES ---
   const [currentProject, setCurrentProject] = useState(null);
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false); // Ανοιχτό από default
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
 
   // --- DATA STATES ---
   const [observations, setObservations] = useState([]);
+  const [adjMetrics, setAdjMetrics] = useState({}); // <--- ΝΕΟ STATE ΓΙΑ ΤΗ ΣΥΝΟΡΘΩΣΗ
   const [traverseData, setTraverseData] = useState([]); 
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
   const [tachymetryData, setTachymetryData] = useState({ data: [], stationList: [] }); 
 
-  // --- ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
-  const handleProjectLoaded = (projectData) => {
-    setCurrentProject(projectData.project_name);
-    setGlobalSettings(projectData.settings || {});
+  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
+  // Κάθε φορά που αλλάζει ένα από αυτά τα states, θα αποθηκεύεται αυτόματα!
+  useEffect(() => {
+    if (!currentProject) return; // Αν δεν έχουμε project, δεν σώζουμε τίποτα
 
-    if (projectData.traverse_data) {
-      setTraverseData(projectData.traverse_data);
-    }
-    if (projectData.metrics) {
-      setTraverseMetrics(projectData.metrics);
+    // Παίρνουμε όλα τα projects από το localStorage
+    const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
+
+    // Ανανεώνουμε το τρέχον project με τα νέα δεδομένα
+    savedProjects[currentProject] = {
+      ...savedProjects[currentProject], // Κρατάμε ότι άλλο υπήρχε
+      project_name: currentProject,
+      settings: globalSettings,
+      observations: observations,
+      adjMetrics: adjMetrics,       // <--- ΠΡΟΣΘΗΚΗ: Σώζουμε και τα αποτελέσματα της συνόρθωσης
+      traverse_data: traverseData,
+      metrics: traverseMetrics,
+      tachymetryData: tachymetryData
+    };
+
+    // Αποθηκεύουμε ξανά
+    localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
+  }, [currentProject, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData]);
+
+
+// --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
+  const handleProjectLoaded = (projectData) => {
+    const pName = projectData.project_name;
+    setCurrentProject(pName);
+    setGlobalSettings(projectData.settings || {});
+    
+    // Διαβάζουμε ΠΡΩΤΑ το Local Storage του browser!
+    const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
+    const localProject = savedProjects[pName];
+
+    if (localProject) {
+      // Αν το έχουμε σώσει τοπικά, φορτώνουμε τη δική μας (ενημερωμένη) έκδοση
+      setObservations(localProject.observations || []);
+      setAdjMetrics(localProject.adjMetrics || {});      // <--- ΠΡΟΣΘΗΚΗ
+      setTraverseData(localProject.traverse_data || []);
+      setTraverseMetrics(localProject.metrics || {});
+      setTachymetryData(localProject.tachymetryData || { data: [], stationList: [] });
+    } else {
+      // Αν δεν υπάρχει στο browser, φορτώνουμε ό,τι έφερε η Python
+      setObservations(projectData.observations || []);
+      setAdjMetrics(projectData.adjMetrics || {});       // <--- ΠΡΟΣΘΗΚΗ
+      setTraverseData(projectData.traverse_data || []);
+      setTraverseMetrics(projectData.metrics || {});
+      setTachymetryData(projectData.tachymetryData || { data: [], stationList: [] });
     }
 
     setIsProjectModalOpen(false);
@@ -45,7 +85,6 @@ function App() {
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
 
-      {/* ΑΛΛΑΓΗ 2: Χρησιμοποιούμε το component με Κεφαλαίο P */}
       <ProjectManager 
         isOpen={isProjectModalOpen} 
         onClose={() => setIsProjectModalOpen(false)} 
@@ -57,7 +96,7 @@ function App() {
 
       <div className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         
-        {/* ΚΟΥΜΠΙ ΔΙΑΧΕΙΡΙΣΗΣ PROJECT (Πάνω δεξιά) */}
+        {/* ΚΟΥΜΠΙ ΔΙΑΧΕΙΡΙΣΗΣ PROJECT */}
         <div className="absolute top-4 right-6 z-50 flex items-center gap-3">
           {currentProject && (
             <span className="text-[10px] font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 rounded-lg shadow-sm">
@@ -87,12 +126,22 @@ function App() {
               />
             )}
             
-            {activeTab === 'adjustment' && <Adjustment observations={observations} setObservations={setObservations} />}
+            {/* ΠΡΟΣΘΗΚΗ: Περάσαμε τα adjMetrics & setAdjMetrics στο Adjustment */}
+            {activeTab === 'adjustment' && (
+              <Adjustment 
+                observations={observations} 
+                setObservations={setObservations} 
+                adjMetrics={adjMetrics}
+                setAdjMetrics={setAdjMetrics}
+              />
+            )}
             
             {activeTab === 'traverse' && (
               <Traverse 
                 data={traverseData} 
+                setData={setTraverseData}         
                 metrics={traverseMetrics} 
+                setMetrics={setTraverseMetrics}   
                 projectSettings={globalSettings}
               />
             )}

@@ -1,46 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
-  Map as MapIcon, 
-  Info, 
-  Database, 
-  Activity, 
-  Target, 
-  Ruler,
-  Play,
-  Cpu,
-  Image as ImageIcon,
-  Maximize2,
-  Download,
-  X
+  Map as MapIcon, Info, Database, Activity, Target, Ruler,
+  Play, Cpu, Image as ImageIcon, Maximize2, Download, X
 } from 'lucide-react';
 
-const Traverse = ({ data = [], onDataUpdate }) => {
+// --- ΑΛΛΑΓΗ 1: Δεχόμαστε τα νέα props από το App.jsx ---
+const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSettings }) => {
   
-  const [tableData, setTableData] = useState(data);
-  const [metrics, setMetrics] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [plotImage, setPlotImage] = useState(null); 
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // States για τις παραμέτρους
-  const [klass, setKlass] = useState("Πρωτεύουσα");
-  const [terrain, setTerrain] = useState("Ομαλό");
-  const [scale, setScale] = useState("1:1000");
+  // --- ΑΛΛΑΓΗ 2: Αρχικοποιούμε τα dropdowns από τα metrics ---
+  const [klass, setKlass] = useState(metrics.klass || "Πρωτεύουσα");
+  const [terrain, setTerrain] = useState(metrics.terrain || "Ομαλό");
+  const [scale, setScale] = useState(metrics.scale || "1:1000");
 
-  useEffect(() => {
-    setTableData(data);
-  }, [data]);
+  // ΠΡΟΣΘΗΚΗ: Όταν φορτώνουμε το Project από τη μνήμη, τα dropdowns πρέπει να ενημερώνονται!
+  React.useEffect(() => {
+    if (metrics.klass) setKlass(metrics.klass);
+    if (metrics.terrain) setTerrain(metrics.terrain);
+    if (metrics.scale) setScale(metrics.scale);
+  }, [metrics]);
+
+  // --- ΑΛΛΑΓΗ 3: Το plotImage πλέον διαβάζεται από το App.jsx ---
+  const plotImage = metrics.plotImage || null;
 
   const handleInputChange = (index, field, value) => {
-    const newData = [...tableData];
+    // ... (ο υπόλοιπος κώδικας συνεχίζει κανονικά)
+    const newData = [...data]; // Χρησιμοποιούμε απευθείας το prop data
     newData[index] = { ...newData[index], [field]: value };
-    setTableData(newData);
     
-    if (onDataUpdate) {
-      onDataUpdate(newData);
-    }
+    // Ενημερώνουμε ΑΠΕΥΘΕΙΑΣ το App.jsx. Έτσι γίνεται auto-save σε κάθε πληκτρολόγηση!
+    if (setData) setData(newData); 
   };
 
   const handleKeyDown = (e, rowIndex, colName) => {
@@ -74,7 +67,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
     }
 
     if (shouldMove) {
-      if (nextRow >= 0 && nextRow < tableData.length && nextCol >= 0 && nextCol < columns.length) {
+      if (nextRow >= 0 && nextRow < data.length && nextCol >= 0 && nextCol < columns.length) {
         const nextColName = columns[nextCol];
         const nextInput = document.getElementById(`input-${nextRow}-${nextColName}`);
         if (nextInput) {
@@ -95,22 +88,27 @@ const Traverse = ({ data = [], onDataUpdate }) => {
     setIsLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:5000/api/traverse', {
-        measurements: tableData,
+        measurements: data,
         scale: scale,
         terrain: terrain,
         klass: klass
       });
 
       if (response.data) {
-        if (response.data.results) {
-          setTableData(response.data.results);
-          if (onDataUpdate) onDataUpdate(response.data.results);
+        // 1. Στέλνουμε τα διορθωμένα δεδομένα (πίνακας) στο App.jsx
+        if (response.data.results && setData) {
+          setData(response.data.results);
         }
-        if (response.data.metrics) {
-          setMetrics(response.data.metrics);
-        }
-        if (response.data.plot) {
-          setPlotImage(response.data.plot);
+        
+        // 2. Στέλνουμε τα σφάλματα (metrics) ΚΑΙ το διάγραμμα ΚΑΙ τις ρυθμίσεις στο App.jsx!
+        if (setMetrics) {
+          setMetrics({
+            ...(response.data.metrics || {}),
+            plotImage: response.data.plot || null, // Αποθηκεύουμε την εικόνα!
+            klass: klass,     // Σώζουμε και την επιλογή Τάξης
+            terrain: terrain, // Σώζουμε και την επιλογή Εδάφους
+            scale: scale      // Σώζουμε και την επιλογή Κλίμακας
+          });
         }
       }
     } catch (error) {
@@ -262,8 +260,8 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20">
-                  {tableData.length > 0 ? (
-                    tableData.map((row, idx) => (
+                  {data && data.length > 0 ? (
+                    data.map((row, idx) => (
                       <tr key={idx} className="hover:bg-emerald-500/[0.04] active:bg-emerald-500/[0.08] transition-all duration-150 group">
                         <td className="p-2">
                           <div className="flex items-center gap-3">
@@ -508,7 +506,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
   );
 };
 
-// --- Sub-Components ---
+// --- Sub-Components παραμένουν ίδια ---
 const CompactStat = ({ label, value, unit, icon, color }) => (
   <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
     <div className="text-slate-500">{icon}</div>

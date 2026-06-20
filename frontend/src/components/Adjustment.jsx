@@ -2,13 +2,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
-const Adjustment = ({ observations, setObservations }) => {
-  const [isAdjusted, setIsAdjusted] = useState(false);
+// --- ΑΛΛΑΓΗ 1: Δεχόμαστε τα νέα props (adjMetrics, setAdjMetrics) από το App.jsx ---
+const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics }) => {
+  
+  // --- ΑΛΛΑΓΗ 2: Διαβάζουμε το state από τα metrics του App.jsx ---
+  const [isAdjusted, setIsAdjusted] = useState(adjMetrics.isAdjusted || false);
+  const [plotImage, setPlotImage] = useState(adjMetrics.plotImage || null);
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [plotImage, setPlotImage] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false); 
   
   const isFormattingRef = useRef(false);
+
+  // --- ΑΛΛΑΓΗ 3: Όταν φορτώνει το project, παίρνουμε τις σωσμένες τιμές ---
+  useEffect(() => {
+    setIsAdjusted(adjMetrics.isAdjusted || false);
+    setPlotImage(adjMetrics.plotImage || null);
+  }, [adjMetrics]);
 
   // Helper functions για δεκαδικά
   const to4 = (val) => {
@@ -24,7 +34,6 @@ const Adjustment = ({ observations, setObservations }) => {
   };
 
   // Logic για το ποια δεδομένα θα εμφανίζονται
-  // Αν έχει γίνει η συνόρθωση, κρατάμε μόνο μοναδικούς συνδυασμούς From-To
   const displayObservations = isAdjusted 
     ? observations.reduce((acc, current) => {
         const x = acc.find(item => item.station === current.station && item.target === current.target);
@@ -106,7 +115,6 @@ const Adjustment = ({ observations, setObservations }) => {
 
   const runAdjustment = async () => {
     setIsLoading(true);
-    setPlotImage(null);
     try {
       const validObservations = observations.filter(obs => String(obs.station || "").trim() !== "" && String(obs.target || "").trim() !== "");
       if (validObservations.length === 0) { alert("Συμπληρώστε τουλάχιστον μία έγκυρη μέτρηση."); setIsLoading(false); return; }
@@ -121,8 +129,14 @@ const Adjustment = ({ observations, setObservations }) => {
         });
 
         setObservations(updatedObservations);
-        setIsAdjusted(true); 
-        if (response.data.plot) setPlotImage(response.data.plot);
+        
+        // --- ΑΛΛΑΓΗ 4: Στέλνουμε το plot και το status στο App.jsx για Auto-Save ---
+        if (setAdjMetrics) {
+          setAdjMetrics({
+            isAdjusted: true,
+            plotImage: response.data.plot || null
+          });
+        }
       }
     } catch (error) {
       console.error("Σφάλμα στη συνόρθωση:", error);
@@ -138,6 +152,13 @@ const Adjustment = ({ observations, setObservations }) => {
     link.href = `data:image/png;base64,${plotImage}`;
     link.download = 'Network_Preview_Plot.png';
     link.click();
+  };
+
+  // --- ΑΛΛΑΓΗ 5: Κουμπί επιστροφής ενημερώνει το App.jsx ---
+  const handleBackToEdit = () => {
+    if (setAdjMetrics) {
+      setAdjMetrics({ ...adjMetrics, isAdjusted: false });
+    }
   };
 
   return (
@@ -176,7 +197,7 @@ const Adjustment = ({ observations, setObservations }) => {
                       <div className="flex justify-end pr-2 gap-2">
                         {isAdjusted && (
                           <button 
-                            onClick={() => setIsAdjusted(false)}
+                            onClick={handleBackToEdit}
                             className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all"
                             title="Επιστροφή στην επεξεργασία"
                           >
@@ -269,7 +290,7 @@ const Adjustment = ({ observations, setObservations }) => {
           </div>
         </div>
 
-        {/* Visualizer - Παραμένει το ίδιο */}
+        {/* Visualizer */}
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -301,7 +322,7 @@ const Adjustment = ({ observations, setObservations }) => {
         </div>
       </div>
 
-      {/* Fullscreen Overlay - Παραμένει το ίδιο */}
+      {/* Fullscreen Overlay */}
       {isFullscreen && plotImage && (
         <div className="fixed inset-0 z-50 bg-[#030712]/95 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-300">
           <button onClick={() => setIsFullscreen(false)} className="absolute top-8 right-8 bg-slate-900/80 text-slate-400 p-3 rounded-xl border border-slate-800 hover:text-red-400 transition-all"><X size={24} /></button>

@@ -24,9 +24,7 @@ def normalize_400(angle):
     while angle >= 400.0: angle -= 400.0
     return angle
 
-# ==========================================
-# 0. ENDPOINTS ΓΙΑ ΔΙΑΧΕΙΡΙΣΗ PROJECTS
-# ==========================================
+
 @app.route('/api/projects/list', methods=['GET'])
 def list_projects():
     try:
