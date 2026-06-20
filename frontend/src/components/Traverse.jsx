@@ -252,19 +252,19 @@ const Traverse = ({ data = [], onDataUpdate }) => {
             <div className="flex-1">
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
-                  <tr className="border-b border-slate-800/50">
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest">Station</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope_D [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">X [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">Y [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-500 tracking-widest text-right">H [m]</th>
+                  <tr className="border-b border-slate-800/60">
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest">Station</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Hz [grad]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Slope_D [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">X [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">Y [m]</th>
+                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">H [m]</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/30">
+                <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20">
                   {tableData.length > 0 ? (
                     tableData.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-blue-500/5 transition-colors group">
+                      <tr key={idx} className="hover:bg-emerald-500/[0.04] active:bg-emerald-500/[0.08] transition-all duration-150 group">
                         <td className="p-2">
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full flex-none ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse' : 'bg-slate-800 group-hover:bg-slate-600'}`} />
@@ -274,7 +274,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                               value={row.name ?? ""}
                               onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, idx, 'name')}
-                              className="bg-transparent w-full font-bold text-slate-300 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
+                              className="bg-transparent w-full font-bold text-slate-400 group-hover:text-emerald-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
                               placeholder="Name"
                             />
                           </div>
@@ -287,7 +287,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
                             onBlur={(e) => handleInputChange(idx, 'hz', formatVal(e.target.value, 4))}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
-                            className="bg-transparent w-full font-mono text-amber-400/90 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
+                            className="bg-transparent w-full font-mono text-amber-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -299,7 +299,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
                             onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
-                            className="bg-transparent w-full font-mono text-slate-400 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
+                            className="bg-transparent w-full font-mono text-slate-300 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -310,7 +310,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             value={row.x ?? ""}
                             onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'x')}
-                            className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
+                            className="bg-transparent w-full font-mono text-cyan-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -321,7 +321,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             value={row.y ?? ""}
                             onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'y')}
-                            className="bg-transparent w-full font-mono text-cyan-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
+                            className="bg-transparent w-full font-mono text-cyan-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -332,7 +332,7 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                             value={row.h ?? ""}
                             onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
-                            className="bg-transparent w-full font-mono text-emerald-400/80 text-right tabular-nums text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
+                            className="bg-transparent w-full font-mono text-emerald-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
                             placeholder="-"
                           />
                         </td>
@@ -341,8 +341,10 @@ const Traverse = ({ data = [], onDataUpdate }) => {
                   ) : (
                     <tr>
                       <td colSpan="6" className="p-24 text-center">
-                        <Info size={30} className="text-slate-700 mx-auto mb-3" />
-                        <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest">Αναμονή Δεδομένων</p>
+                        <div className="flex flex-col items-center opacity-20">
+                          <Info size={30} className="text-slate-700 mx-auto mb-3" />
+                          <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest">Αναμονή Δεδομένων</p>
+                        </div>
                       </td>
                     </tr>
                   )}

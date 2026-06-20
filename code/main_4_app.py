@@ -2,11 +2,18 @@ import pandas as pd
 import math
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from pathlib import Path
+import os
+
 import data_proccessing as dpr  # Το αρχείο σου με τις συναρτήσεις
 import vis_4_app as vis         # Το αρχείο για τα γραφήματα
+from project_manager import TopoProject  # <--- Προσθήκη της κλάσης των Projects
 
 app = Flask(__name__)
 CORS(app) 
+
+# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects
+WORKSPACE_DIR = Path(os.getcwd()) / "Topo_Workspace"
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -16,6 +23,58 @@ def normalize_400(angle):
     while angle < 0: angle += 400.0
     while angle >= 400.0: angle -= 400.0
     return angle
+
+# ==========================================
+# 0. ENDPOINTS ΓΙΑ ΔΙΑΧΕΙΡΙΣΗ PROJECTS
+# ==========================================
+@app.route('/api/projects/list', methods=['GET'])
+def list_projects():
+    try:
+        if not WORKSPACE_DIR.exists():
+            WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+            return jsonify([])
+        projects = [d.name for d in WORKSPACE_DIR.iterdir() if d.is_dir()]
+        return jsonify(projects)
+    except Exception as e:
+        print(f"❌ Σφάλμα κατά τη λίστα των projects: {str(e)}")
+        return jsonify({"error": "Αποτυχία ανάγνωσης φακέλων εργασίας"}), 500
+
+@app.route('/api/projects/load', methods=['POST'])
+def load_project():
+    try:
+        req = request.json
+        project_name = req.get("project_name")
+        settings = req.get("settings", {})
+
+        if not project_name:
+            return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
+
+        project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
+        project_state = project.setup_project_structure(initial_settings=settings)
+        
+        return jsonify(project_state)
+    except Exception as e:
+        print(f"❌ Σφάλμα κατά τη φόρτωση του project: {str(e)}")
+        return jsonify({"error": "Αποτυχία αρχικοποίησης/φόρτωσης project"}), 500
+
+@app.route('/api/projects/save', methods=['POST'])
+def save_project():
+    try:
+        req = request.json
+        project_name = req.get("project_name")
+        current_state = req.get("state")
+
+        if not project_name or not current_state:
+            return jsonify({"error": "Λείπουν απαραίτητα δεδομένα"}), 400
+
+        project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
+        project.save_state(current_state)
+        
+        return jsonify({"status": "success", "message": f"Το project '{project_name}' αποθηκεύτηκε!"})
+    except Exception as e:
+        print(f"❌ Σφάλμα κατά την αποθήκευση του project: {str(e)}")
+        return jsonify({"error": "Αποτυχία αποθήκευσης δεδομένων"}), 500
+
 
 # ==========================================
 # 1. ENDPOINT ΓΙΑ ΣΥΝΟΡΘΩΣΗ (ADJUSTMENT)
@@ -194,7 +253,6 @@ def run_tachymetry():
         return jsonify({"results": []})
 
     try:
-        # Δημιουργία lookup dictionary για τις συντεταγμένες των σταθμών
         st_lookup = {}
         for st in stations:
             name = str(st.get('station_name', '')).strip()
@@ -214,23 +272,19 @@ def run_tachymetry():
             if st_id not in st_lookup or bs_id not in st_lookup:
                 continue
 
-            # Συντεταγμένες Στάσης (S) και Προσανατολισμού (O)
             xs, ys, zs = st_lookup[st_id]['x'], st_lookup[st_id]['y'], st_lookup[st_id]['z']
             xo, yo = st_lookup[bs_id]['x'], st_lookup[bs_id]['y']
 
-            # 2ο Θεμελιώδες: Υπολογισμός Αζιμουθίου Στάσης-Προσανατολισμού (G_so)
             dx_so = xo - xs
             dy_so = yo - ys
             g_so = math.atan2(dx_so, dy_so) * 200.0 / math.pi
             g_so = normalize_400(g_so)
 
-            # Σφάλμα Προσανατολισμού Κύκλου (V0)
             hz_o = float(m.get('hz_o', 0.0) or 0.0)
             v0 = g_so - hz_o
 
-            # Πολικά Στοιχεία Σημείου Λεπτομέρειας
             hz = float(m.get('hz', 0.0) or 0.0)
-            z_angle = float(m.get('z', 100.0) or 100.0)  # default 100 gon αν λείπει
+            z_angle = float(m.get('z', 100.0) or 100.0)
             sd = float(m.get('sd', 0.0) or 0.0)
             ih = float(m.get('station_height', 0.0) or 0.0)
             th = float(m.get('targetHeight', 0.0) or 0.0)
@@ -238,10 +292,8 @@ def run_tachymetry():
             if sd <= 0:
                 continue
 
-            # Υπολογισμός Γωνίας Διεύθυνσης προς το Σημείο (G_sp)
             g_sp = normalize_400(v0 + hz)
 
-            # Μετατροπές & 1ο Θεμελιώδες Πρόβλημα
             z_rad = g2r(z_angle)
             hd = sd * math.sin(z_rad)
             vd = sd * math.cos(z_rad)

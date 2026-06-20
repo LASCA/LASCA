@@ -4,11 +4,16 @@ import { toast } from 'react-hot-toast';
 import { 
   Plus, FolderOpen, Save, Upload, 
   Settings2, Globe2, Ruler, Beaker,
-  ChevronRight, HardDrive, FileSpreadsheet,
+  ChevronRight, FileSpreadsheet,
   Activity, LayoutGrid
 } from 'lucide-react';
 
-const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
+const Dashboard = ({ 
+  setObservations, 
+  setTraverseData, 
+  setTachymetryData, 
+  onOpenProjectManager
+}) => {
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -80,7 +85,6 @@ const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
             code: row['Code'] || row['Κωδικός'] || "DETAIL"
           }));
 
-          // Ανίχνευση λίστας σταθμών από το stations_taxymetria tab
           let stationList = [];
           if (stationsSheetName) {
             const wsStations = wb.Sheets[stationsSheetName];
@@ -90,7 +94,6 @@ const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
               .filter(Boolean);
           }
 
-          // Fallback αν το tab των σταθμών είναι άδειο, βγάλε τους μοναδικούς από τις μετρήσεις λεπτομέρειας
           if (stationList.length === 0) {
             stationList = [...new Set(formattedTaxymetry.map(p => String(p.station)))].filter(Boolean);
           }
@@ -132,13 +135,6 @@ const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
             ΔΙΑΧΕΙΡΙΣΗ ΚΑΙ ΠΑΡΑΜΕΤΡΟΠΟΙΗΣΗ ΜΕΛΕΤΗΣ
           </span>
         </div>
-
-        <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-900 border border-slate-800 rounded-full">
-          <HardDrive size={14} className="text-blue-500" />
-          <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-            LOCAL WORKSPACE: ACTIVE
-          </span>
-        </div>
       </header>
 
       {/* MAIN DASHBOARD GRID */}
@@ -155,11 +151,13 @@ const Dashboard = ({ setObservations, setTraverseData, setTachymetryData }) => {
                 title="CREATE NEW" 
                 subtitle="Νέο αρχείο .lasca" 
                 variant="primary" 
+                onClick={onOpenProjectManager}
               />
               <ActionButton 
                 icon={<FolderOpen size={20} />} 
                 title="OPEN PROJECT" 
                 subtitle="Ανάκτηση από δίσκο" 
+                onClick={onOpenProjectManager}
               />
               <ActionButton 
                 icon={<Save size={20} />} 
@@ -269,10 +267,12 @@ const SectionTitle = ({ title }) => (
   </h3>
 );
 
-const ActionButton = ({ icon, title, subtitle, variant }) => {
+const ActionButton = ({ icon, title, subtitle, variant, onClick }) => {
   const isPrimary = variant === 'primary';
   return (
-    <button className={`
+    <button 
+      onClick={onClick} 
+      className={`
       w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border text-left
       ${isPrimary 
         ? 'bg-blue-600 border-blue-500 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.2)]' 
