@@ -14,7 +14,9 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // --- PROJECT MANAGEMENT STATES ---
-  const [currentProject, setCurrentProject] = useState(null);
+  const [currentProject, setCurrentProject] = useState(() => {
+    return localStorage.getItem('current_active_project') || null;
+  });
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
 
@@ -25,14 +27,53 @@ function App() {
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
   const [tachymetryData, setTachymetryData] = useState({ measurements: [], stations: [], results: [] }); 
 
-  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
+  // ΝΕΟ STATE: "Κλειδαριά" για το Auto-Save
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // --- 0. ΦΟΡΤΩΣΗ ΤΟΥ PROJECT ΑΠΟ ΤΟ .JSON ΤΟΥ ΣΚΛΗΡΟΥ ΔΙΣΚΟΥ ΣΤΗΝ ΕΚΚΙΝΗΣΗ ---
   useEffect(() => {
-    if (!currentProject) return; 
+    if (currentProject) {
+      console.log(`⏳ Φόρτωση του project "${currentProject}" από το αρχείο JSON του Backend...`);
+      
+      fetch('http://localhost:5000/api/projects/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_name: currentProject })
+      })
+      .then(res => res.json())
+      .then(backendData => {
+        if (backendData && !backendData.error) {
+          // Γεμίζουμε την οθόνη με τα αυθεντικά δεδομένα από τον δίσκο!
+          setGlobalSettings(backendData.settings || {});
+          setObservations(backendData.observations || []);
+          setAdjMetrics(backendData.adjMetrics || {});      
+          setTraverseData(backendData.traverse_data || []);
+          setTraverseMetrics(backendData.metrics || {});
+          setTachymetryData(backendData.tachymetryData || { measurements: [], stations: [], results: [] });
+          console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
+          
+          // ΞΕΚΛΕΙΔΩΝΟΥΜΕ ΤΟ AUTO-SAVE
+          setIsDataLoaded(true);
+        }
+      })
+      .catch(err => {
+        console.error("❌ Αποτυχία σύνδεσης με τον server κατά την εκκίνηση:", err);
+        setIsDataLoaded(true); // Απεμπλοκή ακόμα και σε error
+      });
+    } else {
+      // Αν δεν υπάρχει ενεργό project στην εκκίνηση, το auto-save είναι ξεκλείδωτο για το επόμενο που θα φτιαχτεί
+      setIsDataLoaded(true);
+    }
+  }, []); // Τρέχει ΜΟΝΟ μία φορά όταν ανοίγει ο server/browser
 
+  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ (Browser + Σκληρός Δίσκος JSON) ---
+  useEffect(() => {
+    // ΦΡΕΝΟ: Αν δεν έχουμε project Ή αν δεν έχουν φορτώσει ακόμα τα δεδομένα, ΣΤΑΜΑΤΑ!
+    if (!currentProject || !isDataLoaded) return; 
+
+    // Α. Τοπική αποθήκευση στον Browser για ασφάλεια
     const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
-
-    savedProjects[currentProject] = {
-      ...savedProjects[currentProject], 
+    const projectState = {
       project_name: currentProject,
       settings: globalSettings,
       observations: observations,
@@ -42,8 +83,28 @@ function App() {
       tachymetryData: tachymetryData
     };
 
+    savedProjects[currentProject] = projectState;
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
-  }, [currentProject, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData]);
+    localStorage.setItem('current_active_project', currentProject);
+
+    // Β. LIVE ΣΥΓΧΡΟΝΙΣΜΟΣ ΜΕ ΤΟ BACKEND (Γράψιμο στο project_data.json)
+    fetch('http://localhost:5000/api/projects/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: currentProject,
+        state: projectState // Στέλνουμε όλο το state
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        console.log(`💾 Auto-save: Το αρχείο .json στον φάκελο "${currentProject}" ενημερώθηκε!`);
+      }
+    })
+    .catch(err => console.error("❌ Το Auto-save απέτυχε να γράψει στο Backend:", err));
+
+  }, [currentProject, isDataLoaded, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData]);
 
 
   // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
@@ -52,23 +113,15 @@ function App() {
     setCurrentProject(pName);
     setGlobalSettings(projectData.settings || {});
     
-    const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
-    const localProject = savedProjects[pName];
+    // Φορτώνουμε απευθείας τα δεδομένα που μας επέστρεψε το backend load endpoint
+    setObservations(projectData.observations || []);
+    setAdjMetrics(projectData.adjMetrics || {});       
+    setTraverseData(projectData.traverse_data || []);
+    setTraverseMetrics(projectData.metrics || {});
+    setTachymetryData(projectData.tachymetryData || { measurements: [], stations: [], results: [] });
 
-    if (localProject) {
-      setObservations(localProject.observations || []);
-      setAdjMetrics(localProject.adjMetrics || {});      
-      setTraverseData(localProject.traverse_data || []);
-      setTraverseMetrics(localProject.metrics || {});
-      setTachymetryData(localProject.tachymetryData || { measurements: [], stations: [], results: [] });
-    } else {
-      setObservations(projectData.observations || []);
-      setAdjMetrics(projectData.adjMetrics || {});       
-      setTraverseData(projectData.traverse_data || []);
-      setTraverseMetrics(projectData.metrics || {});
-      setTachymetryData(projectData.tachymetryData || { measurements: [], stations: [], results: [] });
-    }
-
+    // ΞΕΚΛΕΙΔΩΝΟΥΜΕ ΤΟ AUTO-SAVE ΓΙΑ ΤΟ ΝΕΟ PROJECT
+    setIsDataLoaded(true);
     setIsProjectModalOpen(false);
   };
 
@@ -130,7 +183,7 @@ function App() {
             {activeTab === 'traverse' && (
               <Traverse 
                 data={traverseData} 
-                setData={setTraverseData}         
+                setData={setTraverseData}        
                 metrics={traverseMetrics} 
                 setMetrics={setTraverseMetrics}   
                 projectSettings={globalSettings}
