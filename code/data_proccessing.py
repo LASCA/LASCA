@@ -126,42 +126,57 @@ def tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C):
     ym = (k1 * ya + k2 * yb + k3 * yc) / sk
     return xm, ym
 
-def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
-    # 1. Φόρτωση των 2 ξεχωριστών Sheets
-    df_st = pd.read_excel(excel_path, sheet_name='stations_taxymetria')
-    df_meas = pd.read_excel(excel_path, sheet_name='measurements_taxymetria')
+import pandas as pd
+import math
+
+# (Οι συναρτήσεις σου deutero_them, proto_themeliodes, norm400, g2r παραμένουν ως έχουν)
+
+def tachymetry(data_meas, data_st=None, target_station=None, target_orientation=None, apply_scale=False, scale_factor=1.0):
+    # 1. Φόρτωση: Αν περάσουμε path διαβάζει Excel (παλιός τρόπος). Αν περάσουμε DataFrame, τα παίρνει κατευθείαν (νέος τρόπος API).
+    if isinstance(data_meas, str):
+        df_st = pd.read_excel(data_meas, sheet_name='stations_taxymetria')
+        df_meas = pd.read_excel(data_meas, sheet_name='measurements_taxymetria')
+    else:
+        df_st = data_st.copy()
+        df_meas = data_meas.copy()
 
     # 2. Προσαρμογή Ονομάτων Στηλών (Δυναμική Αναζήτηση)
-    # Ελέγχει πώς έχεις ονομάσει τις στήλες στο Excel (π.χ. 'From' ή 'Station', 'O' ή 'Orientation')
     col_st = 'From' if 'From' in df_meas.columns else 'Station'
     col_or = 'O' if 'O' in df_meas.columns else 'Orientation'
 
     # 3. Αυτόματη συμπλήρωση κενών κελιών (Forward Fill)
-    # Κατεβάζει τον μηδενισμό (HZ_O) και το ύψος οργάνου σε όλες τις γραμμές.
     cols_to_fill = [col_st, col_or, 'HZ_O', 'Station_Height']
     for col in cols_to_fill:
         if col in df_meas.columns:
             df_meas[col] = df_meas[col].ffill()
 
-    # 4. Δημιουργία Λεξικού (Lookup) για τις Στάσεις
     st_lookup = df_st.set_index('Station_Name').to_dict('index')
 
     results = []
     first_station = None
     first_coords = None
 
+    # Σταθερές Διάθλασης/Καμπυλότητας για απόλυτη ακρίβεια στο Z
+    R = 6371000.0
+    k = 0.13
+
     # 5. Επεξεργασία των μετρήσεων γραμμή-γραμμή
     for index, row in df_meas.iterrows():
-        st_id = row[col_st]
-        bs_id = row[col_or]
+        st_id = row.get(col_st)
+        bs_id = row.get(col_or)
 
-        # Προσπέραση αν οι στήλες παραμένουν κενές
         if pd.isna(st_id) or pd.isna(bs_id):
+            continue
+
+        # --- ΦΙΛΤΡΟ ΓΙΑ ΤΟ UI (Υπολογίζει μόνο ό,τι επιλέξαμε στην οθόνη) ---
+        if target_station and str(st_id).lower() != str(target_station).lower():
+            continue
+        if target_orientation and str(bs_id).lower() != str(target_orientation).lower():
             continue
 
         # Έλεγχος ύπαρξης στο φύλλο Σταθμών
         if st_id not in st_lookup or bs_id not in st_lookup:
-            print(f"⚠️ Προειδοποίηση (Γραμμή {index + 2}): Η στάση '{st_id}' ή ο προσανατολισμός '{bs_id}' δεν βρέθηκε. Αγνόηση.")
+            print(f"⚠️ Προειδοποίηση: Η στάση '{st_id}' ή ο προσανατολισμός '{bs_id}' δεν βρέθηκε. Αγνόηση.")
             continue
 
         # Ανάκτηση των συντεταγμένων
@@ -172,14 +187,14 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
             first_station = st_id
             first_coords = (xs, ys, zs)
 
-        # Ανάκτηση μετρήσεων γραμμής
-        hz_o = row['HZ_O']
-        i = row['Station_Height']
-        p_id = row['Point_ID']
-        hz = row['Hz']
-        z = row['Z']
-        sd = row['SD']
-        t = row['TargetHeight']
+        # Ανάκτηση μετρήσεων γραμμής (με ασφάλεια για None)
+        hz_o = float(row.get('HZ_O', 0) or 0)
+        i = float(row.get('Station_Height', 0) or 0)
+        p_id = row.get('Point_ID')
+        hz = float(row.get('Hz', 0) or 0)
+        z = float(row.get('Z', 100) or 100)
+        sd = float(row.get('SD', 0) or 0)
+        t = float(row.get('TargetHeight', 0) or 0)
 
         if pd.isna(sd) or sd <= 0: 
             continue
@@ -198,19 +213,23 @@ def tachymetry(excel_path, apply_scale=False, scale_factor=1.0):
         g_sp = norm400(g_so + hz_diff)
 
         xp, yp = proto_themeliodes(xs, ys, hd, g_sp)
-        zp = zs + i + vd - t
+        
+        # Προσθήκη διόρθωσης καμπυλότητας & διάθλασης (έτσι δεν χάνεις στο Ζ)
+        dz_curvature = ((1 - k) / (2 * R)) * (hd ** 2)
+        zp = zs + i + vd - t + dz_curvature
 
-        # Καθαρισμός Point_ID (αφαίρεση δεκαδικών αν είναι αριθμός)
+        # Καθαρισμός Point_ID
         point_name = int(p_id) if not pd.isna(p_id) and isinstance(p_id, (int, float)) else p_id
 
         results.append({
             'Στάση': st_id,
+            'Προσανατολισμός': bs_id, # Απαραίτητο για το γράφημα στο React
             'Σημείο': point_name, 
             'X': round(xp, 3), 
             'Y': round(yp, 3), 
             'Z': round(zp, 3)
         })
- 
+
     results_df = pd.DataFrame(results)
     
     if first_station is None:

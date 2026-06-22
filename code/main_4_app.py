@@ -239,105 +239,55 @@ def run_traverse():
 
 
 # ==========================================
-# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY)
+# 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) 
+# Πλέον καλεί απευθείας την dpr.tachymetry()!
 # ==========================================
 @app.route('/api/tachymetry', methods=['POST'])
 def run_tachymetry():
     data = request.json
     measurements = data.get('measurements', [])
     stations = data.get('stations', [])
+    
+    target_station = data.get('station_name')
+    target_orientation = data.get('orientation_name')
 
     if not measurements:
         return jsonify({"results": []})
 
+    # 1. Μετατροπή των λιστών JSON σε Pandas DataFrames
+    df_meas = pd.DataFrame(measurements)
+    df_st = pd.DataFrame(stations)
+    
+    # 2. Εξασφάλιση ότι τα ονόματα στηλών στους σταθμούς ταιριάζουν με αυτά που περιμένει η dpr
+    rename_st = {}
+    for col in df_st.columns:
+        if col.lower() in ['station_name', 'station']: rename_st[col] = 'Station_Name'
+        if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
+        if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
+        if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
+    df_st.rename(columns=rename_st, inplace=True)
+
     try:
-        # 1. Χαρτογράφηση γνωστών συντεταγμένων στάσεων
-        st_lookup = {}
-        for st in stations:
-            name = str(st.get('Station_Name', st.get('station_name', ''))).strip()
-            if name:
-                st_lookup[name] = {
-                    'x': float(st.get('XS', st.get('x', 0.0)) or 0.0),
-                    'y': float(st.get('YS', st.get('y', 0.0)) or 0.0),
-                    'z': float(st.get('ZS', st.get('z', 0.0)) or 0.0)
-                }
+        # 3. ΚΑΛΟΥΜΕ ΤΗ ΔΙΚΗ ΣΟΥ ΕΛΕΓΜΕΝΗ ΣΥΝΑΡΤΗΣΗ!
+        results_df, _, _ = dpr.tachymetry(
+            data_meas=df_meas, 
+            data_st=df_st, 
+            target_station=target_station,
+            target_orientation=target_orientation
+        )
+        
+        calculated_points = results_df.to_dict('records') if not results_df.empty else []
 
-        # 2. Συλλογή των setups οργάνων
-        setups = {}
-        for m in measurements:
-            st = m.get('Station')
-            ori = m.get('Orientation')
-            if st and ori:
-                st_key = (str(st).strip(), str(ori).strip())
-                setups[st_key] = {
-                    'hz_o': float(m.get('HZ_O', m.get('hz_o', 0.0)) or 0.0),
-                    'station_height': float(m.get('Station_Height', m.get('station_height', 0.0)) or 0.0)
-                }
+        # 4. Φτιάχνουμε το st_lookup για το γράφημα (Matplotlib)
+        st_lookup = df_st.set_index('Station_Name').to_dict('index')
+        st_lookup_vis = {k: {'x': v['XS'], 'y': v['YS'], 'z': v['ZS']} for k, v in st_lookup.items()}
 
-        calculated_points = []
-
-        # 3. Επεξεργασία των πολικών μετρήσεων λεπτομέρειας
-        for m in measurements:
-            st_id = str(m.get('From', m.get('station', ''))).strip()
-            bs_id = str(m.get('O', m.get('backsight', ''))).strip()
-            point_id = m.get('Point_ID', m.get('pointId', ''))
-
-            if not st_id or not bs_id or not point_id:
-                continue
-
-            if st_id not in st_lookup or bs_id not in st_lookup:
-                continue
-
-            xs, ys, zs = st_lookup[st_id]['x'], st_lookup[st_id]['y'], st_lookup[st_id]['z']
-            xo, yo = st_lookup[bs_id]['x'], st_lookup[bs_id]['y']
-
-            dx_so = xo - xs
-            dy_so = yo - ys
-            g_so = math.atan2(dx_so, dy_so) * 200.0 / math.pi
-            g_so = normalize_400(g_so)
-
-            setup_info = setups.get((st_id, bs_id), {'hz_o': 0.0, 'station_height': 0.0})
-            hz_o = setup_info['hz_o']
-            ih = setup_info['station_height']
-
-            v0 = g_so - hz_o
-
-            hz = float(m.get('Hz', m.get('hz', 0.0)) or 0.0)
-            z_angle = float(m.get('Z', m.get('z', 100.0)) or 100.0)
-            sd = float(m.get('SD', m.get('sd', 0.0)) or 0.0)
-            th = float(m.get('TargetHeight', m.get('targetHeight', 0.0)) or 0.0)
-
-            if sd <= 0:
-                continue
-
-            g_sp = normalize_400(v0 + hz)
-
-            z_rad = g2r(z_angle)
-            hd = sd * math.sin(z_rad)
-            vd = sd * math.cos(z_rad)
-
-            g_rad = g2r(g_sp)
-            xp = xs + hd * math.sin(g_rad)
-            yp = ys + hd * math.cos(g_rad)
-            zp = zs + ih + vd - th
-
-            calculated_points.append({
-                "Στάση": st_id,
-                "Προσανατολισμός": bs_id,
-                "Σημείο": str(point_id),
-                "X": round(xp, 3),
-                "Y": round(yp, 3),
-                "Z": round(zp, 3)
-            })
-
-        # 4. Παραγωγή του Matplotlib Διαγράμματος
         plot_base64 = None
         try:
-            plot_base64 = vis.plot_tachymetry_base64(calculated_points, st_lookup)
+            plot_base64 = vis.plot_tachymetry_base64(calculated_points, st_lookup_vis)
         except Exception as plot_err:
             print(f"❌ Σφάλμα κατά τη δημιουργία του σκαριφήματος ταχυμετρίας: {plot_err}")
 
-        print(f"Successfully calculated {len(calculated_points)} detail points.")
         return jsonify({
             "results": calculated_points,
             "plot": plot_base64

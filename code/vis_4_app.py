@@ -229,16 +229,37 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     ax.scatter(df['X'], df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
     ax.scatter(df['X'], df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
 
-    # 2. Σχεδίαση όλων των Στάσεων που χρησιμοποιήθηκαν στις μετρήσεις
+    # 2. Σχεδίαση όλων των Στάσεων, των Προσανατολισμών και των Γραμμών Εξάρτησης
     unique_stations = df['Στάση'].unique()
+    drawn_orientations = set()  # Για να μην ξανασχεδιάζουμε το ίδιο σημείο αν συμπίπτει
+
     for st_name in unique_stations:
         if st_name in st_lookup:
-            xs = st_lookup[st_name]['x']
-            ys = st_lookup[st_name]['y']
+            st_x = st_lookup[st_name]['x']
+            st_y = st_lookup[st_name]['y']
+            
             # Σχεδίαση κυανού τριγώνου στάσης
-            ax.scatter(xs, ys, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, zorder=10)
-            # Label ονόματος στάσης
-            ax.text(xs, ys, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
+            ax.scatter(st_x, st_y, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, zorder=10)
+            ax.text(st_x, st_y, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
+
+            # Εύρεση των προσανατολισμών που ανήκουν σε αυτή τη στάση
+            station_df = df[df['Στάση'] == st_name]
+            if 'Προσανατολισμός' in station_df.columns:
+                unique_bs = station_df['Προσανατολισμός'].unique()
+                
+                for bs_name in unique_bs:
+                    if bs_name in st_lookup:
+                        bs_x = st_lookup[bs_name]['x']
+                        bs_y = st_lookup[bs_name]['y']
+                        
+                        # α) Σχεδίαση Διακεκομμένης Γραμμής Εξάρτησης (Στάση -> Προσανατολισμός)
+                        ax.plot([st_x, bs_x], [st_y, bs_y], color='#FFA500', linestyle='--', linewidth=1.5, alpha=0.8, zorder=3)
+                        
+                        # β) Σχεδίαση του Σημείου Προσανατολισμού (αν δεν είναι ήδη κύρια στάση)
+                        if bs_name not in unique_stations and bs_name not in drawn_orientations:
+                            ax.scatter(bs_x, bs_y, marker='^', s=160, facecolors='none', edgecolors='#FFA500', linewidths=1.8, zorder=9)
+                            ax.text(bs_x, bs_y, f"  {bs_name}", color='#FFA500', fontsize=11, fontweight='bold', va='top', zorder=11)
+                            drawn_orientations.add(bs_name)
 
     # 3. Δυναμικά Labels Σημείων χωρίς δεκαδικά
     texts = []
@@ -274,7 +295,7 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
 
-    # 5. Δημιουργία Custom Υπομνήματος με Line2D (Συνδυασμός Σταυρού + Κύκλου)
+    # 5. Δημιουργία Custom Υπομνήματος με Line2D (Ενημερωμένο)
     detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
                           markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
     cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
@@ -282,8 +303,13 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     station_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
                            markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
     
-    handles = [(detail_proxy, cross_proxy), station_proxy]
-    labels = ['Σημεία Λεπτομερείας', 'Στάσεις / Σταθμοί']
+    # Νέοι proxies για το Υπόμνημα (Προσανατολισμός και Γραμμή)
+    bs_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
+                        markeredgecolor='#FFA500', markersize=10, markeredgewidth=1.8)
+    line_proxy = Line2D([], [], color='#FFA500', linestyle='--', linewidth=1.5)
+    
+    handles = [(detail_proxy, cross_proxy), station_proxy, bs_proxy, line_proxy]
+    labels = ['Σημεία Λεπτομερείας', 'Στάσεις (Σταθμοί)', 'Σημεία Εξάρτησης', 'Γραμμή Εξάρτησης']
 
     legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#1e1e1e', edgecolor='none')
     for text in legend.get_texts(): 
