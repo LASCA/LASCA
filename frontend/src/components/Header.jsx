@@ -35,11 +35,25 @@ const Header = ({ activeTab }) => {
           accentLine: "border-amber-500",
           textAccent: "text-amber-500",
           bgAccent: "bg-amber-500",
-          stats: [
-            { label: "NET_TYPE", value: "CLOSED", valColor: "text-amber-400" },
-            { label: "STATIONS", value: "AWAITING", valColor: "text-slate-300" },
-            { label: "CLOSURE_ERR", value: "N/A", valColor: "text-slate-500" }
-          ]
+          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση της όδευσης
+        };
+      case 'tachymetry':
+        return { 
+          code: "GEO-TACH-05", 
+          label: "TACHYMETRY",
+          accentLine: "border-pink-500",
+          textAccent: "text-pink-500",
+          bgAccent: "bg-pink-500",
+          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση της ταχυμετρίας
+        };
+      case 'mapping':
+        return { 
+          code: "GEO-MAP-08", 
+          label: "DIGITAL_MAPPING",
+          accentLine: "border-purple-500",
+          textAccent: "text-purple-500",
+          bgAccent: "bg-purple-500",
+          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση του mapping
         };
       default:
         return { 

@@ -2,11 +2,13 @@ import React from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { 
-  Plus, FolderOpen, Save, Upload, 
+  Plus, FolderOpen, Upload, 
   Settings2, Globe2, Ruler, Beaker,
-  ChevronRight, FileSpreadsheet,
-  Activity, LayoutGrid
+  ChevronRight, FileSpreadsheet, LayoutGrid
 } from 'lucide-react';
+
+// Εισαγωγή της αυτόνομης συνάρτησης δημιουργίας template
+import { downloadSurveyTemplate } from '../utils/excel_template';
 
 const Dashboard = ({ 
   setObservations, 
@@ -121,11 +123,12 @@ const Dashboard = ({
       </header>
 
       <main className="flex-1 p-10">
-        <div className="grid grid-cols-12 gap-8 max-w-[1600px] mx-auto h-full">
+        {/* Διατήρηση του κομψού max-w-[1100px] με 3 ίσες στήλες */}
+        <div className="grid grid-cols-3 gap-8 max-w-[1100px] mx-auto h-full">
           
-          <div className="col-span-3 flex flex-col gap-4">
+          {/* FILE OPERATIONS */}
+          <div className="flex flex-col gap-4">
             <SectionTitle title="FILE OPERATIONS" />
-            
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-4 flex flex-col gap-3">
               <ActionButton 
                 icon={<Plus size={20} />} 
@@ -140,63 +143,46 @@ const Dashboard = ({
                 subtitle="Ανάκτηση από δίσκο" 
                 onClick={onOpenProjectManager}
               />
-              <ActionButton 
-                icon={<Save size={20} />} 
-                title="SAVE CURRENT" 
-                subtitle="Αποθήκευση αλλαγών" 
-              />
-            </div>
-
-            <div className="mt-auto bg-[#0B1221] border border-slate-800/80 rounded-[1.5rem] p-6">
-              <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">AUTO-SAVE</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Το σύστημα αποθηκεύει αυτόματα τις αλλαγές.
-              </p>
             </div>
           </div>
 
-          <div className="col-span-5 flex flex-col gap-4">
+          {/* DATA INGESTION */}
+          <div className="flex flex-col gap-4">
             <SectionTitle title="DATA INGESTION" />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <label className="relative cursor-pointer bg-[#0B1221] border border-slate-800/80 hover:border-blue-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
-                <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all">
-                  <Upload size={20} className="text-blue-500" />
+            <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-4 flex flex-col gap-3">
+              
+              {/* Σύνδεση της αυτόνομης συνάρτησης στο κλικ του template - ΠΡΩΤΟ */}
+              <button 
+                onClick={downloadSurveyTemplate}
+                className="w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-emerald-500/50 group text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all">
+                  <FileSpreadsheet size={18} className="text-emerald-500" />
                 </div>
-                <h3 className="text-base font-bold text-white mb-2">Import Data</h3>
-                <p className="text-[11px] text-slate-500 mb-8">Εισαγωγή δεδομένων μορφής .xlsx</p>
-                <div className="px-8 py-2.5 bg-white text-black text-[11px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-200 transition-colors w-full">
-                  SELECT FILES
+                <div>
+                  <h4 className="text-[13px] font-bold uppercase tracking-wide text-slate-200 group-hover:text-white transition-colors">Excel Template</h4>
+                  <p className="text-[11px] mt-0.5 text-slate-500">Λήψη κενού αρχείου με την προκαθορισμένη δομή</p>
+                </div>
+              </button>
+
+              {/* Import Data - ΔΕΥΤΕΡΟ */}
+              <label className="relative cursor-pointer w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-blue-500/50 group text-left">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all">
+                  <Upload size={18} className="text-blue-500" />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-bold uppercase tracking-wide text-slate-200 group-hover:text-white transition-colors">Import Data</h4>
+                  <p className="text-[11px] mt-0.5 text-slate-500">Εισαγωγή δεδομένων μορφής .xlsx</p>
                 </div>
                 <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
               </label>
 
-              <button className="bg-[#0B1221] border border-slate-800/80 hover:border-emerald-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center transition-all group">
-                <div className="w-12 h-12 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center mb-6 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all">
-                  <FileSpreadsheet size={20} className="text-emerald-500" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-2">Excel Template</h3>
-                <p className="text-[11px] text-slate-500 mb-8">Λήψη κενού αρχείου με την προκαθορισμένη δομή.</p>
-                <div className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mt-auto py-2.5">
-                  DOWNLOAD
-                </div>
-              </button>
-            </div>
-
-            <div className="flex-1 bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 flex flex-col">
-              <div className="flex items-center gap-2 mb-6 text-slate-500">
-                <Activity size={14} />
-                <h4 className="text-[10px] font-bold uppercase tracking-widest">RECENT ACTIVITY LOG</h4>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-xs text-slate-600 italic">No ingestion events recorded yet.</span>
-              </div>
             </div>
           </div>
 
-          <div className="col-span-4 flex flex-col gap-4">
+          {/* GLOBAL SETTINGS */}
+          <div className="flex flex-col gap-4">
             <SectionTitle title="GLOBAL SETTINGS" />
-            
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 space-y-6">
               
               <SettingItem 

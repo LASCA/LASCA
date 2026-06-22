@@ -1,20 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
-// --- ΑΛΛΑΓΗ 1: Δεχόμαστε τα νέα props (adjMetrics, setAdjMetrics) από το App.jsx ---
 const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics }) => {
   
-  // --- ΑΛΛΑΓΗ 2: Διαβάζουμε το state από τα metrics του App.jsx ---
   const [isAdjusted, setIsAdjusted] = useState(adjMetrics.isAdjusted || false);
   const [plotImage, setPlotImage] = useState(adjMetrics.plotImage || null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false); 
-  
-  const isFormattingRef = useRef(false);
 
-  // --- ΑΛΛΑΓΗ 3: Όταν φορτώνει το project, παίρνουμε τις σωσμένες τιμές ---
   useEffect(() => {
     setIsAdjusted(adjMetrics.isAdjusted || false);
     setPlotImage(adjMetrics.plotImage || null);
@@ -33,7 +28,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     return isNaN(num) ? val : num.toFixed(2);
   };
 
-  // Logic για το ποια δεδομένα θα εμφανίζονται
   const displayObservations = isAdjusted 
     ? observations.reduce((acc, current) => {
         const x = acc.find(item => item.station === current.station && item.target === current.target);
@@ -44,29 +38,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         }
       }, [])
     : observations;
-
-  useEffect(() => {
-    if (isFormattingRef.current) {
-      isFormattingRef.current = false;
-      return;
-    }
-    const needsFormatting = observations.some(obs => {
-      const f1 = String(obs.Face_I || "");
-      const f2 = String(obs.Face_II || "");
-      return (f1 !== "" && (!f1.includes('.') || f1.split('.')[1].length !== 4)) ||
-             (f2 !== "" && (!f2.includes('.') || f2.split('.')[1].length !== 4));
-    });
-
-    if (needsFormatting) {
-      isFormattingRef.current = true;
-      const formatted = observations.map(obs => ({
-        ...obs,
-        Face_I: to4(obs.Face_I),
-        Face_II: to4(obs.Face_II)
-      }));
-      setObservations(formatted);
-    }
-  }, [observations, setObservations]);
 
   useEffect(() => {
     if (observations && observations.length === 0) {
@@ -83,9 +54,12 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   };
 
   const handleBlur = (id, field, value) => {
-    if (field === 'Face_I' || field === 'Face_II') handleInputChange(id, field, to4(value));
+    if (field === 'Face_I' || field === 'Face_II') {
+      handleInputChange(id, field, to4(value));
+    }
   };
 
+  // Έξυπνη πλοήγηση χωρίς μαρκάρισμα/επιλογή του κειμένου
   const handleKeyDown = (e, index, colName) => {
     const columns = ['station', 'target', 'Period', 'Face_I', 'Face_II'];
     const colIndex = columns.indexOf(colName);
@@ -93,15 +67,36 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     let nextCol = colIndex;
     let shouldMove = false;
 
-    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); nextRow = index + 1; shouldMove = true; e.target.blur(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); nextRow = index - 1; shouldMove = true; e.target.blur(); }
-    else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) { e.preventDefault(); nextCol = colIndex - 1; shouldMove = true; e.target.blur(); }
-    else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) { e.preventDefault(); nextCol = colIndex + 1; shouldMove = true; e.target.blur(); }
+    if (e.key === 'Enter' || e.key === 'ArrowDown') { 
+      e.preventDefault(); 
+      nextRow = index + 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowUp') { 
+      e.preventDefault(); 
+      nextRow = index - 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) { 
+      e.preventDefault(); 
+      nextCol = colIndex - 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) { 
+      e.preventDefault(); 
+      nextCol = colIndex + 1; 
+      shouldMove = true; 
+    }
 
     if (shouldMove) {
       if (nextRow >= 0 && nextRow < observations.length && nextCol >= 0 && nextCol < columns.length) {
         const nextInput = document.getElementById(`input-${nextRow}-${columns[nextCol]}`);
-        if (nextInput) { nextInput.focus(); setTimeout(() => nextInput.select(), 0); }
+        if (nextInput) { 
+          nextInput.focus(); 
+          // Αντί για select(), βάζουμε τον κέρσορα στο τέλος του κειμένου για να μην σβήνονται τα δεδομένα
+          const valLength = nextInput.value.length;
+          nextInput.setSelectionRange(valLength, valLength);
+        }
       }
     }
   };
@@ -130,7 +125,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
 
         setObservations(updatedObservations);
         
-        // --- ΑΛΛΑΓΗ 4: Στέλνουμε το plot και το status στο App.jsx για Auto-Save ---
         if (setAdjMetrics) {
           setAdjMetrics({
             isAdjusted: true,
@@ -154,7 +148,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     link.click();
   };
 
-  // --- ΑΛΛΑΓΗ 5: Κουμπί επιστροφής ενημερώνει το App.jsx ---
   const handleBackToEdit = () => {
     if (setAdjMetrics) {
       setAdjMetrics({ ...adjMetrics, isAdjusted: false });
@@ -231,6 +224,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                             className={`w-full bg-transparent p-2 text-sm outline-none rounded ${isAdjusted ? 'text-slate-400' : 'text-amber-300/80 focus:bg-slate-800/50'}`} 
                             value={obs.station} 
                             onChange={(e) => handleInputChange(obs.id, 'station', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'station')}
                           />
                         </td>
                         <td className="p-2">
@@ -240,15 +234,42 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                             className={`w-full bg-transparent p-2 text-sm outline-none rounded ${isAdjusted ? 'text-slate-400' : 'text-amber-300/80 focus:bg-slate-800/50'}`} 
                             value={obs.target} 
                             onChange={(e) => handleInputChange(obs.id, 'target', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'target')}
                           />
                         </td>
 
                         {/* CONDITIONAL COLUMNS */}
                         {!isAdjusted ? (
                           <>
-                            <td className="p-2"><input id={`input-${index}-Period`} className="w-full bg-transparent p-2 text-sm font-mono text-slate-400 outline-none focus:bg-slate-800/50 rounded" value={obs.Period} onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} /></td>
-                            <td className="p-2"><input id={`input-${index}-Face_I`} className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" value={obs.Face_I} onBlur={(e) => handleBlur(obs.id, 'Face_I', e.target.value)} onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)} /></td>
-                            <td className="p-2"><input id={`input-${index}-Face_II`} className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" value={obs.Face_II} onBlur={(e) => handleBlur(obs.id, 'Face_II', e.target.value)} onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} /></td>
+                            <td className="p-2">
+                              <input 
+                                id={`input-${index}-Period`} 
+                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-400 outline-none focus:bg-slate-800/50 rounded" 
+                                value={obs.Period} 
+                                onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} 
+                                onKeyDown={(e) => handleKeyDown(e, index, 'Period')}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input 
+                                id={`input-${index}-Face_I`} 
+                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" 
+                                value={obs.Face_I} 
+                                onBlur={(e) => handleBlur(obs.id, 'Face_I', e.target.value)} 
+                                onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)} 
+                                onKeyDown={(e) => handleKeyDown(e, index, 'Face_I')}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input 
+                                id={`input-${index}-Face_II`} 
+                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" 
+                                value={obs.Face_II} 
+                                onBlur={(e) => handleBlur(obs.id, 'Face_II', e.target.value)} 
+                                onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} 
+                                onKeyDown={(e) => handleKeyDown(e, index, 'Face_II')}
+                              />
+                            </td>
                           </>
                         ) : (
                           <>
