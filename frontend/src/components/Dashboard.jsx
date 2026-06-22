@@ -3,8 +3,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { 
   Plus, FolderOpen, Upload, 
-  Settings2, Globe2, Ruler, Beaker,
-  ChevronRight, FileSpreadsheet, LayoutGrid
+  FileSpreadsheet, LayoutGrid
 } from 'lucide-react';
 
 // Εισαγωγή της αυτόνομης συνάρτησης δημιουργίας template
@@ -123,8 +122,7 @@ const Dashboard = ({
       </header>
 
       <main className="flex-1 p-10">
-        {/* Διατήρηση του κομψού max-w-[1100px] με 3 ίσες στήλες */}
-        <div className="grid grid-cols-3 gap-8 max-w-[1100px] mx-auto h-full">
+        <div className="grid grid-cols-2 gap-8 max-w-[800px]">
           
           {/* FILE OPERATIONS */}
           <div className="flex flex-col gap-4">
@@ -134,13 +132,14 @@ const Dashboard = ({
                 icon={<Plus size={20} />} 
                 title="CREATE NEW" 
                 subtitle="Νέο αρχείο .lasca" 
-                variant="primary" 
+                theme="primary" 
                 onClick={onOpenProjectManager}
               />
               <ActionButton 
                 icon={<FolderOpen size={20} />} 
                 title="OPEN PROJECT" 
                 subtitle="Ανάκτηση από δίσκο" 
+                theme="default"
                 onClick={onOpenProjectManager}
               />
             </div>
@@ -151,66 +150,16 @@ const Dashboard = ({
             <SectionTitle title="DATA INGESTION" />
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-4 flex flex-col gap-3">
               
-              {/* Σύνδεση της αυτόνομης συνάρτησης στο κλικ του template - ΠΡΩΤΟ */}
-              <button 
+              <ActionButton 
+                icon={<FileSpreadsheet size={18} />} 
+                title="EXCEL TEMPLATE" 
+                subtitle="Λήψη κενού αρχείου με τη δομή" 
+                theme="emerald"
                 onClick={downloadSurveyTemplate}
-                className="w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-emerald-500/50 group text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all">
-                  <FileSpreadsheet size={18} className="text-emerald-500" />
-                </div>
-                <div>
-                  <h4 className="text-[13px] font-bold uppercase tracking-wide text-slate-200 group-hover:text-white transition-colors">Excel Template</h4>
-                  <p className="text-[11px] mt-0.5 text-slate-500">Λήψη κενού αρχείου με την προκαθορισμένη δομή</p>
-                </div>
-              </button>
-
-              {/* Import Data - ΔΕΥΤΕΡΟ */}
-              <label className="relative cursor-pointer w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-blue-500/50 group text-left">
-                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all">
-                  <Upload size={18} className="text-blue-500" />
-                </div>
-                <div>
-                  <h4 className="text-[13px] font-bold uppercase tracking-wide text-slate-200 group-hover:text-white transition-colors">Import Data</h4>
-                  <p className="text-[11px] mt-0.5 text-slate-500">Εισαγωγή δεδομένων μορφής .xlsx</p>
-                </div>
-                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
-              </label>
-
-            </div>
-          </div>
-
-          {/* GLOBAL SETTINGS */}
-          <div className="flex flex-col gap-4">
-            <SectionTitle title="GLOBAL SETTINGS" />
-            <div className="bg-[#0B1221] border border-slate-800/80 rounded-[2rem] p-6 space-y-6">
-              
-              <SettingItem 
-                icon={<Globe2 />} 
-                label="COORDINATE SYSTEM" 
-                value="ΕΓΣΑ '87 / EPSG:2100" 
               />
               
-              <SettingItem 
-                icon={<Ruler />} 
-                label="MEASUREMENT UNITS" 
-                value="Meters / Grads" 
-              />
-              
-              <SettingItem 
-                icon={<Beaker />} 
-                label="ADJUSTMENT METHOD" 
-                value="Least Squares (Rigorous)" 
-              />
+              <ImportButton onChange={handleFileUpload} />
 
-              <button className="w-full mt-4 flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all group">
-                <div className="flex items-center gap-3">
-                  <Settings2 size={16} className="text-slate-500 group-hover:text-white transition-colors" />
-                  <span className="text-[11px] font-bold text-white uppercase tracking-widest">ADVANCED PARAMS</span>
-                </div>
-                <ChevronRight size={14} className="text-slate-600 group-hover:text-white transition-colors" />
-              </button>
-              
             </div>
           </div>
 
@@ -226,25 +175,35 @@ const SectionTitle = ({ title }) => (
   </h3>
 );
 
-const ActionButton = ({ icon, title, subtitle, variant, onClick }) => {
-  const isPrimary = variant === 'primary';
+// Το κοινό κουμπί προσαρμόζεται ανάλογα με το "theme"
+const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => {
+  const isPrimary = theme === 'primary';
+
+  const getContainerClasses = () => {
+    if (isPrimary) return 'bg-blue-600 border-blue-500 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.2)]';
+    if (theme === 'emerald') return 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-emerald-500/50';
+    return 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-slate-700';
+  };
+
+  const getIconBoxClasses = () => {
+    if (isPrimary) return 'text-white flex items-center justify-center shrink-0 w-10 h-10';
+    if (theme === 'emerald') return 'w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all text-emerald-500';
+    return 'text-slate-400 flex items-center justify-center shrink-0 w-10 h-10';
+  };
+
   return (
     <button 
       onClick={onClick} 
-      className={`
-      w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border text-left
-      ${isPrimary 
-        ? 'bg-blue-600 border-blue-500 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.2)]' 
-        : 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-slate-700 text-slate-300'}
-    `}>
-      <div className={`flex items-center justify-center ${isPrimary ? 'text-white' : 'text-slate-400'}`}>
+      className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border text-left group ${getContainerClasses()}`}
+    >
+      <div className={getIconBoxClasses()}>
         {icon}
       </div>
-      <div>
-        <h4 className={`text-[13px] font-bold uppercase tracking-wide ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
+      <div className="overflow-hidden">
+        <h4 className={`text-[13px] font-bold uppercase tracking-wide truncate transition-colors group-hover:text-white ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
           {title}
         </h4>
-        <p className={`text-[11px] mt-0.5 ${isPrimary ? 'text-blue-100' : 'text-slate-500'}`}>
+        <p className={`text-[11px] mt-0.5 truncate ${isPrimary ? 'text-blue-100' : 'text-slate-500'}`}>
           {subtitle}
         </p>
       </div>
@@ -252,16 +211,22 @@ const ActionButton = ({ icon, title, subtitle, variant, onClick }) => {
   );
 };
 
-const SettingItem = ({ icon, label, value }) => (
-  <div className="space-y-3">
-    <div className="flex items-center gap-2 text-slate-500">
-      {React.cloneElement(icon, { size: 14 })}
-      <span className="text-[10px] font-bold uppercase tracking-[0.15em]">{label}</span>
+// Ειδικό label component για το input file, με το μπλε θέμα ακριβώς όπως το ζήτησες
+const ImportButton = ({ onChange }) => (
+  <label className="relative cursor-pointer w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-blue-500/50 group text-left bg-transparent">
+    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all text-blue-500">
+      <Upload size={18} />
     </div>
-    <div className="w-full px-4 py-3.5 bg-[#030712] border border-slate-800 rounded-xl text-sm font-semibold text-slate-200">
-      {value}
+    <div className="overflow-hidden">
+      <h4 className="text-[13px] font-bold uppercase tracking-wide truncate group-hover:text-white transition-colors text-slate-200">
+        IMPORT DATA
+      </h4>
+      <p className="text-[11px] mt-0.5 truncate text-slate-500">
+        Εισαγωγή δεδομένων μορφής .xlsx
+      </p>
     </div>
-  </div>
+    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={onChange} />
+  </label>
 );
 
 export default Dashboard;

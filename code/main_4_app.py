@@ -187,6 +187,7 @@ def run_traverse():
             return f"{float(val):.{decimals}f}" if val is not None else "---"
 
         react_metrics = {
+            "n": py_metrics.get("n"),
             "totalLength": fmt(py_metrics.get("S_total"), 2),
             "gTarget": fmt(py_metrics.get("G_prepei"), 4),
             "gActual": fmt(py_metrics.get("G_einai"), 4),

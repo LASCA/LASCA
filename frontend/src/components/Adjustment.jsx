@@ -49,6 +49,47 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     }
   }, []);
 
+  // ΕΞΥΠΝΟ FORMATTING: Εφαρμόζει 4 δεκαδικά παντού, ΕΚΤΟΣ από το κελί που κάνουμε edit
+  useEffect(() => {
+    if (isAdjusted || !observations || observations.length === 0) return;
+
+    let hasChanges = false;
+    // Βρίσκουμε ποιο input έχει το focus αυτή τη στιγμή (αν υπάρχει)
+    const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
+
+    const formattedObservations = observations.map((obs, index) => {
+      let updatedObs = { ...obs };
+      
+      const isFaceIFocused = activeId === `input-${index}-Face_I`;
+      const isFaceIIFocused = activeId === `input-${index}-Face_II`;
+
+      // Αν το Face I έχει τιμή και ΔΕΝ είναι επιλεγμένο αυτή τη στιγμή -> format σε 4 δεκαδικά
+      if (!isFaceIFocused && obs.Face_I !== "" && obs.Face_I != null) {
+        const formattedVal = to4(obs.Face_I);
+        if (formattedVal !== String(obs.Face_I)) {
+          updatedObs.Face_I = formattedVal;
+          hasChanges = true;
+        }
+      }
+
+      // Αν το Face II έχει τιμή και ΔΕΝ είναι επιλεγμένο αυτή τη στιγμή -> format σε 4 δεκαδικά
+      if (!isFaceIIFocused && obs.Face_II !== "" && obs.Face_II != null) {
+        const formattedVal = to4(obs.Face_II);
+        if (formattedVal !== String(obs.Face_II)) {
+          updatedObs.Face_II = formattedVal;
+          hasChanges = true;
+        }
+      }
+
+      return updatedObs;
+    });
+
+    // Κάνουμε setObservations μόνο αν υπήρξε πραγματική αλλαγή (αποφυγή λούπας)
+    if (hasChanges) {
+      setObservations(formattedObservations);
+    }
+  }, [observations, isAdjusted, setObservations]);
+
   const handleInputChange = (id, field, value) => {
     setObservations(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: value } : obs));
   };
