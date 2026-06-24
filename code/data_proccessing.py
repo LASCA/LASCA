@@ -723,74 +723,83 @@ def trig_leveling(dataframe):
     
     return dataframe
 
-def trig_level_traverse(leveling_df, traverse_flow_df):
+def traverse_level(file_path):
     """
-    Υπολογίζει τα υψόμετρα των στάσεων κατά μήκος της όδευσης
-    χωρίς να εφαρμόζει καμία διόρθωση/συνόρθωση σφάλματος.
+    Η ΤΕΛΙΚΗ BACKEND ΣΥΝΑΡΤΗΣΗ
+    Διαβάζει το Excel, εκτελεί όλους τους τοπογραφικούς υπολογισμούς
+    και επιστρέφει καθαρά δεδομένα έτοιμα για το UI σε μορφή dict/JSON.
     """
-    df = leveling_df.copy()
+    # 1. Ανάγνωση του φύλλου 'traverse'
+    try:
+        df_raw = pd.read_excel(file_path, sheet_name='traverse')
+    except Exception as e:
+        return {"status": "error", "message": f"Σφάλμα κατά την ανάγνωση του αρχείου: {str(e)}"}
+
+    # 2. Απομονώνουμε τα δεδομένα του αριστερού πίνακα (Σταθμοί - Υψόμετρα)
+    df_stations = pd.DataFrame({
+        'Stations': df_raw.iloc[:, 0],
+        'H_m': df_raw.iloc[:, 5]
+    })
+    df_stations = df_stations.dropna(subset=['Stations']).copy()
+    df_stations['Stations'] = df_stations['Stations'].astype(str).str.strip()
+    df_stations['H_m'] = pd.to_numeric(df_stations['H_m'], errors='coerce')
+
+    # 3. Απομονώνουμε τα δεδομένα του δεξιού πίνακα (Μετρήσεις)
+    leveling_cols = ['From', 'To', 'Slope_D', 'Z[grad]', 'H_station', 'H_target']
+    df_measurements = df_raw[leveling_cols].dropna(subset=['From', 'To']).copy()
     
-    # 1. Υπολογισμός dh ανά σκόπευση
-    z_rad = g2r(df['Z[grad]'])
-    df['dh'] = (df['Slope_D'] * np.cos(z_rad)) + df['H_station'] - df['H_target']
-    df['dh'] = df['dh'].round(3)
+    df_measurements['From'] = df_measurements['From'].astype(str).str.strip()
+    df_measurements['To'] = df_measurements['To'].astype(str).str.strip()
     
-    # 2. Γεωδαιτικός συνδυασμός Μετάβασης - Επιστροφής (Side Key)
-    df['side_key'] = df.apply(lambda r: '-'.join(sorted([str(r['From']), str(r['To'])])), axis=1)
-    
-    # Αλλαγή προσήμου αν η γραμμή είναι "Επιστροφή" για σωστό μέσο όρο
-    df['dh_directed'] = df.apply(
-        lambda r: r['dh'] if str(r['From']) == min(str(r['From']), str(r['To'])) else -r['dh'], 
-        axis=1
+    for col in ['Slope_D', 'Z[grad]', 'H_station', 'H_target']:
+        df_measurements[col] = pd.to_numeric(df_measurements[col], errors='coerce').fillna(0.0)
+
+    # 4. Υπολογισμός dh ανά γραμμή
+    z_rad = g2r(df_measurements['Z[grad]'])
+    df_measurements['dh'] = (df_measurements['Slope_D'] * np.cos(z_rad)) + df_measurements['H_station'] - df_measurements['H_target']
+    df_measurements['dh'] = df_measurements['dh'].round(3)
+
+    # 5. Δυναμική ενοποίηση περιόδων (Υπολογισμός dh_mean)
+    df_measurements['pair_key'] = df_measurements.apply(
+        lambda row: "_".join(sorted([str(row['From']), str(row['To'])])), axis=1
     )
     
-    # Μέσος όρος ανά πλευρά
-    side_means = df.groupby('side_key')['dh_directed'].mean().to_dict()
+    df_measurements['dh_for_mean'] = df_measurements['dh']
+    df_measurements.iloc[1::2, df_measurements.columns.get_loc('dh_for_mean')] = -df_measurements.iloc[1::2]['dh']
     
-    # Δημιουργία lookup dictionary για τις κατευθύνσεις (A -> B και B -> A)
-    dh_lookup = {}
-    for side_key, mean_dh in side_means.items():
-        node_a, node_b = side_key.split('-')
-        dh_lookup[(node_a, node_b)] = mean_dh
-        dh_lookup[(node_b, node_a)] = -mean_dh
+    global_mean = df_measurements.groupby('pair_key')['dh_for_mean'].transform('mean')
+    df_measurements['dh_mean'] = global_mean
+    df_measurements.iloc[1::2, df_measurements.columns.get_loc('dh_mean')] = -df_measurements.iloc[1::2]['dh_mean']
 
-    # 3. Υπολογισμός Υψομέτρων με βάση τη ροή
-    stations_flow = traverse_flow_df['Stations'].dropna().tolist()
+    # 6. Φιλτράρισμα για το τελικό DataFrame μόνο με τις μεταβάσεις
+    df_forward_only = df_measurements.iloc[0::2].copy()
+    df_final_vectors = df_forward_only[['From', 'To', 'dh_mean']].reset_index(drop=True)
+
+    # 7. Αλυσιδωτός υπολογισμός των υψομέτρων για το UI πίνακα
+    known_heights = df_stations.dropna(subset=['H_m']).set_index('Stations')['H_m'].to_dict()
     
-    # Παίρνουμε το πρώτο γνωστό υψόμετρο (Αφετηρία)
-    known_heights = traverse_flow_df.dropna(subset=['H [m]'])
-    if known_heights.empty:
-        raise ValueError("Πρέπει να ορίσετε τουλάχιστον το αρχικό υψόμετρο (H) στην αφετηρία.")
+    for _, vector in df_final_vectors.iterrows():
+        start_node = vector['From']
+        end_node = vector['To']
+        dh = vector['dh_mean']
         
-    H_start = float(known_heights.iloc[0]['H [m]'])
-    
-    # Ξεκινάμε την αλυσίδα των υπολογισμών
-    current_H = H_start
-    calculated_heights = [current_H]
-    
-    for i in range(len(stations_flow) - 1):
-        st_from = str(stations_flow[i])
-        st_to = str(stations_flow[i+1])
-        
-        # Ψάχνουμε το συνδυασμένο dh
-        dh_edge = dh_lookup.get((st_from, st_to))
-        
-        # Fallback σε μονόπλευρη μέτρηση αν δεν υπάρχει αμφίδρομη
-        if dh_edge is None:
-            fallback = df[(df['From'] == st_from) & (df['To'] == st_to)]
-            if not fallback.empty:
-                dh_edge = fallback['dh'].mean()
-            else:
-                # Αν δεν υπάρχει καθόλου μέτρηση, κρατάμε το προηγούμενο υψόμετρο ή βάζουμε None
-                dh_edge = 0.0 
-        
-        current_H += dh_edge
-        calculated_heights.append(round(current_H, 3))
-        
-    # 4. Επιστροφή έτοιμου DataFrame για το Front-end
-    result_df = pd.DataFrame({
-        'Station': stations_flow,
-        'H_calculated': calculated_heights
-    })
-    
-    return result_df
+        if start_node in known_heights:
+            calculated_height = known_heights[start_node] + dh
+            if end_node not in known_heights or end_node.startswith('S') or end_node.isdigit():
+                known_heights[end_node] = round(calculated_height, 3)
+
+    # Συμπλήρωση των NaN στον πίνακα σταθμών
+    for idx, row in df_stations.iterrows():
+        st_name = row['Stations']
+        if pd.isna(row['H_m']) and st_name in known_heights:
+            df_stations.at[idx, 'H_m'] = known_heights[st_name]
+
+    # Αντικατάσταση τυχόν εναπομεινάντων NaN με None για να γίνουν σωστό null στο JSON
+    df_stations = df_stations.replace({np.nan: None})
+
+    # 8. ΜΕΤΑΤΡΟΠΗ ΣΕ ΜΟΡΦΗ ΕΤΟΙΜΗ ΓΙΑ JSON/FRONTEND
+    return {
+        "status": "success",
+        "stations_table": df_stations.to_dict(orient="records"),
+        "vectors_table": df_final_vectors.to_dict(orient="records")
+    }
