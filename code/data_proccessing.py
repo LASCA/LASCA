@@ -722,3 +722,75 @@ def trig_leveling(dataframe):
     dataframe.loc[duplicates, 'dh_mean'] = ""
     
     return dataframe
+
+def trig_level_traverse(leveling_df, traverse_flow_df):
+    """
+    Υπολογίζει τα υψόμετρα των στάσεων κατά μήκος της όδευσης
+    χωρίς να εφαρμόζει καμία διόρθωση/συνόρθωση σφάλματος.
+    """
+    df = leveling_df.copy()
+    
+    # 1. Υπολογισμός dh ανά σκόπευση
+    z_rad = g2r(df['Z[grad]'])
+    df['dh'] = (df['Slope_D'] * np.cos(z_rad)) + df['H_station'] - df['H_target']
+    df['dh'] = df['dh'].round(3)
+    
+    # 2. Γεωδαιτικός συνδυασμός Μετάβασης - Επιστροφής (Side Key)
+    df['side_key'] = df.apply(lambda r: '-'.join(sorted([str(r['From']), str(r['To'])])), axis=1)
+    
+    # Αλλαγή προσήμου αν η γραμμή είναι "Επιστροφή" για σωστό μέσο όρο
+    df['dh_directed'] = df.apply(
+        lambda r: r['dh'] if str(r['From']) == min(str(r['From']), str(r['To'])) else -r['dh'], 
+        axis=1
+    )
+    
+    # Μέσος όρος ανά πλευρά
+    side_means = df.groupby('side_key')['dh_directed'].mean().to_dict()
+    
+    # Δημιουργία lookup dictionary για τις κατευθύνσεις (A -> B και B -> A)
+    dh_lookup = {}
+    for side_key, mean_dh in side_means.items():
+        node_a, node_b = side_key.split('-')
+        dh_lookup[(node_a, node_b)] = mean_dh
+        dh_lookup[(node_b, node_a)] = -mean_dh
+
+    # 3. Υπολογισμός Υψομέτρων με βάση τη ροή
+    stations_flow = traverse_flow_df['Stations'].dropna().tolist()
+    
+    # Παίρνουμε το πρώτο γνωστό υψόμετρο (Αφετηρία)
+    known_heights = traverse_flow_df.dropna(subset=['H [m]'])
+    if known_heights.empty:
+        raise ValueError("Πρέπει να ορίσετε τουλάχιστον το αρχικό υψόμετρο (H) στην αφετηρία.")
+        
+    H_start = float(known_heights.iloc[0]['H [m]'])
+    
+    # Ξεκινάμε την αλυσίδα των υπολογισμών
+    current_H = H_start
+    calculated_heights = [current_H]
+    
+    for i in range(len(stations_flow) - 1):
+        st_from = str(stations_flow[i])
+        st_to = str(stations_flow[i+1])
+        
+        # Ψάχνουμε το συνδυασμένο dh
+        dh_edge = dh_lookup.get((st_from, st_to))
+        
+        # Fallback σε μονόπλευρη μέτρηση αν δεν υπάρχει αμφίδρομη
+        if dh_edge is None:
+            fallback = df[(df['From'] == st_from) & (df['To'] == st_to)]
+            if not fallback.empty:
+                dh_edge = fallback['dh'].mean()
+            else:
+                # Αν δεν υπάρχει καθόλου μέτρηση, κρατάμε το προηγούμενο υψόμετρο ή βάζουμε None
+                dh_edge = 0.0 
+        
+        current_H += dh_edge
+        calculated_heights.append(round(current_H, 3))
+        
+    # 4. Επιστροφή έτοιμου DataFrame για το Front-end
+    result_df = pd.DataFrame({
+        'Station': stations_flow,
+        'H_calculated': calculated_heights
+    })
+    
+    return result_df
