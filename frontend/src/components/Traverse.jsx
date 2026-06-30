@@ -324,16 +324,22 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           />
                         </td>
                         <td className="p-2">
-                          <input 
-                            id={`input-${idx}-h`}
-                            type="text"
-                            value={row.h ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
-                            className="bg-transparent w-full font-mono text-emerald-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
-                            placeholder="-"
-                          />
-                        </td>
+                        <input 
+                          id={`input-${idx}-h`}
+                          type="text"
+                          value={
+                            document.activeElement?.id === `input-${idx}-h`
+                              ? (row.h ?? "")
+                              : formatVal(row.h, 3)
+                          }
+                          onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
+                          /* onBlur για να στρογγυλοποιεί αμέσως μόλις βγαίνει από το πεδίο */
+                          onBlur={(e) => handleInputChange(idx, 'h', formatVal(e.target.value, 3))}
+                          onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
+                          className="bg-transparent w-full font-mono text-emerald-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
+                          placeholder="-"
+                        />
+                      </td>
                       </tr>
                     ))
                   ) : (

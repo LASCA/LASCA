@@ -158,18 +158,79 @@ def run_traverse():
         return jsonify({"results": [], "metrics": {}})
         
     try:
-        # =====================================================================
-        # ΝΕΑ ΠΡΟΣΘΗΚΗ: Υπολογισμός των Υψομέτρων (H) ΠΡΙΝ την οριζοντιογραφία!
-        # Εμπλουτίζει τη λίστα 'measurements' βάζοντας τις τιμές στο κλειδί 'h'.
-        # =====================================================================
-        measurements = dpr.traverse_level_calc(measurements)
+        # 1. ΕΛΕΓΧΟΣ ΓΙΑ ΤΟΝ ΒΟΗΘΗΤΙΚΟ ΠΙΝΑΚΑ 2 (ΥΨΟΜΕΤΡΙΑ)
+        leveling_network = None
+        if measurements and 'levelingNetwork' in measurements[0]:
+            leveling_network = measurements[0]['levelingNetwork']
 
+        # 2. ΑΝ ΥΠΑΡΧΕΙ ΤΟ LEVELING NETWORK, ΚΑΝΟΥΜΕ ΕΞΥΠΝΗ ΑΝΑΣΥΝΘΕΣΗ
+        if leveling_network is not None:
+            # Κρατάμε ένα καθαρό αντίγραφο των γραμμών του Πίνακα 1 (Όδευση)
+            clean_traverse_rows = [m.copy() for m in measurements]
+            if 'levelingNetwork' in clean_traverse_rows[0]:
+                del clean_traverse_rows[0]['levelingNetwork']
+
+            # Ανασυνθέτουμε τη flat δομή που περιμένει η traverse_level_calc για να μην σπάσει
+            flat_data_for_calc = []
+            max_len = max(len(clean_traverse_rows), len(leveling_network))
+            
+            for i in range(max_len):
+                row_dict = {}
+                
+                # Αν είμαστε εντός των ορίων του Πίνακα 1 (Όδευση)
+                if i < len(clean_traverse_rows):
+                    m = clean_traverse_rows[i]
+                    row_dict.update(m)
+                    # Δικλίδα ασφαλείας: Διασφαλίζουμε ότι υπάρχουν και τα αυθεντικά Excel keys 
+                    # σε περίπτωση που η dpr.traverse_level_calc τα ζητάει έτσι
+                    if 'name' in m and 'Stations' not in row_dict: row_dict['Stations'] = m['name']
+                    if 'hz' in m and 'Hz [grad]' not in row_dict: row_dict['Hz [grad]'] = m['hz']
+                    if 'sd' in m and 'Slope_D [m]' not in row_dict: row_dict['Slope_D [m]'] = m['sd']
+                    if 'x' in m and 'X [m]' not in row_dict: row_dict['X [m]'] = m['x']
+                    if 'y' in m and 'Y [m]' not in row_dict: row_dict['Y [m]'] = m['y']
+                    if 'h' in m and 'H [m]' not in row_dict: row_dict['H [m]'] = m['h']
+
+                # Αν είμαστε εντός των ορίων του Πίνακα 2 (Υψομετρία)
+                if i < len(leveling_network):
+                    lev_row = leveling_network[i]
+                    row_dict['From'] = lev_row.get('From', '')
+                    row_dict['To'] = lev_row.get('To', '')
+                    row_dict['Slope_D'] = lev_row.get('Slope_D', '')
+                    row_dict['Z[grad]'] = lev_row.get('Z[grad]', lev_row.get('Z_grad', ''))
+                    row_dict['H_station'] = lev_row.get('H_station', '')
+                    row_dict['H_target'] = lev_row.get('H_target', '')
+
+                flat_data_for_calc.append(row_dict)
+
+            # Εκτελούμε τον υψομετρικό υπολογισμό πάνω σε ΟΛΟ το δίκτυο (π.χ. 30 σειρές)
+            calculated_flat = dpr.traverse_level_calc(flat_data_for_calc)
+            
+            # Κρατάμε ΜΟΝΟ τις πρώτες σειρές που αντιστοιχούν στον Πίνακα 1 (Όδευση)
+            measurements = calculated_flat[:len(clean_traverse_rows)]
+            
+            # Συγχρονίζουμε τα αποτελέσματα της Python με τα πεδία που περιμένει το Frontend
+            for m in measurements:
+                if 'H [m]' in m and m['H [m]'] not in [None, '', '---']:
+                    m['h'] = m['H [m]']
+                elif 'H[m]' in m and m['H[m]'] not in [None, '', '---']:
+                    m['h'] = m['H[m]']
+                if 'Stations' in m and m['Stations'] not in [None, '']:
+                    m['name'] = m['Stations']
+        else:
+            # Fallback σε περίπτωση που τα δεδομένα έρθουν με τον παλιό τρόπο
+            measurements = dpr.traverse_level_calc(measurements)
+
+        # 3. ΣΥΝΕΧΕΙΑ ΜΕ ΤΗΝ ΟΡΙΖΟΝΤΙΟΓΡΑΦΙΚΗ ΕΠΙΛΥΣΗ (TRAVERSE)
+        # Τώρα το measurements έχει ΑΚΡΙΒΩΣ το μέγεθος του Πίνακα 1, με συμπληρωμένα τα Η!
         points = []
         for m in measurements:
             def to_float(val):
-                if val is None or str(val).strip() == "":
+                if val is None or str(val).strip() == "" or str(val).strip() == "---":
                     return None
-                return float(val)
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
 
             pt = dpr.TraversePoint(
                 name=m.get('name'),
@@ -218,8 +279,6 @@ def run_traverse():
                 calc_Y = getattr(results_rr[idx], 'Y', getattr(results_rr[idx], 'Yi', None))
                 calc_H = getattr(results_rr[idx], 'H', None)
                 
-                # Επειδή το 'm' έχει ήδη το υπολογισμένο 'h' από την traverse_level_calc,
-                # το 'm.copy()' το κρατάει! Άρα το Front-End θα το πάρει έτοιμο!
                 updated_row = m.copy() 
                 if calc_X is not None: updated_row['x'] = fmt(calc_X, 3)
                 if calc_Y is not None: updated_row['y'] = fmt(calc_Y, 3)

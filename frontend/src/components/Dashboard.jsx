@@ -51,43 +51,47 @@ const Dashboard = ({
           setObservations(formattedAdj);
         }
 
-// 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+// 2. ΔΙΑΒΑΣΜΑ TRAVERSE & ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          const formattedTraverse = [];
-          
-          for (let i = 0; i < dataTraverse.length; i++) {
-            const row = dataTraverse[i];
-            const stationName = row['Stations'] || row['Station'] || "";
-            
-            // Μόλις βρούμε γραμμή χωρίς όνομα σταθμού (αφού έχουμε ήδη διαβάσει την 1η),
-            // σταματάμε για να μην γεμίσει ο πίνακας με τις κενές γραμμές του διπλανού πίνακα!
-            if (!stationName && formattedTraverse.length > 0) {
-              break; 
-            }
+          // Απομονώνουμε ΜΟΝΟ τις γραμμές που ανήκουν στον Πίνακα 1 (Όδευση)
+          const table1Rows = dataTraverse.filter(row => row['Stations'] || row['Station'] || row['Hz [grad]']);
 
-            formattedTraverse.push({
-              id: Date.now() + i,
-              // ΟΡΑΤΑ ΠΕΔΙΑ ΣΤΟΝ ΠΙΝΑΚΑ:
-              name: stationName,
+          // Απομονώνουμε ΟΛΕΣ τις γραμμές του Πίνακα 2 (Υψομετρία) μέχρι το τέλος, αυτόνομα
+          const table2Rows = dataTraverse
+            .filter(row => row['From'] || row['To'])
+            .map(row => ({
+              From: row['From'] || "",
+              To: row['To'] || "",
+              Slope_D: row['Slope_D'] || "",
+              Z_grad: row['Z[grad]'] || row['Z [grad]'] || "",
+              H_station: row['H_station'] || "",
+              H_target: row['H_target'] || ""
+            }));
+
+          // Δημιουργούμε το formattedData με μήκος ΑΚΡΙΒΩΣ όσο ο Πίνακας 1
+          const formattedTraverse = table1Rows.map((row, index) => {
+            const baseRow = {
+              id: Date.now() + index,
+              name: row['Stations'] || row['Station'] || "",
               hz: row['Hz [grad]'] || "",
               sd: row['Slope_D [m]'] || "", 
               x: row['X [m]'] || "",
               y: row['Y [m]'] || "",
-              h: row['H[m]'] || row['H [m]'] || row['H(m)'] || "",
-              
-              // ΚΡΥΦΑ ΠΕΔΙΑ ΓΙΑ ΤΟ BACKEND (Τριγωνομετρική):
-              From: row['From'] || "",
-              To: row['To'] || "",
-              Slope_D: row['Slope_D'] || row['Slope_D [m]'] || "",
-              Z_grad: row['Z[grad]'] || row['Z [grad]'] || "",
-              H_station: row['H_station'] || "",
-              H_target: row['H_target'] || ""
-            });
-          }
+              h: row['H[m]'] || row['H [m]'] || row['H(m)'] || ""
+            };
+
+            // Έξυπνο κόλπο: Επισυνάπτουμε ΟΛΟΚΛΗΡΟ τον Πίνακα 2 στο 1ο row
+            // Έτσι τα δεδομένα ταξιδεύουν στο backend χωρίς να προσθέτουν γραμμές στο UI!
+            if (index === 0) {
+              baseRow.levelingNetwork = table2Rows;
+            }
+
+            return baseRow;
+          });
           
           setTraverseData(formattedTraverse);
         }
