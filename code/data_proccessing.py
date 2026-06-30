@@ -809,3 +809,57 @@ def traverse_level_calc(measurements_json):
                 row['h'] = known_heights[st_name]
 
     return measurements_json
+
+def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) -> dict:
+    """ 
+    Παράμετροι:
+      station: {'name': str, 'x': str/float, 'y': str/float}
+      backsight: {'name': str, 'x': str/float, 'y': str/float}
+      points_to_stake: [{'id': int/str, 'name': str, 'x': str/float, 'y': str/float}, ...]
+    """
+    try:
+        # 1. Μετατροπή και απομόνωση συντεταγμένων Στάσης (St) και Προσανατολισμού (Bs)
+        xs = float(station.get('x', 0))
+        ys = float(station.get('y', 0))
+        xo = float(backsight.get('x', 0))
+        yo = float(backsight.get('y', 0))
+
+        # 2. Υπολογισμός Azimuth προσανατολισμού G(S->O) με τη δική σου deutero_themeliodes
+        g_so, _ = deutero_them(xs, ys, xo, yo)
+        
+        updated_points = []
+
+        # 3. Υπολογισμός για κάθε σημείο προς χάραξη
+        for pt in points_to_stake:
+            # Αν το σημείο είναι άδειο, το προσπερνάμε χωρίς να κρασάρει το app
+            if not pt.get('x') or not pt.get('y'):
+                updated_pt = pt.copy()
+                updated_pt['hz_stake'] = '---'
+                updated_pt['dist_stake'] = '---'
+                updated_points.append(updated_pt)
+                continue
+
+            xp = float(pt['x'])
+            yp = float(pt['y'])
+
+            # Υπολογισμός Azimuth G(S->P) και οριζόντιας απόστασης από τη Στάση στο Σημείο P
+            g_sp, dist_ground = deutero_them(xs, ys, xp, yp)
+
+            # Η γωνία χάραξης β είναι η διαφορά των δύο Azimuth, διορθωμένη με τη δική σου norm400
+            beta = g_sp - g_so
+            beta_normalized = norm400(beta)
+
+            # Αντιγραφή του σημείου και προσθήκη των υπολογισμένων στοιχείων
+            updated_pt = pt.copy()
+            updated_pt['hz_stake'] = beta_normalized    # Hz γωνία στροφής σε grad
+            updated_pt['dist_stake'] = dist_ground     # D απόσταση σε μέτρα
+            updated_points.append(updated_pt)
+
+        return {
+            "azimuth_bs": g_so,
+            "points": updated_points
+        }
+
+    except Exception as e:
+        # Επιστρέφουμε το error για να το διαχειριστεί το Flask endpoint
+        raise RuntimeError(f"Σφάλμα κατά τον υπολογισμό της χάραξης: {str(e)}")

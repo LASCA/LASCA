@@ -1,19 +1,20 @@
 import React from 'react';
-import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
+import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
+  // Προσθήκη του αντικειμένου για τη Χάραξη στο menuItems array
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'adjustment', label: 'Συνόρθωση', icon: <Target size={20} /> },
     { id: 'traverse', label: 'Όδευση', icon: <Compass size={20} /> },
     { id: 'mapping', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
+    { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> }, // <-- Η ΝΕΑ ΚΑΡΤΕΛΑ
   ];
 
   return (
     <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative`}>
       
       {/* Κουμπί Toggle για άνοιγμα/κλείσιμο */}
- 
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`absolute -right-3 top-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-1 border-2 border-slate-950 z-[100] transition-transform duration-300 shadow-lg ${!isOpen ? 'rotate-0' : ''}`}

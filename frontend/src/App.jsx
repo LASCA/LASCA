@@ -8,6 +8,7 @@ import Adjustment from './components/Adjustment';
 import Traverse from './components/Traverse';
 import Tachymetry from './components/Tachymetry'; 
 import ProjectManager from './components/project_manager'; 
+import Charaxi from './components/charaxi'; // 1. IMPORT ΤΟΥ ΝΕΟΥ COMPONENT
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -26,8 +27,16 @@ function App() {
   const [traverseData, setTraverseData] = useState([]); 
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
   const [tachymetryData, setTachymetryData] = useState({ measurements: [], stations: [], results: [] }); 
+  
+  // 2. ΝΕΟ STATE ΓΙΑ ΤΗ ΧΑΡΑΞΗ (Κρατάει Station, Backsight και τον Πίνακα Σημείων)
+  const [stakeoutData, setStakeoutData] = useState({
+    station: { name: 'St1', x: '', y: '' },
+    backsight: { name: 'BS1', x: '', y: '' },
+    azimuthBs: '---',
+    points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
+  });
 
-  // ΝΕΟ STATE: "Κλειδαριά" για το Auto-Save
+  // "Κλειδαριά" για το Auto-Save
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // --- 0. ΦΟΡΤΩΣΗ ΤΟΥ PROJECT ΑΠΟ ΤΟ .JSON ΤΟΥ ΣΚΛΗΡΟΥ ΔΙΣΚΟΥ ΣΤΗΝ ΕΚΚΙΝΗΣΗ ---
@@ -50,6 +59,15 @@ function App() {
           setTraverseData(backendData.traverse_data || []);
           setTraverseMetrics(backendData.metrics || {});
           setTachymetryData(backendData.tachymetryData || { measurements: [], stations: [], results: [] });
+          
+          // Φόρτωση των δεδομένων χάραξης αν υπάρχουν ήδη αποθηκευμένα στο αρχείο
+          setStakeoutData(backendData.stakeoutData || {
+            station: { name: 'St1', x: '', y: '' },
+            backsight: { name: 'BS1', x: '', y: '' },
+            azimuthBs: '---',
+            points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
+          });
+
           console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
           
           // ΞΕΚΛΕΙΔΩΝΟΥΜΕ ΤΟ AUTO-SAVE
@@ -61,17 +79,14 @@ function App() {
         setIsDataLoaded(true); // Απεμπλοκή ακόμα και σε error
       });
     } else {
-      // Αν δεν υπάρχει ενεργό project στην εκκίνηση, το auto-save είναι ξεκλείδωτο για το επόμενο που θα φτιαχτεί
       setIsDataLoaded(true);
     }
-  }, []); // Τρέχει ΜΟΝΟ μία φορά όταν ανοίγει ο server/browser
+  }, []);
 
-  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ (Browser + Σκληρός Δίσκος JSON) ---
+  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ (Προσθήκη του stakeoutData στα dependencies) ---
   useEffect(() => {
-    // ΦΡΕΝΟ: Αν δεν έχουμε project Ή αν δεν έχουν φορτώσει ακόμα τα δεδομένα, ΣΤΑΜΑΤΑ!
     if (!currentProject || !isDataLoaded) return; 
 
-    // Α. Τοπική αποθήκευση στον Browser για ασφάλεια
     const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
     const projectState = {
       project_name: currentProject,
@@ -80,31 +95,32 @@ function App() {
       adjMetrics: adjMetrics,       
       traverse_data: traverseData,
       metrics: traverseMetrics,
-      tachymetryData: tachymetryData
+      tachymetryData: tachymetryData,
+      stakeoutData: stakeoutData // Προσθήκη στο JSON structure
     };
 
     savedProjects[currentProject] = projectState;
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
     localStorage.setItem('current_active_project', currentProject);
 
-    // Β. LIVE ΣΥΓΧΡΟΝΙΣΜΟΣ ΜΕ ΤΟ BACKEND (Γράψιμο στο project_data.json)
+    // LIVE ΣΥΓΧΡΟΝΙΣΜΟΣ ΜΕ ΤΟ BACKEND
     fetch('http://localhost:5000/api/projects/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         project_name: currentProject,
-        state: projectState // Στέλνουμε όλο το state
+        state: projectState 
       })
     })
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
-        console.log(`💾 Auto-save: Το αρχείο .json στον φάκελο "${currentProject}" ενημερώθηκε!`);
+        console.log(`💾 Auto-save: Το αρχείο .json στον φάκελο "${currentProject}" ενημερώθηκε και με τη Χάραξη!`);
       }
     })
     .catch(err => console.error("❌ Το Auto-save απέτυχε να γράψει στο Backend:", err));
 
-  }, [currentProject, isDataLoaded, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData]);
+  }, [currentProject, isDataLoaded, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData, stakeoutData]);
 
 
   // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
@@ -112,15 +128,20 @@ function App() {
     const pName = projectData.project_name;
     setCurrentProject(pName);
     setGlobalSettings(projectData.settings || {});
-    
-    // Φορτώνουμε απευθείας τα δεδομένα που μας επέστρεψε το backend load endpoint
     setObservations(projectData.observations || []);
     setAdjMetrics(projectData.adjMetrics || {});       
     setTraverseData(projectData.traverse_data || []);
     setTraverseMetrics(projectData.metrics || {});
     setTachymetryData(projectData.tachymetryData || { measurements: [], stations: [], results: [] });
+    
+    // Φόρτωση χάραξης κατά την αλλαγή project
+    setStakeoutData(projectData.stakeoutData || {
+      station: { name: 'St1', x: '', y: '' },
+      backsight: { name: 'BS1', x: '', y: '' },
+      azimuthBs: '---',
+      points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
+    });
 
-    // ΞΕΚΛΕΙΔΩΝΟΥΜΕ ΤΟ AUTO-SAVE ΓΙΑ ΤΟ ΝΕΟ PROJECT
     setIsDataLoaded(true);
     setIsProjectModalOpen(false);
   };
@@ -167,6 +188,7 @@ function App() {
                 setObservations={setObservations}
                 setTraverseData={setTraverseData}
                 setTachymetryData={setTachymetryData}
+                setStakeoutData={setStakeoutData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
             )}
@@ -194,6 +216,14 @@ function App() {
               <Tachymetry 
                 tachymetryData={tachymetryData} 
                 setTachymetryData={setTachymetryData} 
+              />
+            )}
+
+            {/* 3. CONDITIONAL RENDERING ΓΙΑ ΤΗ ΧΑΡΑΞΗ */}
+            {activeTab === 'stakeout' && (
+              <Charaxi 
+                stakeoutData={stakeoutData}
+                setStakeoutData={setStakeoutData}
               />
             )}
           </div>

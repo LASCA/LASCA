@@ -13,6 +13,7 @@ const Dashboard = ({
   setObservations, 
   setTraverseData, 
   setTachymetryData, 
+  setStakeoutData, // <-- Λήψη του νέου prop
   onOpenProjectManager
 }) => {
 
@@ -51,16 +52,14 @@ const Dashboard = ({
           setObservations(formattedAdj);
         }
 
-// 2. ΔΙΑΒΑΣΜΑ TRAVERSE & ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ
+        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE & ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          // Απομονώνουμε ΜΟΝΟ τις γραμμές που ανήκουν στον Πίνακα 1 (Όδευση)
           const table1Rows = dataTraverse.filter(row => row['Stations'] || row['Station'] || row['Hz [grad]']);
 
-          // Απομονώνουμε ΟΛΕΣ τις γραμμές του Πίνακα 2 (Υψομετρία) μέχρι το τέλος, αυτόνομα
           const table2Rows = dataTraverse
             .filter(row => row['From'] || row['To'])
             .map(row => ({
@@ -72,7 +71,6 @@ const Dashboard = ({
               H_target: row['H_target'] || ""
             }));
 
-          // Δημιουργούμε το formattedData με μήκος ΑΚΡΙΒΩΣ όσο ο Πίνακας 1
           const formattedTraverse = table1Rows.map((row, index) => {
             const baseRow = {
               id: Date.now() + index,
@@ -84,8 +82,6 @@ const Dashboard = ({
               h: row['H[m]'] || row['H [m]'] || row['H(m)'] || ""
             };
 
-            // Έξυπνο κόλπο: Επισυνάπτουμε ΟΛΟΚΛΗΡΟ τον Πίνακα 2 στο 1ο row
-            // Έτσι τα δεδομένα ταξιδεύουν στο backend χωρίς να προσθέτουν γραμμές στο UI!
             if (index === 0) {
               baseRow.levelingNetwork = table2Rows;
             }
@@ -96,7 +92,7 @@ const Dashboard = ({
           setTraverseData(formattedTraverse);
         }
 
-        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ (measurements & stations)
+        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ
         const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_taxymetria'));
         const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
 
@@ -115,6 +111,32 @@ const Dashboard = ({
           stations: rawStations,
           results: [] 
         });
+
+        // 4. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΧΑΡΑΞΗΣ (charaxi) <-- ΝΕΑ ΠΡΟΣΘΗΚΗ
+        const charaxiSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('charaxi'));
+        if (charaxiSheetName) {
+          const wsCharaxi = wb.Sheets[charaxiSheetName];
+          const dataCharaxi = XLSX.utils.sheet_to_json(wsCharaxi);
+
+          if (dataCharaxi.length > 0) {
+            const formattedCharaxi = dataCharaxi.map((row, index) => ({
+              id: Date.now() + index,
+              // Fallbacks για ελληνικά ή αγγλικά headers στις στήλες
+              name: row['Point'],
+              x: row['E[m]'] ,
+              y: row['N[m]'],
+              hz_stake: "",
+              dist_stake: ""
+            }));
+
+            // Ενημερώνουμε μόνο τα points, διατηρώντας άθικτα τα station / backsight
+            setStakeoutData(prev => ({
+              ...prev,
+              points: formattedCharaxi
+            }));
+            console.log("✅ Live Ingestion: Φορτώθηκαν τα σημεία χάραξης!");
+          }
+        }
 
         toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
       } catch (err) {
@@ -202,7 +224,6 @@ const SectionTitle = ({ title }) => (
   </h3>
 );
 
-// Το κοινό κουμπί προσαρμόζεται ανάλογα με το "theme"
 const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => {
   const isPrimary = theme === 'primary';
 
@@ -238,7 +259,6 @@ const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => 
   );
 };
 
-// Ειδικό label component για το input file, με το μπλε θέμα ακριβώς όπως το ζήτησες
 const ImportButton = ({ onChange }) => (
   <label className="relative cursor-pointer w-full p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-blue-500/50 group text-left bg-transparent">
     <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all text-blue-500">
