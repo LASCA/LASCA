@@ -158,6 +158,12 @@ def run_traverse():
         return jsonify({"results": [], "metrics": {}})
         
     try:
+        # =====================================================================
+        # ΝΕΑ ΠΡΟΣΘΗΚΗ: Υπολογισμός των Υψομέτρων (H) ΠΡΙΝ την οριζοντιογραφία!
+        # Εμπλουτίζει τη λίστα 'measurements' βάζοντας τις τιμές στο κλειδί 'h'.
+        # =====================================================================
+        measurements = dpr.traverse_level_calc(measurements)
+
         points = []
         for m in measurements:
             def to_float(val):
@@ -212,7 +218,9 @@ def run_traverse():
                 calc_Y = getattr(results_rr[idx], 'Y', getattr(results_rr[idx], 'Yi', None))
                 calc_H = getattr(results_rr[idx], 'H', None)
                 
-                updated_row = m.copy()
+                # Επειδή το 'm' έχει ήδη το υπολογισμένο 'h' από την traverse_level_calc,
+                # το 'm.copy()' το κρατάει! Άρα το Front-End θα το πάρει έτοιμο!
+                updated_row = m.copy() 
                 if calc_X is not None: updated_row['x'] = fmt(calc_X, 3)
                 if calc_Y is not None: updated_row['y'] = fmt(calc_Y, 3)
                 if calc_H is not None: updated_row['h'] = fmt(calc_H, 3)

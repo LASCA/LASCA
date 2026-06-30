@@ -51,21 +51,44 @@ const Dashboard = ({
           setObservations(formattedAdj);
         }
 
-        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+// 2. ΔΙΑΒΑΣΜΑ TRAVERSE
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          const formattedTraverse = dataTraverse.map(row => ({
-            name: row['Stations'] || row['Station'] || "",
-            hz: row['Hz [grad]'] || "",
-            sd: row['Slope_D [m]'] || "",
-            x: row['X [m]'] || "",
-            y: row['Y [m]'] || "",
-            h: row['H [m]'] || ""
-          }));
+          const formattedTraverse = [];
+          
+          for (let i = 0; i < dataTraverse.length; i++) {
+            const row = dataTraverse[i];
+            const stationName = row['Stations'] || row['Station'] || "";
+            
+            // Μόλις βρούμε γραμμή χωρίς όνομα σταθμού (αφού έχουμε ήδη διαβάσει την 1η),
+            // σταματάμε για να μην γεμίσει ο πίνακας με τις κενές γραμμές του διπλανού πίνακα!
+            if (!stationName && formattedTraverse.length > 0) {
+              break; 
+            }
 
+            formattedTraverse.push({
+              id: Date.now() + i,
+              // ΟΡΑΤΑ ΠΕΔΙΑ ΣΤΟΝ ΠΙΝΑΚΑ:
+              name: stationName,
+              hz: row['Hz [grad]'] || "",
+              sd: row['Slope_D [m]'] || "", 
+              x: row['X [m]'] || "",
+              y: row['Y [m]'] || "",
+              h: row['H[m]'] || row['H [m]'] || row['H(m)'] || "",
+              
+              // ΚΡΥΦΑ ΠΕΔΙΑ ΓΙΑ ΤΟ BACKEND (Τριγωνομετρική):
+              From: row['From'] || "",
+              To: row['To'] || "",
+              Slope_D: row['Slope_D'] || row['Slope_D [m]'] || "",
+              Z_grad: row['Z[grad]'] || row['Z [grad]'] || "",
+              H_station: row['H_station'] || "",
+              H_target: row['H_target'] || ""
+            });
+          }
+          
           setTraverseData(formattedTraverse);
         }
 
