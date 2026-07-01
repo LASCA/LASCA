@@ -52,9 +52,9 @@ def deutero_them(xa: float, ya: float, xb: float, yb: float) -> Optional[float]:
     if Dx == 0.0 and Dy == 0.0:
         return None
     if Dx == 0.0:
-        return 0.0 if Dy > 0.0 else 200.0
+        return 0.0 if Dy > 0.0 else 200.0, s
     if Dy == 0.0:
-        return 100.0 if Dx > 0.0 else 300.0
+        return 100.0 if Dx > 0.0 else 300.0, s
     a = atan_g(abs(Dx / Dy))
 
     if Dx > 0.0 and Dy > 0.0:
@@ -810,6 +810,17 @@ def traverse_level_calc(measurements_json):
 
     return measurements_json
 
+
+# Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
+def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:
+    E = xs
+    Em_tonos = E - 500000.0
+    
+    # ΠΡΟΣΟΧΗ: Χρησιμοποιούμε **2 για το τετράγωνο στην Python
+    mij = m_0 * (1.0 + (Em_tonos**2) / (2.0 * (R_0**2) * (m_0**2)))
+    
+    return mij
+
 def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) -> dict:
     """ 
     Παράμετροι:
@@ -825,7 +836,10 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
         yo = float(backsight.get('y', 0))
 
         # 2. Υπολογισμός Azimuth προσανατολισμού G(S->O) με τη δική σου deutero_themeliodes
-        g_so, _ = deutero_them(xs, ys, xo, yo)
+        g_so, S_test = deutero_them(xs, ys, xo, yo)
+
+        # Υπολογισμός συντελεστή κλίμακας (Δεν χρειάζεται να περάσουμε m_0, R_0, παίρνει τα defaults)
+        mij = sintelestis_klimakas(xs)
         
         updated_points = []
 
@@ -842,17 +856,20 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
             xp = float(pt['x'])
             yp = float(pt['y'])
 
-            # Υπολογισμός Azimuth G(S->P) και οριζόντιας απόστασης από τη Στάση στο Σημείο P
-            g_sp, dist_ground = deutero_them(xs, ys, xp, yp)
+            # Υπολογισμός Azimuth G(S->P) και απόστασης από τη Στάση στο Σημείο P (στο επίπεδο προβολής)
+            g_sp, dist_grid = deutero_them(xs, ys, xp, yp)
 
-            # Η γωνία χάραξης β είναι η διαφορά των δύο Azimuth, διορθωμένη με τη δική σου norm400
+            # Η γωνία χάραξης β είναι η διαφορά των δύο Azimuth, διορθωμένη με τη norm400
             beta = g_sp - g_so
             beta_normalized = norm400(beta)
 
             # Αντιγραφή του σημείου και προσθήκη των υπολογισμένων στοιχείων
             updated_pt = pt.copy()
             updated_pt['hz_stake'] = beta_normalized    # Hz γωνία στροφής σε grad
-            updated_pt['dist_stake'] = dist_ground     # D απόσταση σε μέτρα
+            
+            # ΔΙΑΙΡΕΣΗ με τον συντελεστή κλίμακας για να βρούμε την πραγματική απόσταση εδάφους
+            updated_pt['dist_stake'] = dist_grid / mij  
+            
             updated_points.append(updated_pt)
 
         return {
@@ -861,5 +878,4 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
         }
 
     except Exception as e:
-        # Επιστρέφουμε το error για να το διαχειριστεί το Flask endpoint
         raise RuntimeError(f"Σφάλμα κατά τον υπολογισμό της χάραξης: {str(e)}")

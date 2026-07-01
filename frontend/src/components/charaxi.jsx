@@ -189,8 +189,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       {/* ========================================================= */}
       <div className="lg:col-span-2 bg-[#0b1220] border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-2xl relative h-full min-h-[300px] lg:min-h-0">
         <div className="absolute top-0 left-0 w-full p-3 bg-gradient-to-b from-[#0b1220] to-transparent z-10 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest">
-            <Map size={16} /> Γραφική Απεικόνιση (Plot)
+          <div className="flex items-center gap-2 text-slate-400 text-xs font-bold tracking-widest">
+            <Map size={16} /> Γραφική Απεικόνιση
           </div>
           <button className="text-slate-500 hover:text-white transition-colors bg-slate-900/80 p-1.5 rounded-lg border border-slate-800">
             <Maximize size={14} />

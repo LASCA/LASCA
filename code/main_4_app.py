@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
 import os
-
+import traceback
 import data_proccessing as dpr  # Το αρχείο σου με τις συναρτήσεις
 import vis_4_app as vis         # Το αρχείο για τα γραφήματα
 from project_manager import TopoProject  # Η κλάση των Projects
@@ -366,6 +366,36 @@ def run_tachymetry():
         print(f"Σφάλμα κατά τον υπολογισμό ταχυμετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+# CHARAXI
+
+@app.route('/api/projects/stakeout', methods=['POST'])
+def run_stakeout():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Δεν ελήφθησαν δεδομένα"}), 400
+
+        # Απομόνωση των δεδομένων που στέλνει το React
+        station = data.get('station', {})
+        backsight = data.get('backsight', {})
+        points_to_stake = data.get('points', [])
+
+        # Βασικός έλεγχος εγκυρότητας πριν τον υπολογισμό
+        if not station.get('x') or not station.get('y') or not backsight.get('x') or not backsight.get('y'):
+            return jsonify({"error": "Συμπληρώστε πρώτα τα δεδομένα Στάσης (X, Y) και Προσανατολισμού (X, Y)!"}), 400
+
+        # Κλήση της συνάρτησης υπολογισμού από το data_proccessing.py
+        result = dpr.calculate_stakeout(station, backsight, points_to_stake)
+
+        # Επιστροφή των αποτελεσμάτων (azimuth_bs και εμπλουτισμένη λίστα points)
+        return jsonify(result)
+
+    except Exception as e:
+            # Αυτό θα τυπώσει στο terminal ΑΚΡΙΒΩΣ πού έγινε το λάθος!
+            print("===== ΑΝΑΛΥΤΙΚΟ ΣΦΑΛΜΑ ΧΑΡΑΞΗΣ =====")
+            print(traceback.format_exc())
+            print("====================================")
+            return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
