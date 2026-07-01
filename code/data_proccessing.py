@@ -579,7 +579,6 @@ def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decim
 
 # SYNORTHOSI STATHMOY
 
-
 def solve_lsa_detailed(observations):
     """
     Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
@@ -809,7 +808,6 @@ def traverse_level_calc(measurements_json):
                 row['h'] = known_heights[st_name]
 
     return measurements_json
-
 
 # Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
 def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:
