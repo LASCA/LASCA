@@ -413,7 +413,7 @@ def plot_stakeout_base64(station: dict, backsight: dict, calculated_points: list
     ax.margins(0.15)
 
     # 3. Μορφοποίηση, Άξονες & Κάνναβος
-    ax.set_title("ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ ΧΑΡΑΞΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20)
+    ax.set_title("ΣΚΑΡΙΦΗΜΑ ΧΑΡΑΞΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20)
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
     ax.set_aspect('equal', adjustable='datalim')
