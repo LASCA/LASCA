@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Target, Navigation, Calculator, Trash2, Map, Maximize, Download, X } from 'lucide-react';
+import { Target, Navigation, Calculator, Trash2, Map, Maximize, Download, X, PlusCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const Charaxi = ({ stakeoutData, setStakeoutData }) => {
-  const { station, backsight, points } = stakeoutData;
+  const { station, backsight, points, mij } = stakeoutData;
   const [loading, setLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -31,6 +31,16 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     });
   };
 
+  // Νέα συνάρτηση για προσθήκη γραμμής στο συγκεκριμένο index (Όπως στο Adjustment)
+  const addRowAt = (index) => {
+    setStakeoutData(prev => {
+      const newRow = { id: Date.now().toString(), name: '', x: '', y: '', hz_stake: '', dist_stake: '' };
+      const updated = [...prev.points];
+      updated.splice(index + 1, 0, newRow);
+      return { ...prev, points: updated };
+    });
+  };
+
   const handleCalculate = async () => {
     if (!station.x || !station.y || !backsight.x || !backsight.y) {
       toast.error("Συμπληρώστε πρώτα τα δεδομένα Στάσης και Προσανατολισμού!");
@@ -42,7 +52,13 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ station, backsight, points })
+        // Περνάμε και το Mij στο Python backend!
+        body: JSON.stringify({ 
+          station, 
+          backsight, 
+          points, 
+          mij: mij !== undefined ? mij : 0.9996 
+        })
       });
       
       const result = await response.json();
@@ -62,13 +78,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const addPointRow = () => {
-    setStakeoutData(prev => ({
-      ...prev,
-      points: [...prev.points, { id: Date.now().toString(), name: '', x: '', y: '', hz_stake: '', dist_stake: '' }]
-    }));
   };
 
   const handleDownload = () => {
@@ -104,15 +113,15 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">ID</span>
-                <input type="text" value={station.name} onChange={(e) => setStation('name', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500" />
+                <input type="text" value={station.name || ''} onChange={(e) => setStation('name', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500" />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">X</span>
-                <input type="number" value={station.x} onChange={(e) => setStation('x', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                <input type="number" value={station.x || ''} onChange={(e) => setStation('x', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">Y</span>
-                <input type="number" value={station.y} onChange={(e) => setStation('y', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                <input type="number" value={station.y || ''} onChange={(e) => setStation('y', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
               </div>
             </div>
           </div>
@@ -127,15 +136,15 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">ID</span>
-                <input type="text" value={backsight.name} onChange={(e) => setBacksight('name', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500" />
+                <input type="text" value={backsight.name || ''} onChange={(e) => setBacksight('name', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500" />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">X</span>
-                <input type="number" value={backsight.x} onChange={(e) => setBacksight('x', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                <input type="number" value={backsight.x || ''} onChange={(e) => setBacksight('x', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">Y</span>
-                <input type="number" value={backsight.y} onChange={(e) => setBacksight('y', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                <input type="number" value={backsight.y || ''} onChange={(e) => setBacksight('y', e.target.value)} className={`w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-mono ${noSpinnersClass}`} placeholder="0.000" />
               </div>
             </div>
           </div>
@@ -144,14 +153,32 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
         {/* ΠΙΝΑΚΑΣ & ΚΟΥΜΠΙ ΕΚΤΕΛΕΣΗΣ */}
         <div className="flex-1 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col overflow-hidden shadow-xl min-h-0">
           <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center shrink-0 flex-wrap gap-2 sticky top-0 z-10">
-            <div className="flex items-center gap-3">
+            
+            <div className="flex items-center gap-4 flex-wrap">
               <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Σημεία προς Χάραξη</span>
-              <button
-                onClick={addPointRow}
-                className="bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors"
-              >
-                + Προσθήκη Σημείου
-              </button>
+              
+              <div className="flex items-center gap-3">
+                {/* === ΝΕΟ ΠΛΑΙΣΙΟ ΓΙΑ TO G0 (Αζιμούθιο) === */}
+                <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
+                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">G₀ =</span>
+                  <span className="text-amber-400 text-xs text-center w-20 outline-none font-mono font-bold">
+                    {stakeoutData.azimuthBs !== undefined ? `${Number(stakeoutData.azimuthBs).toFixed(4)} g` : '---'}
+                  </span>
+                </div>
+
+                {/* === INPUT ΓΙΑ TO MIJ === */}
+                <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
+                  <span className="text-[10px] font-mono text-slate-400 font-bold">mij =</span>
+                  <input
+                    type="number"
+                    value={mij !== undefined ? mij : ''}
+                    onChange={(e) => setStakeoutData(prev => ({ ...prev, mij: e.target.value }))}
+                    className={`bg-transparent text-emerald-400 text-xs w-16 outline-none font-mono font-bold ${noSpinnersClass}`}
+                    placeholder="0.9996"
+                    step="0.0001"
+                  />
+                </div>
+              </div>
             </div>
             
             <div className="flex items-center gap-2">
@@ -167,8 +194,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
           </div>
           
           <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600 transition-colors">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead className="sticky top-0 bg-slate-950 z-10 shadow-md">
+            <table className="w-full text-left border-collapse table-fixed relative">
+              <thead className="sticky top-0 bg-slate-950 z-20 shadow-md">
                 <tr className="border-b border-slate-800 text-slate-400 text-[10px] tracking-wider font-mono">
                   <th className="p-2 w-12 text-center">#</th>
                   <th className="p-2 w-3/12">Σημείο</th>
@@ -179,33 +206,46 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                   <th className="p-2 w-10"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/40 text-xs">
+              <tbody className="divide-y divide-slate-800/40 text-xs relative">
                 {points.map((pt, idx) => (
-                  <tr key={pt.id} className="hover:bg-slate-800/30 transition-colors group">
-                    <td className="p-1.5 text-center text-slate-600 font-mono">{idx + 1}</td>
-                    <td className="p-1.5">
-                      <input type="text" value={pt.name} onChange={(e) => handlePointChange(idx, 'name', e.target.value)} className="w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none placeholder:text-slate-700" placeholder={`P${idx+1}`}/>
-                    </td>
-                    <td className="p-1.5">
-                      <input type="number" value={pt.x} onChange={(e) => handlePointChange(idx, 'x', e.target.value)} className={`w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none font-mono ${noSpinnersClass}`} placeholder="0.000" />
-                    </td>
-                    <td className="p-1.5 border-r border-slate-800/50">
-                      <input type="number" value={pt.y} onChange={(e) => handlePointChange(idx, 'y', e.target.value)} className={`w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none font-mono ${noSpinnersClass}`} placeholder="0.000" />
-                    </td>
-                    
-                    <td className="p-1.5 bg-blue-500/5 text-blue-400 font-mono font-bold text-center border-r border-slate-800/20 text-xs">
-                      {typeof pt.hz_stake === 'number' ? pt.hz_stake.toFixed(4) : pt.hz_stake || '-'}
-                    </td>
-                    <td className="p-1.5 bg-emerald-500/5 text-emerald-400 font-mono font-bold text-center text-xs">
-                      {typeof pt.dist_stake === 'number' ? pt.dist_stake.toFixed(3) : pt.dist_stake || '-'}
-                    </td>
-                    
-                    <td className="p-1.5 text-center relative">
-                      <button onClick={() => deleteRow(idx)} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={pt.id}>
+                    <tr className="hover:bg-blue-600/[0.03] transition-colors group relative">
+                      <td className="p-1.5 text-center text-slate-600 font-mono">{idx + 1}</td>
+                      <td className="p-1.5">
+                        <input type="text" value={pt.name || ''} onChange={(e) => handlePointChange(idx, 'name', e.target.value)} className="w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none placeholder:text-slate-700" placeholder={`P${idx+1}`}/>
+                      </td>
+                      <td className="p-1.5">
+                        <input type="number" value={pt.x !== undefined ? pt.x : ''} onChange={(e) => handlePointChange(idx, 'x', e.target.value)} className={`w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                      </td>
+                      <td className="p-1.5 border-r border-slate-800/50">
+                        <input type="number" value={pt.y !== undefined ? pt.y : ''} onChange={(e) => handlePointChange(idx, 'y', e.target.value)} className={`w-full bg-transparent border border-transparent hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-1 text-slate-200 outline-none font-mono ${noSpinnersClass}`} placeholder="0.000" />
+                      </td>
+                      
+                      <td className="p-1.5 bg-blue-500/5 text-blue-400 font-mono font-bold text-center border-r border-slate-800/20 text-xs">
+                        {typeof pt.hz_stake === 'number' ? pt.hz_stake.toFixed(4) : pt.hz_stake || '-'}
+                      </td>
+                      <td className="p-1.5 bg-emerald-500/5 text-emerald-400 font-mono font-bold text-center text-xs">
+                        {typeof pt.dist_stake === 'number' ? pt.dist_stake.toFixed(3) : pt.dist_stake || '-'}
+                      </td>
+                      
+                      <td className="p-1.5 text-center relative">
+                        <button onClick={() => deleteRow(idx)} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                    {/* === INLINE ADD BUTTON (Όπως στο Adjustment) === */}
+                    <tr className="h-0 p-0">
+                      <td colSpan={7} className="p-0 h-0 relative">
+                        <button 
+                          onClick={() => addRowAt(idx)} 
+                          className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"
+                        >
+                          <PlusCircle size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -219,7 +259,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       <div className="lg:col-span-2 flex flex-col h-full min-h-[300px] lg:min-h-0">
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl shadow-lg flex flex-col flex-1 overflow-hidden">
           
-          {/* Header Πλοτ */}
           <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
               <Map size={14} className="text-emerald-500" /> Γραφική Απεικόνιση
@@ -245,7 +284,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
             )}
           </div>
 
-          {/* Κυρίως Χώρος Πλοτ */}
           <div className="flex-1 relative w-full h-full flex items-center justify-center p-4 bg-slate-950/20 overflow-hidden">
             {stakeoutData.plot ? (
               <img 
