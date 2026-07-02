@@ -325,3 +325,123 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     plt.close(fig)
     
     return f"data:image/png;base64,{plot_url}"
+
+def plot_stakeout_base64(station: dict, backsight: dict, calculated_points: list) -> str:
+    """
+    Δημιουργεί το τοπογραφικό σκαρίφημα της χάραξης σε Matplotlib (dark mode)
+    και το επιστρέφει σε μορφή Base64 string για το React Frontend.
+    """
+    if not station or not calculated_points:
+        return ""
+        
+    try:
+        # Ανάγνωση συντεταγμένων Στάσης
+        st_x = float(station.get('x', 0))
+        st_y = float(station.get('y', 0))
+        st_name = str(station.get('id', station.get('name', 'Στάση')))
+    except (ValueError, TypeError):
+        return ""
+
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(11, 8))
+    
+    # Ευθυγράμμιση με το Dashboard theme
+    fig.patch.set_facecolor('#121212')
+    ax.set_facecolor('#121212')
+    
+    # Απενεργοποίηση επιστημονικής σημειογραφίας στους άξονες
+    ax.ticklabel_format(useOffset=False, style='plain', axis='both')
+    
+    # 1. Σχεδίαση μόνο του Συμβόλου της Στάσης
+    ax.scatter(st_x, st_y, marker='^', s=220, facecolors='none', edgecolors='#00FFFF', linewidths=2.5, zorder=10)
+    ax.text(st_x, st_y, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
+    
+    # 2. Σχεδίαση Σημείων προς Χάραξη
+    X_p, Y_p, labels_p = [], [], []
+    
+    for pt in calculated_points:
+        if not pt.get('x') or not pt.get('y'):
+            continue
+        try:
+            xp = float(pt['x'])
+            yp = float(pt['y'])
+            
+            # ΚΑΘΑΡΙΣΜΟΣ ID:
+            # 1. Πρώτα το 'name' (Αυτό που πληκτρολογείς εσύ στο UI του React)
+            # 2. Μετά το 'Point' (Αν ανέβασες αρχείο Excel)
+            # ΑΓΝΟΟΥΜΕ το 'id' γιατί το React στέλνει τεράστια timestamps (π.χ. 178218493242)
+            raw_id = str(pt.get('name', pt.get('Point', ''))).strip()
+            
+            # Αν για κάποιο λόγο είναι κενό, ας βάλουμε ένα default
+            if not raw_id:
+                raw_id = "P"
+                
+            # Αν τραβήξει δεκαδικό από Excel (π.χ. "1.0"), το κάνουμε "1"
+            if raw_id.endswith('.0'):
+                raw_id = raw_id[:-2]
+                
+        except (ValueError, TypeError):
+            continue
+            
+        X_p.append(xp)
+        Y_p.append(yp)
+        labels_p.append(raw_id)
+        
+        # Σχεδίαση Ακτίνας Χάραξης
+        ax.plot([st_x, xp], [st_y, yp], color='#10B981', linestyle=':', linewidth=1.2, alpha=0.5, zorder=2)
+        
+    if X_p:
+        # Σχεδίαση "Στόχων" για τα σημεία χάραξης
+        ax.scatter(X_p, Y_p, marker='o', s=110, facecolors='none', edgecolors='#10B981', linewidths=1.5, zorder=6)
+        ax.scatter(X_p, Y_p, marker='+', s=55, color='#10B981', linewidths=1.5, zorder=7)
+        
+        # Δημιουργία καθαρών κειμένων
+        texts = []
+        for xi, yi, lbl in zip(X_p, Y_p, labels_p):
+            texts.append(ax.text(xi, yi, lbl, color="#FFFEFE", fontsize=11, fontweight='bold'))
+            
+        # adjust_text με μικρές γραμμές αν χρειαστεί να μετακινηθούν πολύ για να μη πέφτουν το ένα πάνω στο άλλο
+        if HAS_ADJUST_TEXT and texts:
+            try:
+                adjust_text(texts, x=np.array(X_p), y=np.array(Y_p), ax=ax, 
+                            expand_points=(1.5, 1.5),
+                            arrowprops=dict(arrowstyle="-", color='#10B981', lw=0.5, alpha=0.6))
+            except Exception:
+                pass
+
+    # ΠΡΟΣΘΗΚΗ ΠΕΡΙΘΩΡΙΩΝ (15% κενό γύρω-γύρω για να μη κόβονται τα σημεία/ονόματα)
+    ax.margins(0.15)
+
+    # 3. Μορφοποίηση, Άξονες & Κάνναβος
+    ax.set_title("ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ ΧΑΡΑΞΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20)
+    ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
+    ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
+    ax.set_aspect('equal', adjustable='datalim')
+    ax.grid(True, linestyle=':', alpha=0.3, color='#555555')
+    
+    ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
+    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
+    
+    # 4. Custom Υπόμνημα
+    st_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none', markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
+    pt_outer = Line2D([], [], color='none', marker='o', markerfacecolor='none', markeredgecolor='#10B981', markersize=9, markeredgewidth=1.2)
+    pt_inner = Line2D([], [], color='#10B981', marker='+', linestyle='None', markersize=7, markeredgewidth=1.2)
+    pt_line = Line2D([], [], color='#10B981', linestyle=':', linewidth=1.2)
+    
+    handles = [st_proxy, (pt_outer, pt_inner), pt_line]
+    labels = ['Στάση Οργάνου', 'Σημεία προς Χάραξη', 'Ακτίνες Χάραξης']
+    
+    legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#1e1e1e', edgecolor='none')
+    for text in legend.get_texts():
+        text.set_color("white")
+        
+    plt.tight_layout()
+    
+    # 5. Μετατροπή σε Base64 String
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', dpi=120)
+    img.seek(0)
+    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
+    plt.close(fig)
+    
+    return f"data:image/png;base64,{plot_url}"

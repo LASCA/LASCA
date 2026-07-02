@@ -387,15 +387,21 @@ def run_stakeout():
         # Κλήση της συνάρτησης υπολογισμού από το data_proccessing.py
         result = dpr.calculate_stakeout(station, backsight, points_to_stake)
 
-        # Επιστροφή των αποτελεσμάτων (azimuth_bs και εμπλουτισμένη λίστα points)
+        # Δημιουργία του Τοπογραφικού Γραφήματος!
+        try:
+            plot_base64 = vis.plot_stakeout_base64(station, backsight, result['points'])
+            result['plot'] = plot_base64  # Προσθέτουμε την εικόνα στο dictionary
+        except Exception as plot_err:
+            print(f"Σφάλμα κατά τη δημιουργία γραφήματος χάραξης: {plot_err}")
+            result['plot'] = None
+
+        # Επιστροφή των αποτελεσμάτων και του γραφήματος
         return jsonify(result)
 
     except Exception as e:
-            # Αυτό θα τυπώσει στο terminal ΑΚΡΙΒΩΣ πού έγινε το λάθος!
-            print("===== ΑΝΑΛΥΤΙΚΟ ΣΦΑΛΜΑ ΧΑΡΑΞΗΣ =====")
-            print(traceback.format_exc())
-            print("====================================")
-            return jsonify({"error": str(e)}), 500
-
+        import traceback
+        print(f"Σφάλμα κατά τον υπολογισμό χάραξης:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

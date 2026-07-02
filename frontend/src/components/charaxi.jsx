@@ -51,7 +51,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
         setStakeoutData(prev => ({
           ...prev,
           azimuthBs: result.azimuth_bs,
-          points: result.points
+          points: result.points,
+          plot: result.plot
         }));
         toast.success("Τα στοιχεία χάραξης υπολογίστηκαν επιτυχώς!");
       }
@@ -209,16 +210,26 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
           <div className="absolute w-full h-[1px] bg-blue-500/10 top-1/2 left-0 pointer-events-none"></div>
           <div className="absolute h-full w-[1px] bg-blue-500/10 top-0 left-1/2 pointer-events-none"></div>
 
-          <div className="text-center space-y-3 z-10 backdrop-blur-md bg-[#0b1220]/60 p-5 rounded-xl border border-slate-800/40 max-w-[280px]">
-            <div className="w-12 h-12 rounded-full border border-dashed border-slate-700 mx-auto flex items-center justify-center text-slate-600">
-              <Map size={20} />
+          {/* DYNAMIC RENDERING: Αν υπάρχει εικόνα, δείξε την, αλλιώς δείξε το placeholder */}
+          {stakeoutData.plot ? (
+            <img 
+              src={stakeoutData.plot} 
+              alt="Διάγραμμα Χάραξης" 
+              className="relative z-10 w-full h-full object-contain p-2 animate-fade-in drop-shadow-2xl"
+            />
+          ) : (
+            <div className="text-center space-y-3 z-10 backdrop-blur-md bg-[#0b1220]/60 p-5 rounded-xl border border-slate-800/40 max-w-[280px]">
+              <div className="w-12 h-12 rounded-full border border-dashed border-slate-700 mx-auto flex items-center justify-center text-slate-600">
+                <Map size={20} />
+              </div>
+              <div>
+                <p className="text-slate-300 font-bold text-xs">Διάγραμμα Χάραξης</p>
+                <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
+                  Εισάγετε δεδομένα και πατήστε "Εκτέλεση" για να παραχθεί το σκαρίφημα της χάραξης.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-slate-300 font-bold text-xs">Διάγραμμα Χάραξης</p>
-              <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
-              </p>
-            </div>
-          </div>
+          )}
         </div>
         
         <div className="absolute bottom-3 right-4 text-[9px] font-mono text-slate-600 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800/50 backdrop-blur-sm">
