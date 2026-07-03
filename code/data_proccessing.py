@@ -872,7 +872,8 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
 
         return {
             "azimuth_bs": g_so,
-            "points": updated_points
+            "points": updated_points,
+            "mij": mij
         }
 
     except Exception as e:

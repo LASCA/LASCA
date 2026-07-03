@@ -41,7 +41,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     });
   };
 
-  const handleCalculate = async () => {
+const handleCalculate = async () => {
     if (!station.x || !station.y || !backsight.x || !backsight.y) {
       toast.error("Συμπληρώστε πρώτα τα δεδομένα Στάσης και Προσανατολισμού!");
       return;
@@ -52,13 +52,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Περνάμε και το Mij στο Python backend!
-        body: JSON.stringify({ 
-          station, 
-          backsight, 
-          points, 
-          mij: mij !== undefined ? mij : 0.9996 
-        })
+        // Στέλνουμε πλέον ΜΟΝΟ τα δεδομένα (αφαιρέσαμε το mij από εδώ)
+        body: JSON.stringify({ station, backsight, points })
       });
       
       const result = await response.json();
@@ -68,6 +63,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
         setStakeoutData(prev => ({
           ...prev,
           azimuthBs: result.azimuth_bs,
+          mij: result.mij, // <--- Παίρνουμε το υπολογισμένο mij από την Python!
           points: result.points,
           plot: result.plot
         }));
@@ -158,7 +154,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
               <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Σημεία προς Χάραξη</span>
               
               <div className="flex items-center gap-3">
-                {/* === ΝΕΟ ΠΛΑΙΣΙΟ ΓΙΑ TO G0 (Αζιμούθιο) === */}
+                {/* === ΕΜΦΑΝΙΣΗ ΓΙΑ TO G0 (Αζιμούθιο) === */}
                 <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                   <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">G₀ =</span>
                   <span className="text-amber-400 text-xs text-center w-20 outline-none font-mono font-bold">
@@ -166,17 +162,12 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                   </span>
                 </div>
 
-                {/* === INPUT ΓΙΑ TO MIJ === */}
+                {/* === ΕΜΦΑΝΙΣΗ ΓΙΑ TO MIJ === */}
                 <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                   <span className="text-[10px] font-mono text-slate-400 font-bold">mij =</span>
-                  <input
-                    type="number"
-                    value={mij !== undefined ? mij : ''}
-                    onChange={(e) => setStakeoutData(prev => ({ ...prev, mij: e.target.value }))}
-                    className={`bg-transparent text-emerald-400 text-xs w-16 outline-none font-mono font-bold ${noSpinnersClass}`}
-                    placeholder="0.9996"
-                    step="0.0001"
-                  />
+                  <span className="text-emerald-400 text-xs text-center w-16 outline-none font-mono font-bold">
+                    {stakeoutData.mij !== undefined && stakeoutData.mij !== null ? Number(stakeoutData.mij).toFixed(4) : '---'}
+                  </span>
                 </div>
               </div>
             </div>
