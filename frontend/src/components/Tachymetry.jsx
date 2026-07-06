@@ -81,11 +81,6 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
         stations: stationsData,
         station_name: activeStation,        
         orientation_name: activeOrientation   
-      }, {
-        // ΠΡΟΣΘΗΚΗ: Στέλνουμε το όνομα του Project στα Headers!
-        headers: {
-          'Active-Project': typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || '')
-        }
       });
 
       if (response.data && response.data.results) {

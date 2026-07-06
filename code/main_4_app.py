@@ -391,14 +391,9 @@ def run_tachymetry():
         if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
         if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
         if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
-        df_st.rename(columns=rename_st, inplace=True)
+    df_st.rename(columns=rename_st, inplace=True)
 
-    # --- ΓΕΦΥΡΑ: Φόρτωση στάσεων Όδευσης από το Project και Συγχώνευση ---
-    
-    # Χρήση της έξυπνης συνάρτησης
-    project_name = get_active_project_name()
-    print(f"🔍 [DEBUG TACHYMETRY] Το backend διάβασε project_name = '{project_name}'")
-    
+    project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
     project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
     traverse_file = project_dir / "latest_traverse.json"
     
@@ -455,6 +450,7 @@ def run_tachymetry():
         import traceback
         print(f"Σφάλμα κατά τον υπολογισμό ταχυμετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+
 
 # CHARAXI
 
