@@ -3,7 +3,7 @@ import math
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
-import os
+import os, json
 import traceback
 import data_proccessing as dpr  # Το αρχείο σου με τις συναρτήσεις
 import vis_4_app as vis         # Το αρχείο για τα γραφήματα
@@ -287,6 +287,37 @@ def run_traverse():
                 updated_measurements.append(updated_row)
             else:
                 updated_measurements.append(m)
+# --- ΓΕΦΥΡΑ: Αποθήκευση στάσεων ΜΕΣΑ στο ενεργό Project ---
+
+        calculated_stations_export = []
+        for pt in results_rr:
+            name = getattr(pt, 'name', None)
+            calc_X = getattr(pt, 'X', getattr(pt, 'Xi', None))
+            calc_Y = getattr(pt, 'Y', getattr(pt, 'Yi', None))
+            calc_H = getattr(pt, 'H', None)
+            
+            if name and calc_X is not None and calc_Y is not None:
+                calculated_stations_export.append({
+                    "Station_Name": str(name),
+                    "XS": float(calc_X),
+                    "YS": float(calc_Y),
+                    "ZS": float(calc_H) if calc_H is not None else 0.0
+                })
+        
+        # Δυναμικός εντοπισμός του φακέλου του τρέχοντος Project
+        project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
+        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+        
+        # Σιγουρευόμαστε ότι ο φάκελος του project υπάρχει
+        project_dir.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            with open(project_dir / "latest_traverse.json", "w", encoding="utf-8") as f:
+                json.dump(calculated_stations_export, f, ensure_ascii=False, indent=4)
+            print(f"✅ ΓΕΦΥΡΑ: Οι στάσεις αποθηκεύτηκαν επιτυχώς στο project: '{project_name}'")
+        except Exception as e:
+            print(f"⚠️ Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης στο project: {e}")
+        # --------------------------------------------------------
 
         plot_base64 = None
         try:
@@ -334,6 +365,33 @@ def run_tachymetry():
         if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
         if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
     df_st.rename(columns=rename_st, inplace=True)
+
+    project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
+    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+    traverse_file = project_dir / "latest_traverse.json"
+    
+    if traverse_file.exists():
+        try:
+            with open(traverse_file, 'r', encoding='utf-8') as f:
+                traverse_stations = json.load(f)
+            
+            if traverse_stations:
+                df_trav = pd.DataFrame(traverse_stations)
+                
+                # 1. Καθαρισμός ονομάτων
+                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
+                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
+                
+                # 2. Ένωση
+                df_st = pd.concat([df_st, df_trav], ignore_index=True)
+                
+                # 3. Διαγραφή διπλοτύπων (κρατάμε την Όδευση)
+                df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
+                
+                print(f"✅ ΓΕΦΥΡΑ: Συγχωνεύτηκαν στάσεις από το project '{project_name}'! Συνολικές μοναδικές: {len(df_st)}")
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων από το project: {e}")
+    # --------------------------------------------------------------
 
     try:
         # 3. ΚΑΛΟΥΜΕ ΤΗ ΔΙΚΗ ΣΟΥ ΕΛΕΓΜΕΝΗ ΣΥΝΑΡΤΗΣΗ!
