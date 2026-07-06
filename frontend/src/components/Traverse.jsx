@@ -92,7 +92,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         scale: scale,
         terrain: terrain,
         klass: klass
-      });
+      },{
+        headers: {
+          'Active-Project': typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || '')
+          }
+          });
 
       if (response.data) {
         // 1. Στέλνουμε τα διορθωμένα δεδομένα (πίνακας) στο App.jsx

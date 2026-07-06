@@ -12,6 +12,35 @@ from project_manager import TopoProject  # Η κλάση των Projects
 app = Flask(__name__)
 CORS(app) 
 
+def get_active_project_name():
+    """ Ψάχνει το όνομα του ενεργού project σε όλα τα πιθανά σημεία του request """
+    # 1. Έλεγχος στα Headers (πεζά/κεφαλαία)
+    for h in ['Active-Project', 'active-project', 'Project-Name', 'project-name']:
+        val = request.headers.get(h)
+        if val: return val
+        
+    # 2. Έλεγχος στα URL Parameters (π.χ. ?project=...)
+    for p in ['project', 'projectName', 'project_name', 'activeProject']:
+        val = request.args.get(p)
+        if val: return val
+        
+    # 3. Έλεγχος στα Form Data (απαραίτητο για το Excel της Ταχυμετρίας που είναι multipart)
+    if request.form:
+        for f in ['project', 'projectName', 'project_name', 'activeProject']:
+            val = request.form.get(f)
+            if val: return val
+            
+    # 4. Έλεγχος στο JSON Body (απαραίτητο για την Όδευση)
+    try:
+        if request.is_json and request.json:
+            for j in ['project', 'projectName', 'project_name', 'activeProject']:
+                val = request.json.get(j)
+                if val: return val
+    except Exception:
+        pass
+        
+    return None
+
 # Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects
 WORKSPACE_DIR = Path(os.getcwd()) / "Topo_Workspace"
 
@@ -288,7 +317,6 @@ def run_traverse():
             else:
                 updated_measurements.append(m)
 # --- ΓΕΦΥΡΑ: Αποθήκευση στάσεων ΜΕΣΑ στο ενεργό Project ---
-
         calculated_stations_export = []
         for pt in results_rr:
             name = getattr(pt, 'name', None)
@@ -304,20 +332,19 @@ def run_traverse():
                     "ZS": float(calc_H) if calc_H is not None else 0.0
                 })
         
-        # Δυναμικός εντοπισμός του φακέλου του τρέχοντος Project
-        project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
-        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+        # Χρήση της έξυπνης συνάρτησης
+        project_name = get_active_project_name()
+        print(f"🔍 [DEBUG TRAVERSE] Το backend διάβασε project_name = '{project_name}'")
         
-        # Σιγουρευόμαστε ότι ο φάκελος του project υπάρχει
+        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
         project_dir.mkdir(parents=True, exist_ok=True)
         
         try:
             with open(project_dir / "latest_traverse.json", "w", encoding="utf-8") as f:
                 json.dump(calculated_stations_export, f, ensure_ascii=False, indent=4)
-            print(f"✅ ΓΕΦΥΡΑ: Οι στάσεις αποθηκεύτηκαν επιτυχώς στο project: '{project_name}'")
+            print(f"✅ ΓΕΦΥΡΑ: Οι στάσεις αποθηκεύτηκαν στο: '{project_dir / 'latest_traverse.json'}'")
         except Exception as e:
-            print(f"⚠️ Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης στο project: {e}")
-        # --------------------------------------------------------
+            print(f"⚠️ Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης: {e}")
 
         plot_base64 = None
         try:
@@ -364,9 +391,14 @@ def run_tachymetry():
         if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
         if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
         if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
-    df_st.rename(columns=rename_st, inplace=True)
+        df_st.rename(columns=rename_st, inplace=True)
 
-    project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
+    # --- ΓΕΦΥΡΑ: Φόρτωση στάσεων Όδευσης από το Project και Συγχώνευση ---
+    
+    # Χρήση της έξυπνης συνάρτησης
+    project_name = get_active_project_name()
+    print(f"🔍 [DEBUG TACHYMETRY] Το backend διάβασε project_name = '{project_name}'")
+    
     project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
     traverse_file = project_dir / "latest_traverse.json"
     

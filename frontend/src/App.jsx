@@ -208,7 +208,7 @@ function App() {
                 setData={setTraverseData}        
                 metrics={traverseMetrics} 
                 setMetrics={setTraverseMetrics}   
-                projectSettings={globalSettings}
+                projectSettings={currentProject} // <-- ΑΛΛΑΓΗ: currentProject
               />
             )}
             
@@ -216,6 +216,7 @@ function App() {
               <Tachymetry 
                 tachymetryData={tachymetryData} 
                 setTachymetryData={setTachymetryData} 
+                projectSettings={currentProject} // <-- ΑΛΛΑΓΗ: Προσθήκη currentProject και εδώ!
               />
             )}
 
