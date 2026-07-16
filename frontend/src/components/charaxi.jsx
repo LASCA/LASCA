@@ -166,7 +166,7 @@ const handleCalculate = async () => {
                 <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                   <span className="text-[10px] font-mono text-slate-400 font-bold">mij =</span>
                   <span className="text-emerald-400 text-xs text-center w-16 outline-none font-mono font-bold">
-                    {stakeoutData.mij !== undefined && stakeoutData.mij !== null ? Number(stakeoutData.mij).toFixed(4) : '---'}
+                    {stakeoutData.mij !== undefined && stakeoutData.mij !== null ? Number(stakeoutData.mij).toFixed(5) : '---'}
                   </span>
                 </div>
               </div>

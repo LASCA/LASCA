@@ -102,6 +102,47 @@ def save_project():
         print(f"❌ Σφάλμα κατά την αποθήκευση του project: {str(e)}")
         return jsonify({"error": "Αποτυχία αποθήκευσης δεδομένων"}), 500
 
+# ==========================================
+# 4. ENDPOINT ΓΙΑ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ (GONIOMETRY)
+# ==========================================
+@app.route('/api/goniometry', methods=['POST'])
+def run_goniometry():
+    data = request.json
+    rows = data.get('rows', [])
+    
+    if not rows:
+        return jsonify({"results": []})
+        
+    try:
+        # Μετατροπή σε DataFrame
+        df = pd.DataFrame(rows)
+        
+        # Μετονομασία στηλών για να ταιριάζουν με τη συνάρτηση gwn
+        df = df.rename(columns={
+            'faceI': 'Face I',
+            'faceII': 'Face II',
+            'to': 'To',
+            'from': 'From',
+            'period': 'Period'
+        })
+        
+        # ΕΔΩ Η ΔΙΟΡΘΩΣΗ: Μετατρέπουμε σε αριθμούς ΜΟΝΟ τις γωνιακές μετρήσεις
+        for col in ['Face I', 'Face II']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+        # Κλήση της συνάρτησης υπολογισμού (dpr.gwn)
+        res_df = dpr.gwn(df)
+        
+        # Μετατροπή πίσω σε λεξικό, αντικαθιστώντας τα NaN με κενά strings για να μην "σπάσει" το JSON
+        results = res_df.fillna("").to_dict('records')
+        
+        return jsonify({"results": results})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τον υπολογισμό Γωνιομετρήσεων:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
 # ==========================================
 # 1. ENDPOINT ΓΙΑ ΣΥΝΟΡΘΩΣΗ (ADJUSTMENT)

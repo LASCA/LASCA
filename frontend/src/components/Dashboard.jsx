@@ -13,7 +13,8 @@ const Dashboard = ({
   setObservations, 
   setTraverseData, 
   setTachymetryData, 
-  setStakeoutData, // <-- Λήψη του νέου prop
+  setStakeoutData, 
+  setGoniometryData,
   onOpenProjectManager
 }) => {
 
@@ -34,22 +35,26 @@ const Dashboard = ({
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
 
-        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT
-        const wsAdjustment = wb.Sheets[wb.SheetNames[0]];
-        const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
-        
-        if (dataAdj.length > 0) {
-          const formattedAdj = dataAdj.map((row, index) => ({
-            id: Date.now() + index,
-            station: row['Stations'] || row['Station'] || row['From'] || "",
-            target: row['Target'] || row['To'] || "",
-            Period: row['Period'] || "1",
-            Face_I: row['Hz [grad]'] || row['Face I'] || "0.0000",
-            Face_II: row['Face II'] || "200.0000",
-            adj_hz: "",
-            std_dev: ""
-          }));
-          setObservations(formattedAdj);
+        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT (Συνορθώση Σταθμού) - Πλέον ψάχνει ρητά το όνομα
+        const adjSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('synorthosi_stathmou'));
+        if (adjSheetName && setObservations) {
+          const wsAdjustment = wb.Sheets[adjSheetName];
+          const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
+          
+          if (dataAdj.length > 0) {
+            const formattedAdj = dataAdj.map((row, index) => ({
+              id: Date.now() + index,
+              station: row['Stations'] || row['Station'] || row['From'] || "",
+              target: row['Target'] || row['To'] || "",
+              Period: row['Period'] || "1",
+              Face_I: row['Hz [grad]'] || row['Face I'] || "0.0000",
+              Face_II: row['Face II'] || "200.0000",
+              adj_hz: "",
+              std_dev: ""
+            }));
+            setObservations(formattedAdj);
+            console.log("✅ Live Ingestion: Φορτώθηκε η Συνορθώση Σταθμού!");
+          }
         }
 
         // 2. ΔΙΑΒΑΣΜΑ TRAVERSE & ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ
@@ -112,7 +117,7 @@ const Dashboard = ({
           results: [] 
         });
 
-        // 4. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΧΑΡΑΞΗΣ (charaxi) <-- ΝΕΑ ΠΡΟΣΘΗΚΗ
+        // 4. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΧΑΡΑΞΗΣ (charaxi)
         const charaxiSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('charaxi'));
         if (charaxiSheetName) {
           const wsCharaxi = wb.Sheets[charaxiSheetName];
@@ -121,7 +126,6 @@ const Dashboard = ({
           if (dataCharaxi.length > 0) {
             const formattedCharaxi = dataCharaxi.map((row, index) => ({
               id: Date.now() + index,
-              // Fallbacks για ελληνικά ή αγγλικά headers στις στήλες
               name: row['Point'],
               x: row['E[m]'] ,
               y: row['N[m]'],
@@ -129,12 +133,32 @@ const Dashboard = ({
               dist_stake: ""
             }));
 
-            // Ενημερώνουμε μόνο τα points, διατηρώντας άθικτα τα station / backsight
             setStakeoutData(prev => ({
               ...prev,
               points: formattedCharaxi
             }));
             console.log("✅ Live Ingestion: Φορτώθηκαν τα σημεία χάραξης!");
+          }
+        }
+
+        // 5. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΓΩΝΙΟΜΕΤΡΗΣΕΩΝ (gwniometriseis)
+        const goniometrySheetName = wb.SheetNames.find(n => n.toLowerCase().includes('gwniometriseis'));
+        if (goniometrySheetName && setGoniometryData) {
+          const wsGoniometry = wb.Sheets[goniometrySheetName];
+          const dataGoniometry = XLSX.utils.sheet_to_json(wsGoniometry);
+
+          if (dataGoniometry.length > 0) {
+            const formattedGoniometry = dataGoniometry.map((row, index) => ({
+              id: Date.now() + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              period: row['Period'] !== undefined ? String(row['Period']) : "1",
+              faceI: row['Face I'] !== undefined ? String(row['Face I']) : "",
+              faceII: row['Face II'] !== undefined ? String(row['Face II']) : ""
+            }));
+
+            setGoniometryData(formattedGoniometry);
+            console.log("✅ Live Ingestion: Φορτώθηκαν οι Γωνιομετρήσεις!");
           }
         }
 

@@ -195,6 +195,7 @@ function App() {
                 setTraverseData={setTraverseData}
                 setTachymetryData={setTachymetryData}
                 setStakeoutData={setStakeoutData}
+                setGoniometryData={setGoniometryData} // <--- 1. ΠΡΟΣΤΕΘΗΚΕ ΕΔΩ
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
             )}
@@ -236,8 +237,8 @@ function App() {
             {/* 3. CONDITIONAL RENDERING ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ */}
             {activeTab === 'goniometry' && (
               <Goniometry 
-                results={goniometryData}
-                setResults={setGoniometryData}
+                rows={goniometryData}      // <--- 2. ΑΛΛΑΞΕ ΑΠΟ results ΣΕ rows
+                setRows={setGoniometryData} // <--- 2. ΑΛΛΑΞΕ ΑΠΟ setResults ΣΕ setRows
               />
             )}
 

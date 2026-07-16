@@ -17,6 +17,16 @@ const Header = ({ activeTab }) => {
             { label: "DATA_NODES", value: "STANDBY", valColor: "text-emerald-500" }
           ]
         };
+      case 'goniometry': 
+        return { 
+          label: "Angle Measurements",
+          accentLine: "border-cyan-500",
+          textAccent: "text-cyan-500",
+          bgAccent: "bg-cyan-500",
+          stats: [
+            { label: "SUBJECT", value: "TOPO I", valColor: "text-cyan-400" },
+          ]
+        };
       case 'adjustment':
         return { 
           code: "CALC-ENG-04", 
@@ -25,6 +35,7 @@ const Header = ({ activeTab }) => {
           textAccent: "text-emerald-500",
           bgAccent: "bg-emerald-500",
           stats: [
+            { label: "SUBJECT", value: "ASKISEIS YPAITHROU", valColor: "text-cyan-400" },
             { label: "ALGORITHM", value: "LEAST_SQ", valColor: "text-emerald-400" },
           ]
         };
