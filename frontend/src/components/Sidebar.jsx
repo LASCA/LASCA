@@ -1,15 +1,39 @@
-import React from 'react';
-import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers, ChevronDown } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
-  // Προσθήκη του αντικειμένου για τη Χάραξη στο menuItems array
+  // Νέο state για να ελέγχουμε αν το dropdown των μετρήσεων είναι ανοιχτό
+  const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
+
+  // Ανανεωμένη δομή μενού με υπο-καρτέλες
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'adjustment', label: 'Συνόρθωση', icon: <Target size={20} /> },
+    { 
+      id: 'station_measurements', 
+      label: 'Μετρήσεις Σταθμού', 
+      icon: <Target size={20} />,
+      subItems: [
+        { id: 'goniometry', label: 'Γωνιομετρήσεις' },
+        { id: 'adjustment', label: 'Συνόρθωση Σταθμού' },
+        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομ.' },
+        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστ.' }
+      ]
+    },
     { id: 'traverse', label: 'Όδευση', icon: <Compass size={20} /> },
     { id: 'mapping', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
-    { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> }, // <-- Η ΝΕΑ ΚΑΡΤΕΛΑ
+    { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> },
   ];
+
+  const handleItemClick = (item) => {
+    if (item.subItems) {
+      // Αν το sidebar είναι κλειστό, το ανοίγουμε αυτόματα
+      if (!isOpen) setIsOpen(true);
+      // Ανοιγοκλείνουμε το dropdown
+      setIsStationMenuOpen(!isStationMenuOpen);
+    } else {
+      setActiveTab(item.id);
+    }
+  };
 
   return (
     <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative`}>
@@ -36,24 +60,58 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-hidden">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center ${isOpen ? 'px-4 justify-between' : 'justify-center'} py-3 rounded-xl transition-all ${
-              activeTab === item.id 
-              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_0_10px_rgba(37,99,235,0.05)]' 
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white border border-transparent'
-            }`}
-          >
-            <div className="flex items-center gap-3 shrink-0">
-              {item.icon}
-              {isOpen && <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>}
+      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        {menuItems.map((item) => {
+          // Ελέγχουμε αν κάποιο από τα subItems είναι το activeTab για να κρατήσουμε το parent "αναμμένο"
+          const hasActiveSubItem = item.subItems?.some(sub => sub.id === activeTab);
+          const isParentActive = activeTab === item.id || hasActiveSubItem;
+
+          return (
+            <div key={item.id} className="flex flex-col gap-1">
+              <button
+                onClick={() => handleItemClick(item)}
+                className={`w-full flex items-center ${isOpen ? 'px-4 justify-between' : 'justify-center'} py-3 rounded-xl transition-all ${
+                  isParentActive 
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_0_10px_rgba(37,99,235,0.05)]' 
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-3 shrink-0">
+                  {item.icon}
+                  {isOpen && <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>}
+                </div>
+                
+                {/* Εικονίδιο για Dropdown ή απλό βέλος */}
+                {isOpen && item.subItems && (
+                  <ChevronDown 
+                    size={16} 
+                    className={`transition-transform duration-300 ${isStationMenuOpen ? 'rotate-180 text-blue-400' : 'opacity-50'}`} 
+                  />
+                )}
+                {isOpen && !item.subItems && activeTab === item.id && <ChevronRight size={16} className="opacity-50" />}
+              </button>
+
+              {/* Sub-Items (Dropdown) */}
+              {item.subItems && isStationMenuOpen && isOpen && (
+                <div className="flex flex-col gap-1 pl-11 pr-2 py-1 mt-1 animate-in slide-in-from-top-2 fade-in duration-200">
+                  {item.subItems.map((subItem) => (
+                    <button
+                      key={subItem.id}
+                      onClick={() => setActiveTab(subItem.id)}
+                      className={`text-left text-sm py-2 px-3 rounded-lg transition-colors ${
+                        activeTab === subItem.id
+                          ? 'bg-blue-600/20 text-blue-300 font-medium'
+                          : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      {subItem.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {isOpen && activeTab === item.id && <ChevronRight size={16} className="opacity-50" />}
-          </button>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer Sidebar */}
