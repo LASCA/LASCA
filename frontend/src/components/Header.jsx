@@ -17,6 +17,7 @@ const Header = ({ activeTab }) => {
             { label: "DATA_NODES", value: "STANDBY", valColor: "text-emerald-500" }
           ]
         };
+
       case 'goniometry': 
         return { 
           label: "Angle Measurements",
@@ -24,13 +25,14 @@ const Header = ({ activeTab }) => {
           textAccent: "text-cyan-500",
           bgAccent: "bg-cyan-500",
           stats: [
-            { label: "SUBJECT", value: "TOPO I", valColor: "text-cyan-400" },
+            { label: "SUBJECT", value: "TOPO I/ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" }
           ]
         };
+
       case 'adjustment':
         return { 
-          code: "CALC-ENG-04", 
-          label: "STATION_ADJUSTMENT",
+          code: "", 
+          label: "Station Adjustment",
           accentLine: "border-emerald-500",
           textAccent: "text-emerald-500",
           bgAccent: "bg-emerald-500",
@@ -39,33 +41,65 @@ const Header = ({ activeTab }) => {
             { label: "ALGORITHM", value: "LEAST_SQ", valColor: "text-emerald-400" },
           ]
         };
+
+      case 'trig_leveling': 
+        return { 
+          label: "Trigonometric Leveling",
+          accentLine: "border-cyan-500",
+          textAccent: "text-cyan-500",
+          bgAccent: "bg-cyan-500",
+          stats: [
+            { label: "SUBJECT", value: "TOPO ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" }
+          ]
+        };
+
+      case 'geom_leveling': 
+        return { 
+          label: "Spirit Leveling",
+          accentLine: "border-cyan-500",
+          textAccent: "text-cyan-500",
+          bgAccent: "bg-cyan-500",
+          stats: [
+            { label: "SUBJECT", value: "TOPO I/ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" },
+          ]
+        };
+
       case 'traverse':
         return { 
-          code: "GEO-TRV-07", 
-          label: "TRAVERSE_NETWORK",
+          code: "", 
+          label: "Traverse",
           accentLine: "border-amber-500",
           textAccent: "text-amber-500",
           bgAccent: "bg-amber-500",
-          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση της όδευσης
+          stats: [
+            { label: "SUBJECT", value: "TOPO ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" }
+          ] 
         };
+
       case 'tachymetry':
         return { 
-          code: "GEO-TACH-05", 
-          label: "TACHYMETRY",
+          code: "", 
+          label: "Tachymetry",
           accentLine: "border-pink-500",
           textAccent: "text-pink-500",
           bgAccent: "bg-pink-500",
-          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση της ταχυμετρίας
+          stats: [
+            { label: "SUBJECT", value: "TOPO ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" }
+          ] 
         };
-      case 'mapping':
+
+      case 'stakeout':
         return { 
-          code: "GEO-MAP-08", 
-          label: "DIGITAL_MAPPING",
-          accentLine: "border-purple-500",
-          textAccent: "text-purple-500",
-          bgAccent: "bg-purple-500",
-          stats: [] // Άδειο array για να μην εμφανίζεται τίποτα στη μέση του mapping
+          code: "", 
+          label: "Stakeout",
+          accentLine: "border-emerald-500",
+          textAccent: "text-emerald-500",
+          bgAccent: "bg-emerald-500",
+          stats: [
+            { label: "SUBJECT", value: "ASKISEIS YPAITHROU", valColor: "text-cyan-400" }
+          ]
         };
+      
       default:
         return { 
           code: "CORE-V2", 

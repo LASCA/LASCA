@@ -9,7 +9,8 @@ import Traverse from './components/Traverse';
 import Tachymetry from './components/Tachymetry'; 
 import ProjectManager from './components/project_manager'; 
 import Charaxi from './components/charaxi'; 
-import Goniometry from './components/gwniometriseis'; // 1. IMPORT ΤΟΥ ΝΕΟΥ COMPONENT
+import Goniometry from './components/gwniometriseis'; 
+import Leveling from './components/leveling';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -37,8 +38,17 @@ function App() {
     points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
   });
 
-  // 2. ΝΕΟ STATE ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ (Ξεκινάει ως άδειος πίνακας)
+  // ΝΕΟ STATE ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ
   const [goniometryData, setGoniometryData] = useState([]);
+
+  // --- ΝΕΑ STATES ΓΙΑ ΤΗ ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ ---
+  const [levelingForward, setLevelingForward] = useState([
+    { id: 1, point: 'BM1', backsight: '', foresight: '', dh: '', elevation: '' },
+  ]);
+  const [levelingBackward, setLevelingBackward] = useState([
+    { id: 1, point: 'BM2', backsight: '', foresight: '', dh: '', elevation: '' },
+  ]);
+  const [levelingMetrics, setLevelingMetrics] = useState({});
 
   // "Κλειδαριά" για το Auto-Save
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -73,6 +83,11 @@ function App() {
           // Φόρτωση γωνιομετρήσεων από το backend JSON
           setGoniometryData(backendData.goniometryData || []);
 
+          // Φόρτωση χωροστάθμισης από το backend JSON
+          setLevelingForward(backendData.levelingForward || []);
+          setLevelingBackward(backendData.levelingBackward || []);
+          setLevelingMetrics(backendData.levelingMetrics || {});
+
           console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
           setIsDataLoaded(true);
         }
@@ -86,7 +101,7 @@ function App() {
     }
   }, []);
 
-  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ (Προσθήκη του goniometryData) ---
+  // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
   useEffect(() => {
     if (!currentProject || !isDataLoaded) return; 
 
@@ -100,7 +115,11 @@ function App() {
       metrics: traverseMetrics,
       tachymetryData: tachymetryData,
       stakeoutData: stakeoutData,
-      goniometryData: goniometryData // Προσθήκη στη δομή αποθήκευσης
+      goniometryData: goniometryData,
+      // Προσθήκη χωροστάθμισης στη δομή αποθήκευσης
+      levelingForward: levelingForward,
+      levelingBackward: levelingBackward,
+      levelingMetrics: levelingMetrics
     };
 
     savedProjects[currentProject] = projectState;
@@ -119,12 +138,26 @@ function App() {
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
-        console.log(`💾 Auto-save: Το αρχείο .json ενημερώθηκε και με τις Γωνιομετρήσεις!`);
+        console.log(`💾 Auto-save: Το αρχείο .json ενημερώθηκε και με τη Χωροστάθμιση!`);
       }
     })
     .catch(err => console.error("❌ Το Auto-save απέτυχε στο Backend:", err));
 
-  }, [currentProject, isDataLoaded, globalSettings, observations, adjMetrics, traverseData, traverseMetrics, tachymetryData, stakeoutData, goniometryData]);
+  }, [
+    currentProject, 
+    isDataLoaded, 
+    globalSettings, 
+    observations, 
+    adjMetrics, 
+    traverseData, 
+    traverseMetrics, 
+    tachymetryData, 
+    stakeoutData, 
+    goniometryData,
+    levelingForward,  // Παρακολούθηση για auto-save
+    levelingBackward, // Παρακολούθηση για auto-save
+    levelingMetrics   // Παρακολούθηση για auto-save
+  ]);
 
 
   // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
@@ -147,6 +180,11 @@ function App() {
 
     // Φόρτωση γωνιομετρήσεων κατά την αλλαγή project
     setGoniometryData(projectData.goniometryData || []);
+
+    // Φόρτωση χωροστάθμισης κατά την αλλαγή project
+    setLevelingForward(projectData.levelingForward || []);
+    setLevelingBackward(projectData.levelingBackward || []);
+    setLevelingMetrics(projectData.levelingMetrics || {});
 
     setIsDataLoaded(true);
     setIsProjectModalOpen(false);
@@ -195,7 +233,7 @@ function App() {
                 setTraverseData={setTraverseData}
                 setTachymetryData={setTachymetryData}
                 setStakeoutData={setStakeoutData}
-                setGoniometryData={setGoniometryData} // <--- 1. ΠΡΟΣΤΕΘΗΚΕ ΕΔΩ
+                setGoniometryData={setGoniometryData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
             )}
@@ -219,7 +257,7 @@ function App() {
               />
             )}
             
-            {activeTab === 'mapping' && (
+            {activeTab === 'tachymetry' && (
               <Tachymetry 
                 tachymetryData={tachymetryData} 
                 setTachymetryData={setTachymetryData} 
@@ -234,11 +272,23 @@ function App() {
               />
             )}
 
-            {/* 3. CONDITIONAL RENDERING ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ */}
             {activeTab === 'goniometry' && (
               <Goniometry 
-                rows={goniometryData}      // <--- 2. ΑΛΛΑΞΕ ΑΠΟ results ΣΕ rows
-                setRows={setGoniometryData} // <--- 2. ΑΛΛΑΞΕ ΑΠΟ setResults ΣΕ setRows
+                rows={goniometryData}      
+                setRows={setGoniometryData} 
+              />
+            )}
+
+            {/* CONDITIONAL RENDERING ΓΙΑ ΤΗ ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ */}
+            {activeTab === 'geom_leveling' && (
+              <Leveling 
+                forwardData={levelingForward}
+                setForwardData={setLevelingForward}
+                backwardData={levelingBackward}
+                setBackwardData={setLevelingBackward}
+                metrics={levelingMetrics}
+                setMetrics={setLevelingMetrics}
+                projectSettings={currentProject}
               />
             )}
 

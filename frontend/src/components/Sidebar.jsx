@@ -15,12 +15,12 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       subItems: [
         { id: 'goniometry', label: 'Γωνιομετρήσεις' },
         { id: 'adjustment', label: 'Συνόρθωση Σταθμού' },
-        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομ.' },
-        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστ.' }
+        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομετρία' },
+        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση' }
       ]
     },
     { id: 'traverse', label: 'Όδευση', icon: <Compass size={20} /> },
-    { id: 'mapping', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
+    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
     { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> },
   ];
 
