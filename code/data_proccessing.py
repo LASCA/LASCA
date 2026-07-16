@@ -577,6 +577,42 @@ def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decim
                 fmt_linear(r.Y)
             ])
 
+#Gwniometriseis
+def gwn(dataframe):
+    # Αντίγραφο για ασφάλεια
+    df = dataframe.copy()
+    
+    # 1. Μέσος Όρος [ I + (II - 200) ] / 2
+    face_I = df['Face I']
+    face_II = df['Face II']
+    df['mesos_oros'] = (face_I + (face_II - 200)) / 2
+    
+    # 2. Ανηγμένη Τιμή (αφαίρεση της 1ης μέτρησης κάθε περιόδου)
+    df['anigmeni_timi'] = df['mesos_oros'] - df.groupby('Period')['mesos_oros'].transform('first')
+    df['anigmeni_timi'] = df['anigmeni_timi'].apply(lambda x: x + 400 if x < 0 else x)
+    
+    # 3. Γενικός Μέσος Όρος ανά σημείο σκόπευσης ("To")
+    # Υπολογίζουμε τον μέσο όρο των ανηγμένων τιμών για κάθε στόχο ("To") σε όλο το dataframe
+    genikos_mesos_map = df.groupby('To')['anigmeni_timi'].mean().to_dict()
+    df['genikos_mesos'] = df['To'].map(genikos_mesos_map)
+    
+    # 4. Υπολογισμός v_ji = (Γενικός Μέσος - Ανηγμένη Τιμή) σε cc
+    # Πολλαπλασιάζουμε με 10000 για να μετατρέψουμε τα grad σε cc (1 grad = 10000 cc)
+    df['v_m'] = (df['genikos_mesos'] - df['anigmeni_timi']) * 10000
+    
+    # 5. Υπολογισμός v'_j (Διόρθωση σταθμού ανά περίοδο)
+    # Βρίσκουμε το μέσο όρο των v_ji για κάθε περίοδο 'Period'
+    v_prime_map = df.groupby('Period')['v_m'].mean().to_dict()
+    df['v_prime'] = df['Period'].map(v_prime_map)
+    
+    # 6. Υπολογισμός v_ji'' = v_ji - v'_j
+    df['v_ji'] = df['v_m'] - df['v_prime']
+    
+    # 7. Υπολογισμός vv = (v_ji'')^2
+    df['vv'] = df['v_ji'] ** 2
+    
+    return df
+
 # SYNORTHOSI STATHMOY
 
 def solve_lsa_detailed(observations):
