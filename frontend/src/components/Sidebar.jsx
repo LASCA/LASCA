@@ -8,7 +8,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   // Ανανεωμένη δομή μενού με υπο-καρτέλες
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'basic_calc', label: 'Τοπογραφικοί Υπολογισμοί', icon: <Calculator size={20} /> },
+    
     { 
       id: 'station_measurements', 
       label: 'Μετρήσεις Σταθμού', 
@@ -20,6 +20,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση' }
       ]
     },
+    { id: 'basic_calc', label: 'Βασικοί Υπολογισμοί', icon: <Calculator size={20} /> },
     { id: 'traverse', label: 'Όδευση', icon: <Compass size={20} /> },
     { id: 'tachymetry', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
     { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> },
