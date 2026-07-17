@@ -615,16 +615,20 @@ def gwn(dataframe):
 
 # SYNORTHOSI STATHMOY
 
+import numpy as np
+import pandas as pd
+
 def solve_lsa_detailed(observations):
     """
     Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
+    Διατηρεί τον πραγματικό προσανατολισμό του 1ου σημείου χωρίς να αλλοιώνει τα σφάλματα.
     """
     df = pd.DataFrame(observations)
     points = df['to'].unique().tolist()
     periods = df['per'].unique().tolist()
     m, r_count = len(points), len(periods)
     
-    # 1. Μέσοι όροι (πάντα υπολογίζονται)
+    # 1. Μέσοι όροι (πάντα υπολογίζονται γύρω από το 0 για ασφάλεια πινάκων)
     reduced_matrix = np.zeros((m, r_count))
     for k, per in enumerate(periods):
         p_obs = df[df['per'] == per].groupby('to')['val'].mean()
@@ -633,10 +637,19 @@ def solve_lsa_detailed(observations):
             diff = p_obs.loc[pt] - base_val
             reduced_matrix[i, k] = (diff + 200) % 400 - 200
 
+    # Αυτό παραμένει κεντραρισμένο στο 0, ώστε να δουλέψουν σωστά τα theta_k και v_val
     final_means_array = np.mean(reduced_matrix, axis=1)
-    final_means = [(val % 400.0) for val in final_means_array]
+
+    # ---- Η ΛΥΣΗ: ΣΤΡΟΦΗ ΣΤΟ ΤΕΛΟΣ ----
+    # Βρίσκουμε τον αρχικό προσανατολισμό (π.χ. 50 gon) του 1ου σημείου από την 1η περίοδο.
+    ref_angle = df[df['per'] == periods[0]].groupby('to')['val'].mean().loc[points[0]]
+    
+    # Μεταφέρουμε τα τελικά αποτελέσματα στο σωστό σύστημα (αναγωγή στο ref_angle αντί για 0).
+    final_means = [(val + ref_angle) % 400.0 for val in final_means_array]
+    # ----------------------------------
 
     # 2. Έλεγχος Βαθμών Ελευθερίας
+    # Από εδώ και κάτω δεν αλλάζει ΤΙΠΟΤΑ. Όλη η LSA χρησιμοποιεί το 0-centered final_means_array.
     f = (m - 1) * (r_count - 1)
     
     v_matrix = np.zeros((m, r_count))
@@ -680,16 +693,16 @@ def solve_lsa_detailed(observations):
                 'sv': sv_calculated, 'ext_v': t_ik
             })
             
-    # Τυπική απόκλιση μέσου όρου (αν r=1, βάζουμε 0 ή μια τυπική τιμή οργάνου)
+    # Τυπική απόκλιση μέσου όρου
     std_mean = (sigma_0 / np.sqrt(r_count)) if r_count > 1 else 0.0
     std_display = f"{std_mean:.2f}" if r_count > 1 else "--"
     
+    # Εδώ τροφοδοτείται ο πίνακας του frontend με τα σωστά στραμμένα final_means!
     results = [[pt, f"{final_means[i]:.5f}", std_display] for i, pt in enumerate(points)]
     
     stats = {'var': total_vv/f if f>0 else 0, 'std': sigma_0, 'f': f, 'vv': total_vv}
     
-    return results, stats, section_3_rows 
-
+    return results, stats, section_3_rows
 
 def process_network_data(raw_data):
     """

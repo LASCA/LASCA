@@ -370,51 +370,80 @@ const Leveling = ({
           </div>
         </div>
 
-        {/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ ΧΩΡΟΣΤΑΘΜΙΣΗΣ */}
+        {/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ ΧΩΡΟΣΤΑΘΜΙΣΗΣ (ΝΕΟ SIDE-BY-SIDE) */}
         <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
           <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
             <Activity size={16} className="text-cyan-500" />
-            <span className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">Έλεγχοι Χωροστάθμισης & Σφάλματα</span>
+            <span className="text-[10px] font-black text-slate-400 tracking-[0.2em]">Συγκριτικός Έλεγχος Μετάβασης / Επιστροφής</span>
           </div>
           
           <div className="flex flex-row gap-4 items-stretch">
-            {/* Αριστερή Στήλη: Σταθμοί & Μήκος */}
-            <div className="flex-1 flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-2">
-                <CompactStat label="Σταθμοί (n)" value={metrics.n} icon={<Target size={12}/>} color="text-slate-200" />
-                <CompactStat label="Μήκος Όδευσης (L)" value={metrics.totalLength} unit=" km" icon={<Ruler size={12}/>} color="text-slate-200" />
-              </div>
-              <DetailedGroup 
-                title="Υψομετρικός Έλεγχος (ΣΔh)"
-                target={metrics.dhTarget} actual={metrics.dhActual} error={metrics.fh} wbi={metrics.fh_mm}
-                labels={["ΣΔh (Μετάβαση)", "ΣΔh (Επιστροφή)", "fh (Σφάλμα)", "fh (σε mm)"]}
-                errorColor="text-rose-400"
+            {/* Αριστερή Στήλη: ΜΕΤΑΒΑΣΗ */}
+            <div className="flex-1">
+              <DirectionStatsGroup 
+                title="1. ΜΕΤΑΒΑΣΗ"
+                sumBS={metrics.forwardSumBS} sumBS_S={metrics.forwardSumBS_S}
+                sumFS={metrics.forwardSumFS} sumFS_S={metrics.forwardSumFS_S}
+                dh={metrics.forwardDh} totalS={metrics.forwardTotalS}
+                themeColor="blue"
               />
             </div>
 
-            {/* Δεξιά Στήλη: Ανάλυση Ανοχών */}
+            {/* Δεξιά Στήλη: ΕΠΙΣΤΡΟΦΗ */}
             <div className="flex-1">
-              <ToleranceAnalysisGroup 
-                title="Ανάλυση Ανοχών"
-                fh={metrics.fh_mm}
-                limit={metrics.fh_limit}
-                status={metrics.status}
-                labels={["Σφάλμα fh (mm)", "Επιτρεπτό Th (mm)", "Κατάσταση Ελέγχου"]}
+              <DirectionStatsGroup 
+                title="2. ΕΠΙΣΤΡΟΦΗ"
+                sumBS={metrics.backwardSumBS} sumBS_S={metrics.backwardSumBS_S}
+                sumFS={metrics.backwardSumFS} sumFS_S={metrics.backwardSumFS_S}
+                dh={metrics.backwardDh} totalS={metrics.backwardTotalS}
+                themeColor="emerald"
               />
             </div>
           </div>
 
-          {/* Μέγιστες επιτρεπόμενες τιμές (Κάτω μπάρα) */}
-          <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
-             <div className="grid grid-cols-2 gap-6">
-               <div className="flex flex-col gap-1">
-                 <span className="text-[10px] text-slate-500 font-black tracking-tighter uppercase">Μέγιστο Επιτρεπτό Σφάλμα (Th Max)</span>
-                 <span className="text-xs font-mono font-bold text-rose-400">{metrics.fh_limit || "---"} mm</span>
+          {/* Μπάρα Σφαλμάτων - Ισομοιρασμένος χώρος */}
+          <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 flex items-center justify-between w-full">
+             
+             {/* Περιτύλιγμα στηλών που απλώνεται */}
+             <div className="flex flex-1 divide-x divide-slate-800/50 mr-6">
+               
+               {/* 1. S Ολικό */}
+               <div className="flex-1 flex flex-col gap-1 pr-4">
+                 <span className="text-[10px] text-slate-500 font-black tracking-tighter">S ολικο (Sμετ.+Sεπιστρ)/2</span>
+                 <span className="text-sm font-mono font-bold text-slate-200">
+                   {metrics.totalMeanS !== undefined ? metrics.totalMeanS : "---"}
+                 </span>
                </div>
-               <div className="flex flex-col gap-1 border-l border-slate-800/50 px-6">
-                 <span className="text-[10px] text-slate-500 font-black tracking-tighter uppercase">Τελικό Υψόμετρο Κλεισίματος</span>
-                 <span className="text-xs font-mono font-bold text-emerald-500">{metrics.finalElevation || "---"} m</span>
+
+               {/* 2. Διαφορά δh */}
+               <div className="flex-1 flex flex-col gap-1 px-4">
+                 <span className="text-[10px] text-slate-500 font-black tracking-tighter">δh μεταβασης - δh επιστροφης</span>
+                 <span className="text-sm font-mono font-bold text-rose-400">
+                   {metrics.dhDiff !== undefined ? metrics.dhDiff : "---"}
+                 </span>
                </div>
+
+               {/* 3. Όριο Σφάλματος */}
+               <div className="flex-1 flex flex-col gap-1 px-4">
+                 <span className="text-[10px] text-slate-500 font-black tracking-tighter">Οριο σφαλματος</span>
+                 <span className="text-sm font-mono font-bold text-slate-300">
+                   {metrics.errorLimit !== undefined ? metrics.errorLimit : "---"}
+                 </span>
+               </div>
+             </div>
+             
+             {/* Οπτική Ένδειξη Κατάστασης (παραμένει σταθερή δεξιά) */}
+             <div className="flex-none">
+                {metrics.status ? (
+                  <div className="flex items-center gap-2 bg-[#070c19] px-4 py-2 rounded-lg border border-slate-800">
+                    <span className={`w-2.5 h-2.5 rounded-full ${metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                    <span className={`text-[12px] font-black tracking-wider ${metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'Εντός Ανοχής' : 'Εκτός Ανοχής'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[12px] font-mono text-slate-500 font-bold">---</span>
+                )}
              </div>
           </div>
         </div>
@@ -425,77 +454,49 @@ const Leveling = ({
   );
 };
 
-// --- Sub-Components ---
-const CompactStat = ({ label, value, unit, icon, color }) => (
-  <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
-    <div className="text-slate-500">{icon}</div>
-    <div className="flex flex-col">
-      <span className="text-[8px] font-black text-slate-500 tracking-widest uppercase">{label}</span>
-      <span className={`text-sm font-mono font-bold ${color}`}>
-        {value !== undefined && value !== null ? value : "0"}{unit || ""}
-      </span>
-    </div>
-  </div>
-);
+// --- Νέο Sub-Component Στατιστικών Κατεύθυνσης ---
+const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS, themeColor }) => {
+  const colorClass = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
+  const borderColorClass = themeColor === 'blue' ? 'border-blue-500/20' : 'border-emerald-500/20';
 
-const DetailedGroup = ({ title, target, actual, error, wbi, labels, errorColor = "text-amber-500" }) => (
-  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3">
-    <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
-    
-    <div className="grid grid-cols-2 gap-4 text-center border-b border-slate-800/30 pb-3">
-      <div className="flex flex-col gap-1">
-        <span className="text-[9px] text-slate-500 font-bold uppercase">{labels[0]}</span>
-        <span className="text-[12px] font-mono text-slate-200">{target || "---"} m</span>
-      </div>
-      <div className="flex flex-col gap-1 border-l border-slate-800/50">
-        <span className="text-[9px] text-slate-500 font-bold uppercase">{labels[1]}</span>
-        <span className="text-[12px] font-mono text-slate-200">{actual || "---"} m</span>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-2 gap-4 pt-1">
-      <div className="flex justify-between items-center px-2">
-        <span className={`text-[9px] ${errorColor}/70 font-bold uppercase`}>{labels[2]}</span>
-        <span className={`text-[13px] font-mono font-bold ${errorColor}`}>{error || "---"} m</span>
-      </div>
-      <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
-        <span className={`text-[9px] ${errorColor}/70 font-bold uppercase`}>{labels[3]}</span>
-        <span className={`text-[13px] font-mono font-bold ${errorColor}`}>{wbi || "---"} mm</span>
-      </div>
-    </div>
-  </div>
-);
-
-const ToleranceAnalysisGroup = ({ title, fh, limit, status, labels }) => {
-  const isOk = status === "Εντός Ανοχής" || status === "OK" || status === true;
-  
   return (
-    <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3 h-full">
-      <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
+    <div className={`bg-slate-900/60 p-4 rounded-xl border ${borderColorClass} flex flex-col gap-3 h-full`}>
+      <span className={`text-[11px] font-black ${colorClass} tracking-widest border-b border-slate-800 pb-2 uppercase`}>{title}</span>
       
+      {/* 1η Γραμμή: Αθροίσματα Οπισθοσκοπεύσεων */}
       <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">{labels[0]}</span>
-          <span className="text-[14px] font-mono text-rose-400 font-bold">{fh || "---"} mm</span>
+          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ο</span>
+          <span className="text-[13px] font-mono text-slate-200 font-bold">{sumBS !== undefined ? sumBS : "---"}</span>
         </div>
         <div className="flex flex-col gap-1 border-l border-slate-800/50">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">{labels[1]}</span>
-          <span className="text-[14px] font-mono text-slate-200 font-bold">{limit || "---"} mm</span>
+          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Απόστασης S (Ο)</span>
+          <span className="text-[13px] font-mono text-slate-200 font-bold">{sumBS_S !== undefined ? sumBS_S : "---"}</span>
         </div>
       </div>
 
-      <div className="flex justify-between items-center px-2 mt-auto pt-4">
-        <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">{labels[2]}</span>
-        {status ? (
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${isOk ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
-            <span className={`text-[12px] font-black uppercase tracking-wider ${isOk ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isOk ? 'Εντός Ανοχής' : 'Εκτός Ανοχής'}
-            </span>
-          </div>
-        ) : (
-          <span className="text-[12px] font-mono text-slate-500 font-bold">---</span>
-        )}
+      {/* 2η Γραμμή: Αθροίσματα Εμπροσθοσκοπεύσεων */}
+      <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ε</span>
+          <span className="text-[13px] font-mono text-slate-200 font-bold">{sumFS !== undefined ? sumFS : "---"}</span>
+        </div>
+        <div className="flex flex-col gap-1 border-l border-slate-800/50">
+          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Απόστασης S (Ε)</span>
+          <span className="text-[13px] font-mono text-slate-200 font-bold">{sumFS_S !== undefined ? sumFS_S : "---"}</span>
+        </div>
+      </div>
+
+      {/* Τελευταία Γραμμή: δh & Ολικό S */}
+      <div className="grid grid-cols-2 gap-4 pt-1 mt-auto">
+        <div className="flex justify-between items-center px-2">
+          <span className={`text-[10px] ${colorClass}/70 font-bold uppercase`}>δh</span>
+          <span className={`text-[14px] font-mono font-black ${colorClass}`}>{dh !== undefined ? dh : "---"}</span>
+        </div>
+        <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
+          <span className={`text-[10px] ${colorClass}/70 font-bold uppercase`}>S Ολικό</span>
+          <span className={`text-[14px] font-mono font-black ${colorClass}`}>{totalS !== undefined ? totalS : "---"}</span>
+        </div>
       </div>
     </div>
   );
