@@ -223,7 +223,7 @@ const Leveling = ({
                           onChange={(e) => handleInputChange(idx, 'point', e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, idx, 'point')}
                           className="bg-transparent w-full font-bold text-slate-400 group-hover:text-emerald-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-1 py-2 transition-all"
-                          placeholder="Όνομα..."
+                          placeholder=""
                         />
                       </td>
                       

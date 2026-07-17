@@ -33,7 +33,7 @@ def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     plt.rcParams['font.family'] = 'Segoe UI'
     
     fig, ax = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor('#030712') # Το άλλαξα ελαφρώς για να ταιριάζει ακριβώς με το bg του React σου
+    fig.patch.set_facecolor('#030712') # Ταιριάζει με το background
     ax.set_facecolor('#030712')
 
     # 3. LOLLIPOP CHART LOGIC
@@ -41,12 +41,31 @@ def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     ax.scatter(names, stds, color='#00FFFF', s=150, alpha=0.3, zorder=4)
     ax.scatter(names, stds, color='#00FFFF', edgecolors='white', linewidths=1.5, s=60, zorder=5)
 
+    # ΠΡΟΣΘΗΚΗ LABELS ΜΕ ΤΙΣ ΤΙΜΕΣ
+    for name, std in zip(names, stds):
+        ax.annotate(
+            f'{std:.2f}',                  # Η τιμή με 2 δεκαδικά ψηφία
+            xy=(name, std),                # Το ακριβές σημείο (x, y)
+            xytext=(0, 12),                # Μετατόπιση κειμένου 12 pixels πιο πάνω 
+            textcoords='offset points',
+            ha='center',                   # Οριζόντιο κεντράρισμα
+            va='bottom',                   # Το κάτω μέρος του κειμένου ακουμπάει την απόσταση xytext
+            color='white',                 # Χρώμα κειμένου
+            fontsize=10,
+            fontweight='bold'
+        )
+
     # 4. Αισθητικές παρεμβάσεις
     ax.set_title("Τυπικές Αποκλίσεις Στάσεων", loc='left', fontsize=14, fontweight='bold', pad=15)
     ax.set_xlabel("Στάση Οργάνου", fontsize=11, fontweight='bold')
     ax.set_ylabel("Τυπική Απόκλιση σ (cc)", fontsize=11, fontweight='bold')
     
-    ax.set_ylim(bottom=0)
+    # Προσθήκη δυναμικού ορίου στον άξονα Y, δίνοντας 15% περισσότερο χώρο στο πάνω μέρος
+    if stds:
+        ax.set_ylim(bottom=0, top=max(stds) * 1.15)
+    else:
+        ax.set_ylim(bottom=0)
+
     ax.grid(True, linestyle=':', alpha=0.3, axis='y')
     ax.axhline(0, color='#333333', linewidth=2)
 
