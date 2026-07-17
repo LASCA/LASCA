@@ -99,6 +99,18 @@ const Header = ({ activeTab }) => {
             { label: "SUBJECT", value: "ASKISEIS YPAITHROU", valColor: "text-cyan-400" }
           ]
         };
+
+        case 'basic_calc':
+        return { 
+          code: "", 
+          label: "Basic Calculations",
+          accentLine: "border-emerald-500",
+          textAccent: "text-emerald-500",
+          bgAccent: "bg-emerald-500",
+          stats: [
+            { label: "SUBJECT", value: "TOPO I/II", valColor: "text-cyan-400" }
+          ]
+        };
       
       default:
         return { 

@@ -11,6 +11,7 @@ import ProjectManager from './components/project_manager';
 import Charaxi from './components/charaxi'; 
 import Goniometry from './components/gwniometriseis'; 
 import Leveling from './components/leveling';
+import BasicCalculations from './components/Basic_Calc';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -236,6 +237,10 @@ function App() {
                 setGoniometryData={setGoniometryData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
+            )}
+
+            {activeTab === 'basic_calc' && (
+              <BasicCalculations />
             )}
             
             {activeTab === 'adjustment' && (

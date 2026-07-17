@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers, ChevronDown, Calculator } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   // Νέο state για να ελέγχουμε αν το dropdown των μετρήσεων είναι ανοιχτό
@@ -8,6 +8,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   // Ανανεωμένη δομή μενού με υπο-καρτέλες
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { id: 'basic_calc', label: 'Τοπογραφικοί Υπολογισμοί', icon: <Calculator size={20} /> },
     { 
       id: 'station_measurements', 
       label: 'Μετρήσεις Σταθμού', 
@@ -58,7 +59,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
           </div>
         )}
       </div>
-      
+
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {menuItems.map((item) => {
