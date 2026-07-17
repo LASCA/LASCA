@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { 
-  Database, Activity, Target, Ruler, Play, Cpu, Info 
+  Database, Activity, Target, Ruler, Play, Cpu, Info, Trash2, PlusCircle 
 } from 'lucide-react';
 
 const Leveling = ({ 
@@ -15,13 +15,11 @@ const Leveling = ({
 }) => {
   
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('forward'); // 'forward' ή 'backward'
+  const [activeTab, setActiveTab] = useState('forward');
   
-  // Επιλογή ποιου πίνακα επεξεργαζόμαστε
   const currentData = activeTab === 'forward' ? forwardData : backwardData;
   const setCurrentData = activeTab === 'forward' ? setForwardData : setBackwardData;
 
-  // Έλεγχος για το αν έχουν υπολογιστεί αποτελέσματα
   const hasResults = currentData && currentData.some(row => row.dh !== undefined && row.dh !== null && row.dh !== "");
 
   const handleInputChange = (index, field, value) => {
@@ -30,7 +28,22 @@ const Leveling = ({
     if (setCurrentData) setCurrentData(newData);
   };
 
-  // Πλοήγηση με βελάκια & Enter
+  const deleteRow = (idx) => {
+    const newData = [...currentData];
+    newData.splice(idx, 1);
+    if (setCurrentData) setCurrentData(newData);
+  };
+
+  const addRowAt = (index) => {
+    const newRow = {
+      point: "", backsight: "", bs_upper: "", bs_lower: "", bs_s: "",
+      foresight: "", fs_upper: "", fs_lower: "", fs_s: ""
+    };
+    const newData = [...currentData];
+    newData.splice(index + 1, 0, newRow);
+    if (setCurrentData) setCurrentData(newData);
+  };
+
   const handleKeyDown = (e, rowIndex, colName) => {
     const columns = hasResults 
       ? ['point', 'backsight', 'bs_upper', 'bs_lower', 'bs_s', 'foresight', 'fs_upper', 'fs_lower', 'fs_s', 'dh', 'elev_backward', 'elevation']
@@ -126,8 +139,6 @@ const Leveling = ({
         <div className="flex-none min-h-[480px] flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between sticky top-0 z-30">
             <div className="flex items-center gap-8">
-              
-              {/* Τίτλος & Tabs */}
               <div className="flex items-center gap-4">
                 <div className="p-2 bg-amber-500/10 rounded-lg">
                   <Database size={18} className="text-amber-500" />
@@ -157,7 +168,6 @@ const Leveling = ({
               </div>
             </div>
 
-            {/* Κουμπί Εκτέλεσης */}
             <button 
               onClick={handleRunLeveling}
               disabled={isLoading}
@@ -176,29 +186,29 @@ const Leveling = ({
             </button>
           </div>
 
-          {/* Πίνακας */}
           <div className="flex-1 overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                 <tr className="border-b border-slate-800/60 bg-slate-900/40">
+                  {/* Προσαρμοσμένα ποσοστά για καλύτερο άπλωμα, μικρότερη στήλη διαγραφής στο τέλος */}
                   <th className={`p-2 text-[10px] font-black text-slate-500 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[4%]' : 'w-[5%]'}`}>#</th>
-                  <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${hasResults ? 'w-[12%]' : 'w-[15%]'}`}>Σημείο Σκόπευσης</th>
+                  <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${hasResults ? 'w-[14%]' : 'w-[17%]'}`}>Σημείο Σκόπευσης</th>
                   
                   {/* Οπισθοσκόπευση Group */}
-                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[8%]' : 'w-[12%]'}`}>οπισθο-<br/>σκόπευση</th>
-                  <th className={`p-0 text-[9px] font-bold text-blue-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[8%]'}`}>
+                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[9%]' : 'w-[13%]'}`}>οπισθο-<br/>σκόπευση</th>
+                  <th className={`p-0 text-[9px] font-bold text-blue-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[9%]'}`}>
                     <div className="border-b border-slate-800/50 py-1.5">άνω</div>
                     <div className="py-1.5">κάτω</div>
                   </th>
-                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[8%]'}`}>S</th>
+                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
                   
                   {/* Εμπροσθοσκόπευση Group */}
-                  <th className={`p-2 text-[10px] font-black text-emerald-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[8%]' : 'w-[12%]'}`}>εμπροσθο-<br/>σκόπευση</th>
-                  <th className={`p-0 text-[9px] font-bold text-emerald-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[8%]'}`}>
+                  <th className={`p-2 text-[10px] font-black text-emerald-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[9%]' : 'w-[13%]'}`}>εμπροσθο-<br/>σκόπευση</th>
+                  <th className={`p-0 text-[9px] font-bold text-emerald-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[9%]'}`}>
                     <div className="border-b border-slate-800/50 py-1.5">άνω</div>
                     <div className="py-1.5">κάτω</div>
                   </th>
-                  <th className={`p-2 text-[10px] font-black text-emerald-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[6%]' : 'w-[8%]'}`}>S</th>
+                  <th className={`p-2 text-[10px] font-black text-emerald-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
                   
                   {/* Results Headers */}
                   {hasResults && (
@@ -208,159 +218,185 @@ const Leveling = ({
                       <th className="w-[12%] p-2 text-[10px] font-black text-amber-500/80 tracking-widest text-right align-middle">Τελικά<br/>Υψόμετρα</th>
                     </>
                   )}
+                  {/* Πολύ στενή Στήλη Διαγραφής */}
+                  <th className="w-[30px] p-0 border-l border-slate-800/30"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20">
+              <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20 relative">
                 {currentData && currentData.length > 0 ? (
                   currentData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-emerald-500/[0.02] active:bg-emerald-500/[0.04] transition-all duration-150 group">
-                      <td className="p-2 text-center text-[10px] text-slate-600 font-mono font-bold border-r border-slate-800/30">{idx + 1}</td>
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-point`}
-                          type="text"
-                          value={row.point ?? ""}
-                          onChange={(e) => handleInputChange(idx, 'point', e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'point')}
-                          className="bg-transparent w-full font-bold text-slate-400 group-hover:text-emerald-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-1 py-2 transition-all"
-                          placeholder=""
-                        />
-                      </td>
-                      
-                      {/* Οπισθοσκόπευση - Κεντρική */}
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-backsight`}
-                          type="text"
-                          value={row.backsight ?? ""}
-                          onChange={(e) => handleInputChange(idx, 'backsight', e.target.value)}
-                          onBlur={(e) => handleInputChange(idx, 'backsight', formatVal(e.target.value, 3))}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'backsight')}
-                          className="bg-transparent w-full font-mono text-blue-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
-                      {/* Οπισθοσκόπευση - Άνω/Κάτω */}
-                      <td className="p-0 border-r border-slate-800/30">
-                        <div className="flex flex-col h-full">
+                    <React.Fragment key={idx}>
+                      <tr className="hover:bg-emerald-500/[0.02] active:bg-emerald-500/[0.04] transition-all duration-150 group relative">
+                        <td className="p-2 text-center text-[10px] text-slate-600 font-mono font-bold border-r border-slate-800/30">{idx + 1}</td>
+                        <td className="p-2 border-r border-slate-800/30">
                           <input 
-                            id={`input-leveling-${idx}-bs_upper`}
+                            id={`input-leveling-${idx}-point`}
                             type="text"
-                            value={row.bs_upper ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'bs_upper', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'bs_upper', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'bs_upper')}
-                            className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            value={row.point ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'point', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'point')}
+                            className="bg-transparent w-full font-bold text-slate-400 group-hover:text-emerald-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-1 py-2 transition-all"
+                            placeholder=""
                           />
+                        </td>
+                        
+                        <td className="p-2 border-r border-slate-800/30">
                           <input 
-                            id={`input-leveling-${idx}-bs_lower`}
+                            id={`input-leveling-${idx}-backsight`}
                             type="text"
-                            value={row.bs_lower ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'bs_lower', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'bs_lower', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'bs_lower')}
-                            className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            value={row.backsight ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'backsight', e.target.value)}
+                            onBlur={(e) => handleInputChange(idx, 'backsight', formatVal(e.target.value, 3))}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'backsight')}
+                            className="bg-transparent w-full font-mono text-blue-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
                           />
-                        </div>
-                      </td>
-                      {/* Οπισθοσκόπευση - S */}
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-bs_s`}
-                          type="text"
-                          value={row.bs_s ?? ""}
-                          onChange={(e) => handleInputChange(idx, 'bs_s', e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'bs_s')}
-                          className="bg-transparent w-full font-mono text-blue-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
+                        </td>
+                        <td className="p-0 border-r border-slate-800/30">
+                          <div className="flex flex-col h-full">
+                            <input 
+                              id={`input-leveling-${idx}-bs_upper`}
+                              type="text"
+                              value={row.bs_upper ?? ""}
+                              onChange={(e) => handleInputChange(idx, 'bs_upper', e.target.value)}
+                              onBlur={(e) => handleInputChange(idx, 'bs_upper', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleKeyDown(e, idx, 'bs_upper')}
+                              className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            />
+                            <input 
+                              id={`input-leveling-${idx}-bs_lower`}
+                              type="text"
+                              value={row.bs_lower ?? ""}
+                              onChange={(e) => handleInputChange(idx, 'bs_lower', e.target.value)}
+                              onBlur={(e) => handleInputChange(idx, 'bs_lower', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleKeyDown(e, idx, 'bs_lower')}
+                              className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-800/30">
+                          <input 
+                            id={`input-leveling-${idx}-bs_s`}
+                            type="text"
+                            value={row.bs_s ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'bs_s', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'bs_s')}
+                            className="bg-transparent w-full font-mono text-blue-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
+                          />
+                        </td>
 
-                      {/* Εμπροσθοσκόπευση - Κεντρική */}
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-foresight`}
-                          type="text"
-                          value={row.foresight ?? ""}
-                          onChange={(e) => handleInputChange(idx, 'foresight', e.target.value)}
-                          onBlur={(e) => handleInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'foresight')}
-                          className="bg-transparent w-full font-mono text-emerald-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
-                      {/* Εμπροσθοσκόπευση - Άνω/Κάτω */}
-                      <td className="p-0 border-r border-slate-800/30">
-                        <div className="flex flex-col h-full">
+                        <td className="p-2 border-r border-slate-800/30">
                           <input 
-                            id={`input-leveling-${idx}-fs_upper`}
+                            id={`input-leveling-${idx}-foresight`}
                             type="text"
-                            value={row.fs_upper ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'fs_upper', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'fs_upper')}
-                            className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                            value={row.foresight ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'foresight', e.target.value)}
+                            onBlur={(e) => handleInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'foresight')}
+                            className="bg-transparent w-full font-mono text-emerald-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
                           />
+                        </td>
+                        <td className="p-0 border-r border-slate-800/30">
+                          <div className="flex flex-col h-full">
+                            <input 
+                              id={`input-leveling-${idx}-fs_upper`}
+                              type="text"
+                              value={row.fs_upper ?? ""}
+                              onChange={(e) => handleInputChange(idx, 'fs_upper', e.target.value)}
+                              onBlur={(e) => handleInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleKeyDown(e, idx, 'fs_upper')}
+                              className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                            />
+                            <input 
+                              id={`input-leveling-${idx}-fs_lower`}
+                              type="text"
+                              value={row.fs_lower ?? ""}
+                              onChange={(e) => handleInputChange(idx, 'fs_lower', e.target.value)}
+                              onBlur={(e) => handleInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleKeyDown(e, idx, 'fs_lower')}
+                              className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-800/30">
                           <input 
-                            id={`input-leveling-${idx}-fs_lower`}
+                            id={`input-leveling-${idx}-fs_s`}
                             type="text"
-                            value={row.fs_lower ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'fs_lower', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'fs_lower')}
-                            className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                            value={row.fs_s ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'fs_s', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'fs_s')}
+                            className="bg-transparent w-full font-mono text-emerald-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
                           />
-                        </div>
-                      </td>
-                      {/* Εμπροσθοσκόπευση - S */}
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-fs_s`}
-                          type="text"
-                          value={row.fs_s ?? ""}
-                          onChange={(e) => handleInputChange(idx, 'fs_s', e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'fs_s')}
-                          className="bg-transparent w-full font-mono text-emerald-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
+                        </td>
 
-                      {/* Κελιά αποτελεσμάτων (Read-Only) */}
-                      {hasResults && (
-                        <>
-                          <td className="p-2">
-                            <input 
-                              id={`input-leveling-${idx}-dh`}
-                              type="text"
-                              value={formatVal(row.dh, 4)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-purple-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input 
-                              id={`input-leveling-${idx}-elev_backward`}
-                              type="text"
-                              value={formatVal(row.elev_backward, 3)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-rose-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input 
-                              id={`input-leveling-${idx}-elevation`}
-                              type="text"
-                              value={formatVal(row.elevation, 3)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-amber-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                        </>
-                      )}
-                    </tr>
+                        {hasResults && (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-dh`}
+                                type="text"
+                                value={formatVal(row.dh, 4)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-purple-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-elev_backward`}
+                                type="text"
+                                value={formatVal(row.elev_backward, 3)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-rose-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-elevation`}
+                                type="text"
+                                value={formatVal(row.elevation, 3)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-amber-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                          </>
+                        )}
+
+                        {/* Συμπιεσμένο Κελί Διαγραφής */}
+                        <td className="w-[30px] p-0 text-center relative border-l border-slate-800/30">
+                          <button 
+                            onClick={() => deleteRow(idx)} 
+                            className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+                            title="Διαγραφή Σημείου"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+
+                      <tr className="h-0 p-0">
+                        <td colSpan={hasResults ? 12 : 9} className="p-0 h-0 relative">
+                          <button 
+                            onClick={() => addRowAt(idx)} 
+                            className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-emerald-400 hover:text-emerald-300 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                            title="Εισαγωγή Νέας Γραμμής"
+                          >
+                            <PlusCircle size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={hasResults ? "11" : "8"} className="p-24 text-center">
-                      <div className="flex flex-col items-center opacity-20">
-                        <Info size={30} className="text-slate-700 mx-auto mb-3" />
-                        <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest">Αναμονή Δεδομένων Χωροστάθμισης</p>
+                    <td colSpan={hasResults ? 12 : 9} className="p-24 text-center">
+                      <div className="flex flex-col items-center opacity-50 hover:opacity-100 transition-opacity">
+                        <Info size={30} className="text-slate-500 mx-auto mb-3" />
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Αναμονή Δεδομένων Χωροστάθμισης</p>
+                        <button 
+                          onClick={() => addRowAt(-1)} 
+                          className="bg-slate-800 hover:bg-slate-700 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold border border-slate-700/50 flex items-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <PlusCircle size={14} /> Προσθήκη Πρώτης Εγγραφής
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -370,7 +406,7 @@ const Leveling = ({
           </div>
         </div>
 
-        {/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ ΧΩΡΟΣΤΑΘΜΙΣΗΣ (ΝΕΟ SIDE-BY-SIDE) */}
+        {/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
         <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
           <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
             <Activity size={16} className="text-cyan-500" />
@@ -378,7 +414,6 @@ const Leveling = ({
           </div>
           
           <div className="flex flex-row gap-4 items-stretch">
-            {/* Αριστερή Στήλη: ΜΕΤΑΒΑΣΗ */}
             <div className="flex-1">
               <DirectionStatsGroup 
                 title="1. ΜΕΤΑΒΑΣΗ"
@@ -389,7 +424,6 @@ const Leveling = ({
               />
             </div>
 
-            {/* Δεξιά Στήλη: ΕΠΙΣΤΡΟΦΗ */}
             <div className="flex-1">
               <DirectionStatsGroup 
                 title="2. ΕΠΙΣΤΡΟΦΗ"
@@ -401,29 +435,20 @@ const Leveling = ({
             </div>
           </div>
 
-          {/* Μπάρα Σφαλμάτων - Ισομοιρασμένος χώρος */}
           <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 flex items-center justify-between w-full">
-             
-             {/* Περιτύλιγμα στηλών που απλώνεται */}
              <div className="flex flex-1 divide-x divide-slate-800/50 mr-6">
-               
-               {/* 1. S Ολικό */}
                <div className="flex-1 flex flex-col gap-1 pr-4">
                  <span className="text-[10px] text-slate-500 font-black tracking-tighter">S ολικο (Sμετ.+Sεπιστρ)/2</span>
                  <span className="text-sm font-mono font-bold text-slate-200">
                    {metrics.totalMeanS !== undefined ? metrics.totalMeanS : "---"}
                  </span>
                </div>
-
-               {/* 2. Διαφορά δh */}
                <div className="flex-1 flex flex-col gap-1 px-4">
                  <span className="text-[10px] text-slate-500 font-black tracking-tighter">δh μεταβασης - δh επιστροφης</span>
                  <span className="text-sm font-mono font-bold text-rose-400">
                    {metrics.dhDiff !== undefined ? metrics.dhDiff : "---"}
                  </span>
                </div>
-
-               {/* 3. Όριο Σφάλματος */}
                <div className="flex-1 flex flex-col gap-1 px-4">
                  <span className="text-[10px] text-slate-500 font-black tracking-tighter">Οριο σφαλματος</span>
                  <span className="text-sm font-mono font-bold text-slate-300">
@@ -432,7 +457,6 @@ const Leveling = ({
                </div>
              </div>
              
-             {/* Οπτική Ένδειξη Κατάστασης (παραμένει σταθερή δεξιά) */}
              <div className="flex-none">
                 {metrics.status ? (
                   <div className="flex items-center gap-2 bg-[#070c19] px-4 py-2 rounded-lg border border-slate-800">
@@ -454,7 +478,6 @@ const Leveling = ({
   );
 };
 
-// --- Νέο Sub-Component Στατιστικών Κατεύθυνσης ---
 const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS, themeColor }) => {
   const colorClass = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
   const borderColorClass = themeColor === 'blue' ? 'border-blue-500/20' : 'border-emerald-500/20';
@@ -463,7 +486,6 @@ const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS
     <div className={`bg-slate-900/60 p-4 rounded-xl border ${borderColorClass} flex flex-col gap-3 h-full`}>
       <span className={`text-[11px] font-black ${colorClass} tracking-widest border-b border-slate-800 pb-2 uppercase`}>{title}</span>
       
-      {/* 1η Γραμμή: Αθροίσματα Οπισθοσκοπεύσεων */}
       <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
         <div className="flex flex-col gap-1">
           <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ο</span>
@@ -475,7 +497,6 @@ const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS
         </div>
       </div>
 
-      {/* 2η Γραμμή: Αθροίσματα Εμπροσθοσκοπεύσεων */}
       <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
         <div className="flex flex-col gap-1">
           <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ε</span>
@@ -487,7 +508,6 @@ const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS
         </div>
       </div>
 
-      {/* Τελευταία Γραμμή: δh & Ολικό S */}
       <div className="grid grid-cols-2 gap-4 pt-1 mt-auto">
         <div className="flex justify-between items-center px-2">
           <span className={`text-[10px] ${colorClass}/70 font-bold uppercase`}>δh</span>

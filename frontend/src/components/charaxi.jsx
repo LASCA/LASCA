@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Navigation, Calculator, Trash2, Map, Maximize, Download, X, PlusCircle } from 'lucide-react';
+import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const Charaxi = ({ stakeoutData, setStakeoutData }) => {
@@ -31,7 +31,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     });
   };
 
-  // Νέα συνάρτηση για προσθήκη γραμμής στο συγκεκριμένο index (Όπως στο Adjustment)
   const addRowAt = (index) => {
     setStakeoutData(prev => {
       const newRow = { id: Date.now().toString(), name: '', x: '', y: '', hz_stake: '', dist_stake: '' };
@@ -41,7 +40,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     });
   };
 
-const handleCalculate = async () => {
+  const handleCalculate = async () => {
     if (!station.x || !station.y || !backsight.x || !backsight.y) {
       toast.error("Συμπληρώστε πρώτα τα δεδομένα Στάσης και Προσανατολισμού!");
       return;
@@ -52,7 +51,6 @@ const handleCalculate = async () => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Στέλνουμε πλέον ΜΟΝΟ τα δεδομένα (αφαιρέσαμε το mij από εδώ)
         body: JSON.stringify({ station, backsight, points })
       });
       
@@ -63,7 +61,7 @@ const handleCalculate = async () => {
         setStakeoutData(prev => ({
           ...prev,
           azimuthBs: result.azimuth_bs,
-          mij: result.mij, // <--- Παίρνουμε το υπολογισμένο mij από την Python!
+          mij: result.mij,
           points: result.points,
           plot: result.plot
         }));
@@ -154,7 +152,6 @@ const handleCalculate = async () => {
               <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Σημεία προς Χάραξη</span>
               
               <div className="flex items-center gap-3">
-                {/* === ΕΜΦΑΝΙΣΗ ΓΙΑ TO G0 (Αζιμούθιο) === */}
                 <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                   <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">G₀ =</span>
                   <span className="text-amber-400 text-xs text-center w-20 outline-none font-mono font-bold">
@@ -162,7 +159,6 @@ const handleCalculate = async () => {
                   </span>
                 </div>
 
-                {/* === ΕΜΦΑΝΙΣΗ ΓΙΑ TO MIJ === */}
                 <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                   <span className="text-[10px] font-mono text-slate-400 font-bold">mij =</span>
                   <span className="text-emerald-400 text-xs text-center w-16 outline-none font-mono font-bold">
@@ -173,13 +169,15 @@ const handleCalculate = async () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <button
+              <button 
                 onClick={handleCalculate}
                 disabled={loading}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-4 py-1.5 rounded transition-all shadow-[0_0_15px_rgba(37,99,235,0.15)] disabled:opacity-50"
+                title="Εκτέλεση Χάραξης"
+                className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
+                  loading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
+                }`}
               >
-                <Calculator size={14} />
-                {loading ? "Υπολογισμός..." : "Εκτέλεση"}
+                {loading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
               </button>
             </div>
           </div>
@@ -225,7 +223,6 @@ const handleCalculate = async () => {
                         </button>
                       </td>
                     </tr>
-                    {/* === INLINE ADD BUTTON (Όπως στο Adjustment) === */}
                     <tr className="h-0 p-0">
                       <td colSpan={7} className="p-0 h-0 relative">
                         <button 
@@ -248,56 +245,51 @@ const handleCalculate = async () => {
       {/* ΔΕΞΙ ΜΕΡΟΣ: ΧΩΡΟΣ ΠΛΟΤΑΡΙΣΜΑΤΟΣ ΣΤΥΛ ΟΜΟΙΟΜΟΡΦΟ           */}
       {/* ========================================================= */}
       <div className="lg:col-span-2 flex flex-col h-full min-h-[300px] lg:min-h-0">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl shadow-lg flex flex-col flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
           
-          <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center shrink-0">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-              <Map size={14} className="text-emerald-500" /> Γραφική Απεικόνιση
-            </div>
-            
-            {stakeoutData.plot && (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setIsFullscreen(true)}
-                  className="text-slate-400 hover:text-blue-400 transition-colors bg-slate-900 p-1.5 rounded border border-slate-700 hover:border-blue-500/50"
-                  title="Πλήρης Οθόνη"
-                >
-                  <Maximize size={14} />
-                </button>
-                <button 
-                  onClick={handleDownload}
-                  className="text-slate-400 hover:text-emerald-400 transition-colors bg-slate-900 p-1.5 rounded border border-slate-700 hover:border-emerald-500/50" 
-                  title="Λήψη Σκαριφήματος"
-                >
-                  <Download size={14} />
-                </button>
+          <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/10 rounded-lg">
+                <Map size={18} className="text-emerald-500" />
               </div>
-            )}
+              <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200">Σκαρίφημα Χάραξης</span>
+            </div>
           </div>
 
-          <div className="flex-1 relative w-full h-full flex items-center justify-center p-4 bg-slate-950/20 overflow-hidden">
-            {stakeoutData.plot ? (
-              <img 
-                src={stakeoutData.plot} 
-                alt="Διάγραμμα Χάραξης" 
-                className="relative z-10 w-full h-full object-contain animate-fade-in drop-shadow-2xl"
-              />
-            ) : (
-              <div className="text-center space-y-3 z-10 p-5 rounded-xl border border-dashed border-slate-700 bg-slate-900/30 max-w-[280px]">
-                <div className="w-12 h-12 rounded-full border border-slate-700 mx-auto flex items-center justify-center text-slate-500 bg-slate-800/50">
-                  <Map size={20} />
-                </div>
-                <div>
-                  <p className="text-slate-300 font-bold text-xs">Διάγραμμα Χάραξης</p>
-                  <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
-                    Εισάγετε δεδομένα και πατήστε "Εκτέλεση" για να παραχθεί το σκαρίφημα.
+          <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden group">
+            {/* Κουκίδες Σχεδίου (Radial Gradient) */}
+            <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"></div>
+            
+            <div className="w-full h-full flex items-center justify-center p-2 z-10 relative">
+              {stakeoutData.plot ? (
+                <>
+                  <img 
+                    src={stakeoutData.plot} 
+                    alt="Διάγραμμα Χάραξης" 
+                    className="relative z-10 max-w-full max-h-full object-contain animate-in fade-in zoom-in duration-700 drop-shadow-2xl"
+                  />
+                  
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
+                    <button onClick={handleDownload} className="bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 p-2 rounded-lg border border-slate-700/50 transition-all" title="Λήψη">
+                      <Download size={16} />
+                    </button>
+                    <button onClick={() => setIsFullscreen(true)} className="bg-slate-900/80 hover:bg-cyan-500/20 text-slate-300 p-2 rounded-lg border border-slate-700/50 transition-all" title="Πλήρης Οθόνη">
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center">
+                  <Map className="mx-auto transition-all duration-1000 text-slate-800" size={60} strokeWidth={1} />
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] mt-6 text-slate-700">
+                    Interactive Map View
                   </p>
                 </div>
+              )}
+              
+              <div className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-600 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800/50 z-10 backdrop-blur-sm shadow-sm">
+                System: EGSA'87
               </div>
-            )}
-            
-            <div className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-600 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800/50 z-10">
-              System: EGSA'87
             </div>
           </div>
 
@@ -309,7 +301,7 @@ const handleCalculate = async () => {
       {/* ========================================================= */}
       {isFullscreen && stakeoutData.plot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="absolute top-4 right-4 flex items-center gap-3">
+          <div className="absolute top-4 right-4 flex items-center gap-3 z-50">
             <button
               onClick={handleDownload}
               className="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl transition-all flex items-center gap-2 text-xs font-semibold shadow-lg"

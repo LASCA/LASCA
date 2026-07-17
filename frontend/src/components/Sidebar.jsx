@@ -47,7 +47,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       </button>
 
       {/* Header Sidebar */}
-      <div className={`p-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800 overflow-hidden`}>
+      <div className={`h-20 px-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800/80 overflow-hidden`}>
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
           <Compass size={24} />
         </div>
@@ -58,7 +58,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
           </div>
         )}
       </div>
-
+      
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {menuItems.map((item) => {
