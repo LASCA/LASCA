@@ -65,7 +65,7 @@ const InputField = ({ label, value, onChange }) => (
 const BasicCalculations = () => {
   const [loadings, setLoadings] = useState({});
   const [results, setResults] = useState({
-    convert: null, prob1: null, prob2: null, prob3: null, intersect: null, resect: null
+    convert: null, prob1: null, prob2: null, prob3: null, scale: null, intersect: null, resect: null
   });
 
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
@@ -198,7 +198,47 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 4. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΕΜΠΡΟΣΘΟΤΟΜΙΑ
+  // 4. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΣΥΝΤΕΛΕΣΤΗ ΚΛΙΜΑΚΑΣ
+  // ----------------------------------------------------------------
+  const [scaleData, setScaleData] = useState({ input1: '' });
+
+  const handleScaleCalculation = async () => {
+    if (!scaleData.input1) {
+      toast.error('Παρακαλώ συμπληρώστε το πεδίο!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, scale: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/scale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input1: parseFloat(scaleData.input1)
+        }),
+      });
+
+      if (!response.ok) throw new Error('Σφάλμα δικτύου');
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        scale: [data.k.toFixed(6)]
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error('Αποτυχία επικοινωνίας με το server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, scale: false }));
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // 5. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΕΜΠΡΟΣΘΟΤΟΜΙΑ
   // ----------------------------------------------------------------
   const [intersectData, setIntersectData] = useState({ xa: '', ya: '', xb: '', yb: '', a: '', b: '' });
 
@@ -246,7 +286,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 5. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΟΠΙΣΘΟΤΟΜΙΑ
+  // 6. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΟΠΙΣΘΟΤΟΜΙΑ
   // ----------------------------------------------------------------
   const [resectData, setResectData] = useState({ 
     xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', 
@@ -303,7 +343,7 @@ const BasicCalculations = () => {
         
         {/* --- 1. Μετατροπές Γωνιών --- */}
         <CalcWidget 
-          title="Μετατροπες Μοναδων Γωνιας" 
+          title="Μετατροπές Μονάδων Γωνίας" 
           icon={<Repeat size={18} />}
           loading={loadings.convert}
           result={results.convert}
@@ -391,31 +431,53 @@ const BasicCalculations = () => {
           </div>
         </CalcWidget>
 
-        {/* --- 4. 3ο Θεμελιώδες --- */}
-        <CalcWidget 
-          title="3ο Θεμελιώδες" 
-          icon={<Calculator size={18} />}
-          loading={loadings.prob3}
-          result={results.prob3}
-          resultLabels={[<span>G<sub>next</sub> [grad]</span>]}
-          onCalculate={handleProb3Calculation}
-          onClear={() => clearResult('prob3')}
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <InputField 
-              label={<span>G<sub>prev</sub> [grad]</span>} 
-              value={prob3Data.gprev}
-              onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
-            />
-            <InputField 
-              label={<span>Γωνία β [grad]</span>} 
-              value={prob3Data.b}
-              onChange={(e) => setProb3Data({...prob3Data, b: e.target.value})}
-            />
-          </div>
-        </CalcWidget>
+        {/* ================= ΣΤΗΛΗ 4: ΟΜΑΔΟΠΟΙΗΜΕΝΑ WIDGETS ================= */}
+        <div className="flex flex-col gap-6 h-full">
+          {/* --- 4. 3ο Θεμελιώδες --- */}
+          <CalcWidget 
+            title="3ο Θεμελιώδες" 
+            icon={<Calculator size={18} />}
+            loading={loadings.prob3}
+            result={results.prob3}
+            resultLabels={[<span>G<sub>next</sub> [grad]</span>]}
+            onCalculate={handleProb3Calculation}
+            onClear={() => clearResult('prob3')}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <InputField 
+                label={<span>G<sub>prev</sub> [grad]</span>} 
+                value={prob3Data.gprev}
+                onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
+              />
+              <InputField 
+                label={<span>β&#770; [grad]</span>} 
+                value={prob3Data.b}
+                onChange={(e) => setProb3Data({...prob3Data, b: e.target.value})}
+              />
+            </div>
+          </CalcWidget>
 
-{/* --- 5. Εμπροσθοτομία --- */}
+          {/* --- 7. Συντελεστής Κλίμακας --- */}
+          <CalcWidget 
+            title="Συντελεστής Κλίμακας m" 
+            icon={<MapPin size={18} />}
+            loading={loadings.scale}
+            result={results.scale}
+            resultLabels={[<span>m<sub>ij</sub></span>]}
+            onCalculate={handleScaleCalculation}
+            onClear={() => clearResult('scale')}
+          >
+            <div className="grid grid-cols-1 gap-3">
+              <InputField 
+                label={<span>Συνιστώσα E [m]</span>} 
+                value={scaleData.input1}
+                onChange={(e) => setScaleData({...scaleData, input1: e.target.value})}
+              />
+            </div>
+          </CalcWidget>
+        </div>
+
+        {/* --- 5. Εμπροσθοτομία --- */}
         <CalcWidget 
           title="Εμπροσθοτομία" 
           icon={<Target size={18} />}
@@ -425,7 +487,7 @@ const BasicCalculations = () => {
           onCalculate={handleIntersectCalculation}
           onClear={() => clearResult('intersect')}
         >
-            <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 flex gap-3">
               <InputField 
                 label={<span>X<sub>A</sub> [m]</span>} 
@@ -450,7 +512,7 @@ const BasicCalculations = () => {
                 onChange={(e) => setIntersectData({...intersectData, yb: e.target.value})}
               />
             </div>
-            {/* ΕΔΩ ΕΓΙΝΕ Η ΔΙΟΡΘΩΣΗ: Χρήση του intersectData αντί για resectData */}
+            
             <InputField 
               label={<span>a&#770; [grad]</span>} 
               value={intersectData.a} 
@@ -474,7 +536,7 @@ const BasicCalculations = () => {
           onCalculate={handleResectCalculation}
           onClear={() => clearResult('resect')}
         >
-           <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <InputField label={<span>X<sub>A</sub> [m]</span>} value={resectData.xa} onChange={(e) => setResectData({...resectData, xa: e.target.value})} />
             <InputField label={<span>X<sub>B</sub> [m]</span>} value={resectData.xb} onChange={(e) => setResectData({...resectData, xb: e.target.value})} />
             <InputField label={<span>X<sub>C</sub> [m]</span>} value={resectData.xc} onChange={(e) => setResectData({...resectData, xc: e.target.value})} />

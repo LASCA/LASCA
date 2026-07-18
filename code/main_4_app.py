@@ -656,5 +656,27 @@ def calc_resect():
         print(f"Σφάλμα στην Οπισθοτομία:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+@app.route('/api/basic_calc/scale', methods=['POST'])
+def calc_scale():
+    try:
+        data = request.json
+        
+        # Το input1 από το React αντιστοιχεί στη συντεταγμένη X (Easting)
+        xs = float(data.get('input1', 0))
+        
+        # Το input2 μπορούμε να το αγνοήσουμε ή να το χρησιμοποιήσουμε μελλοντικά
+        # (π.χ. για να δέχεται το m_0 ή το R_0 αν χρειαστεί)
+
+        # Κλήση της συνάρτησης υπολογισμού συντελεστή κλίμακας
+        k = dpr.sintelestis_klimakas(xs)
+
+        # Επιστροφή του αποτελέσματος στο React (το JSON κλειδί πρέπει να είναι "k")
+        return jsonify({"k": k})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στον Συντελεστή Κλίμακας:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
