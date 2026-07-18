@@ -146,7 +146,7 @@ const Leveling = ({
                 <div className="flex bg-[#030712] border border-slate-800/80 p-0.5 rounded-lg">
                   <button
                     onClick={() => setActiveTab('forward')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
                       activeTab === 'forward'
                         ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
                         : 'text-slate-500 hover:text-slate-300'
@@ -156,7 +156,7 @@ const Leveling = ({
                   </button>
                   <button
                     onClick={() => setActiveTab('backward')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
                       activeTab === 'backward'
                         ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
                         : 'text-slate-500 hover:text-slate-300'
@@ -190,7 +190,6 @@ const Leveling = ({
             <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                 <tr className="border-b border-slate-800/60 bg-slate-900/40">
-                  {/* Προσαρμοσμένα ποσοστά για καλύτερο άπλωμα, μικρότερη στήλη διαγραφής στο τέλος */}
                   <th className={`p-2 text-[10px] font-black text-slate-500 tracking-widest text-center border-r border-slate-800/30 align-middle ${hasResults ? 'w-[4%]' : 'w-[5%]'}`}>#</th>
                   <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${hasResults ? 'w-[14%]' : 'w-[17%]'}`}>Σημείο Σκόπευσης</th>
                   
@@ -218,7 +217,7 @@ const Leveling = ({
                       <th className="w-[12%] p-2 text-[10px] font-black text-amber-500/80 tracking-widest text-right align-middle">Τελικά<br/>Υψόμετρα</th>
                     </>
                   )}
-                  {/* Πολύ στενή Στήλη Διαγραφής */}
+                  {/* Στήλη Διαγραφής */}
                   <th className="w-[30px] p-0 border-l border-slate-800/30"></th>
                 </tr>
               </thead>
@@ -284,49 +283,60 @@ const Leveling = ({
                           />
                         </td>
 
-                        <td className="p-2 border-r border-slate-800/30">
-                          <input 
-                            id={`input-leveling-${idx}-foresight`}
-                            type="text"
-                            value={row.foresight ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'foresight', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'foresight')}
-                            className="bg-transparent w-full font-mono text-emerald-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
-                          />
-                        </td>
-                        <td className="p-0 border-r border-slate-800/30">
-                          <div className="flex flex-col h-full">
-                            <input 
-                              id={`input-leveling-${idx}-fs_upper`}
-                              type="text"
-                              value={row.fs_upper ?? ""}
-                              onChange={(e) => handleInputChange(idx, 'fs_upper', e.target.value)}
-                              onBlur={(e) => handleInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
-                              onKeyDown={(e) => handleKeyDown(e, idx, 'fs_upper')}
-                              className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                            />
-                            <input 
-                              id={`input-leveling-${idx}-fs_lower`}
-                              type="text"
-                              value={row.fs_lower ?? ""}
-                              onChange={(e) => handleInputChange(idx, 'fs_lower', e.target.value)}
-                              onBlur={(e) => handleInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
-                              onKeyDown={(e) => handleKeyDown(e, idx, 'fs_lower')}
-                              className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                            />
-                          </div>
-                        </td>
-                        <td className="p-2 border-r border-slate-800/30">
-                          <input 
-                            id={`input-leveling-${idx}-fs_s`}
-                            type="text"
-                            value={row.fs_s ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'fs_s', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'fs_s')}
-                            className="bg-transparent w-full font-mono text-emerald-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
-                          />
-                        </td>
+                        {/* ================= ΕΜΠΡΟΣΘΟΣΚΟΠΕΥΣΗ (ΓΚΡΙΖΑΡΙΣΜΕΝΗ ΣΤΗΝ 1Η ΓΡΑΜΜΗ) ================= */}
+                        {idx === 0 ? (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]" title="Δεν υφίσταται εμπροσθοσκόπευση στο 1ο σημείο"></td>
+                            <td className="p-0 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
+                            <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-foresight`}
+                                type="text"
+                                value={row.foresight ?? ""}
+                                onChange={(e) => handleInputChange(idx, 'foresight', e.target.value)}
+                                onBlur={(e) => handleInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
+                                onKeyDown={(e) => handleKeyDown(e, idx, 'foresight')}
+                                className="bg-transparent w-full font-mono text-emerald-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
+                              />
+                            </td>
+                            <td className="p-0 border-r border-slate-800/30">
+                              <div className="flex flex-col h-full">
+                                <input 
+                                  id={`input-leveling-${idx}-fs_upper`}
+                                  type="text"
+                                  value={row.fs_upper ?? ""}
+                                  onChange={(e) => handleInputChange(idx, 'fs_upper', e.target.value)}
+                                  onBlur={(e) => handleInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
+                                  onKeyDown={(e) => handleKeyDown(e, idx, 'fs_upper')}
+                                  className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                                />
+                                <input 
+                                  id={`input-leveling-${idx}-fs_lower`}
+                                  type="text"
+                                  value={row.fs_lower ?? ""}
+                                  onChange={(e) => handleInputChange(idx, 'fs_lower', e.target.value)}
+                                  onBlur={(e) => handleInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
+                                  onKeyDown={(e) => handleKeyDown(e, idx, 'fs_lower')}
+                                  className="bg-transparent w-full font-mono text-emerald-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                                />
+                              </div>
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-fs_s`}
+                                type="text"
+                                value={row.fs_s ?? ""}
+                                onChange={(e) => handleInputChange(idx, 'fs_s', e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, idx, 'fs_s')}
+                                className="bg-transparent w-full font-mono text-emerald-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 py-2 transition-all"
+                              />
+                            </td>
+                          </>
+                        )}
 
                         {hasResults && (
                           <>
@@ -360,7 +370,6 @@ const Leveling = ({
                           </>
                         )}
 
-                        {/* Συμπιεσμένο Κελί Διαγραφής */}
                         <td className="w-[30px] p-0 text-center relative border-l border-slate-800/30">
                           <button 
                             onClick={() => deleteRow(idx)} 
@@ -406,7 +415,7 @@ const Leveling = ({
           </div>
         </div>
 
-        {/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
+{/* 📊 ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
         <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
           <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
             <Activity size={16} className="text-cyan-500" />
@@ -417,9 +426,9 @@ const Leveling = ({
             <div className="flex-1">
               <DirectionStatsGroup 
                 title="1. ΜΕΤΑΒΑΣΗ"
-                sumBS={metrics.forwardSumBS} sumBS_S={metrics.forwardSumBS_S}
-                sumFS={metrics.forwardSumFS} sumFS_S={metrics.forwardSumFS_S}
-                dh={metrics.forwardDh} totalS={metrics.forwardTotalS}
+                sumBS={metrics?.forward?.sum_backsights} sumBS_S={metrics?.forward?.sum_bs_s}
+                sumFS={metrics?.forward?.sum_foresights} sumFS_S={metrics?.forward?.sum_fs_s}
+                dh={metrics?.forward?.dh} totalS={metrics?.forward?.total_s}
                 themeColor="blue"
               />
             </div>
@@ -427,9 +436,9 @@ const Leveling = ({
             <div className="flex-1">
               <DirectionStatsGroup 
                 title="2. ΕΠΙΣΤΡΟΦΗ"
-                sumBS={metrics.backwardSumBS} sumBS_S={metrics.backwardSumBS_S}
-                sumFS={metrics.backwardSumFS} sumFS_S={metrics.backwardSumFS_S}
-                dh={metrics.backwardDh} totalS={metrics.backwardTotalS}
+                sumBS={metrics?.backward?.sum_backsights} sumBS_S={metrics?.backward?.sum_bs_s}
+                sumFS={metrics?.backward?.sum_foresights} sumFS_S={metrics?.backward?.sum_fs_s}
+                dh={metrics?.backward?.dh} totalS={metrics?.backward?.total_s}
                 themeColor="emerald"
               />
             </div>
@@ -440,31 +449,44 @@ const Leveling = ({
                <div className="flex-1 flex flex-col gap-1 pr-4">
                  <span className="text-[10px] text-slate-500 font-black tracking-tighter">S ολικο (Sμετ.+Sεπιστρ)/2</span>
                  <span className="text-sm font-mono font-bold text-slate-200">
-                   {metrics.totalMeanS !== undefined ? metrics.totalMeanS : "---"}
+                   {metrics?.forward && metrics?.backward 
+                     ? ((metrics.forward.total_s + metrics.backward.total_s) / 2).toFixed(2) 
+                     : "---"}
                  </span>
                </div>
                <div className="flex-1 flex flex-col gap-1 px-4">
                  <span className="text-[10px] text-slate-500 font-black tracking-tighter">δh μεταβασης - δh επιστροφης</span>
                  <span className="text-sm font-mono font-bold text-rose-400">
-                   {metrics.dhDiff !== undefined ? metrics.dhDiff : "---"}
+                   {metrics?.error_dh !== undefined ? metrics.error_dh : "---"}
                  </span>
                </div>
                <div className="flex-1 flex flex-col gap-1 px-4">
-                 <span className="text-[10px] text-slate-500 font-black tracking-tighter">Οριο σφαλματος</span>
+                 <span className="text-[10px] text-slate-500 font-black tracking-tighter">Οριο σφαλματος (mm)</span>
                  <span className="text-sm font-mono font-bold text-slate-300">
-                   {metrics.errorLimit !== undefined ? metrics.errorLimit : "---"}
+                   {metrics?.forward && metrics?.backward 
+                     ? (12 * Math.sqrt(((metrics.forward.total_s + metrics.backward.total_s) / 2) / 1000)).toFixed(2)
+                     : "---"}
                  </span>
                </div>
              </div>
              
              <div className="flex-none">
-                {metrics.status ? (
-                  <div className="flex items-center gap-2 bg-[#070c19] px-4 py-2 rounded-lg border border-slate-800">
-                    <span className={`w-2.5 h-2.5 rounded-full ${metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
-                    <span className={`text-[12px] font-black tracking-wider ${metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {metrics.status === "Εντός Ανοχής" || metrics.status === "OK" || metrics.status === true ? 'Εντός Ανοχής' : 'Εκτός Ανοχής'}
-                    </span>
-                  </div>
+                {metrics?.forward && metrics?.backward && metrics?.error_dh !== undefined ? (
+                  (() => {
+                    const totalMeanS = (metrics.forward.total_s + metrics.backward.total_s) / 2;
+                    const errorLimit = 12 * Math.sqrt(totalMeanS / 1000);
+                    const dhDiffMm = Math.abs(metrics.error_dh * 1000); // Μετατροπή δh σε mm για σύγκριση
+                    const isOk = dhDiffMm <= errorLimit;
+
+                    return (
+                      <div className="flex items-center gap-2 bg-[#070c19] px-4 py-2 rounded-lg border border-slate-800">
+                        <span className={`w-2.5 h-2.5 rounded-full ${isOk ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                        <span className={`text-[12px] font-black tracking-wider ${isOk ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isOk ? 'Εντός Ανοχής' : 'Εκτός Ανοχής'}
+                        </span>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <span className="text-[12px] font-mono text-slate-500 font-bold">---</span>
                 )}
@@ -484,37 +506,40 @@ const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS
 
   return (
     <div className={`bg-slate-900/60 p-4 rounded-xl border ${borderColorClass} flex flex-col gap-3 h-full`}>
-      <span className={`text-[11px] font-black ${colorClass} tracking-widest border-b border-slate-800 pb-2 uppercase`}>{title}</span>
+      {/* Ο τίτλος (1. ΜΕΤΑΒΑΣΗ / 2. ΕΠΙΣΤΡΟΦΗ) παραμένει όπως τον περνάμε */}
+      <span className={`text-[11px] font-black ${colorClass} tracking-widest border-b border-slate-800 pb-2`}>
+        {title}
+      </span>
       
       <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ο</span>
+          <span className="text-[10px] text-slate-500 font-bold">Άθροισμα Ο</span>
           <span className="text-[13px] font-mono text-slate-200 font-bold">{sumBS !== undefined ? sumBS : "---"}</span>
         </div>
         <div className="flex flex-col gap-1 border-l border-slate-800/50">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Απόστασης S (Ο)</span>
+          <span className="text-[10px] text-slate-500 font-bold">Άθροισμα Απόστασης S (Ο)</span>
           <span className="text-[13px] font-mono text-slate-200 font-bold">{sumBS_S !== undefined ? sumBS_S : "---"}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-center pb-3 border-b border-slate-800/30">
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Ε</span>
+          <span className="text-[10px] text-slate-500 font-bold">Άθροισμα Ε</span>
           <span className="text-[13px] font-mono text-slate-200 font-bold">{sumFS !== undefined ? sumFS : "---"}</span>
         </div>
         <div className="flex flex-col gap-1 border-l border-slate-800/50">
-          <span className="text-[9px] text-slate-500 font-bold uppercase">Άθροισμα Απόστασης S (Ε)</span>
+          <span className="text-[10px] text-slate-500 font-bold">Άθροισμα Απόστασης S (Ε)</span>
           <span className="text-[13px] font-mono text-slate-200 font-bold">{sumFS_S !== undefined ? sumFS_S : "---"}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 pt-1 mt-auto">
         <div className="flex justify-between items-center px-2">
-          <span className={`text-[10px] ${colorClass}/70 font-bold uppercase`}>δh</span>
+          <span className={`text-[11px] ${colorClass}/70 font-bold`}>δh</span>
           <span className={`text-[14px] font-mono font-black ${colorClass}`}>{dh !== undefined ? dh : "---"}</span>
         </div>
         <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
-          <span className={`text-[10px] ${colorClass}/70 font-bold uppercase`}>S Ολικό</span>
+          <span className={`text-[11px] ${colorClass}/70 font-bold`}>S Ολικό</span>
           <span className={`text-[14px] font-mono font-black ${colorClass}`}>{totalS !== undefined ? totalS : "---"}</span>
         </div>
       </div>

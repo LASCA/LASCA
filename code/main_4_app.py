@@ -678,5 +678,54 @@ def calc_scale():
         print(f"Σφάλμα στον Συντελεστή Κλίμακας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+# ==========================================
+# 7. ENDPOINT ΓΙΑ ΧΩΡΟΣΤΑΘΜΙΣΗ (LEVELING) 
+# ==========================================
+@app.route('/api/leveling', methods=['POST'])
+def run_leveling():
+    try:
+        data = request.json
+        forward_data = data.get('forward', [])
+        backward_data = data.get('backward', [])
+        
+        # 1. Κλήση της νέας συνάρτησης υπολογισμών από το data_proccessing (dpr)
+        forward_metrics, backward_metrics, error_dh = dpr.calculate_leveling(forward_data, backward_data)
+        
+        # 2. Εύρεση του ενεργού Project
+        project_name = get_active_project_name()
+        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+        project_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 3. Αποθήκευση Δεδομένων ΚΑΙ Αποτελεσμάτων στο Project
+        save_path = project_dir / "latest_leveling.json"
+        
+        response_data = {
+            "forward": forward_data,
+            "backward": backward_data,
+            "metrics": {
+                "forward": forward_metrics,
+                "backward": backward_metrics,
+                "error_dh": error_dh
+            }
+        }
+        
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(response_data, f, ensure_ascii=False, indent=4)
+            
+        print(f"✅ ΓΕΦΥΡΑ: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
+
+        # 4. Επιστροφή στο React
+        return jsonify({
+            "status": "success",
+            "forward_results": forward_data,
+            "backward_results": backward_data,
+            "metrics": response_data["metrics"]
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά την αποθήκευση/υπολογισμό Χωροστάθμισης:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

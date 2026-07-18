@@ -926,3 +926,49 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
 
     except Exception as e:
         raise RuntimeError(f"Σφάλμα κατά τον υπολογισμό της χάραξης: {str(e)}")
+    
+def calculate_leveling(forward_data, backward_data):
+    """
+    Υπολογίζει τα αθροίσματα και τις διαφορές για τη χωροστάθμιση (Μετάβαση & Επιστροφή).
+    Βασίζεται στη μαθηματική σχέση: dh = Σ(Οπισθοσκοπεύσεων) - Σ(Εμπροσθοσκοπεύσεων)
+    """
+    
+    def calc_leg(data):
+        sum_bs = sum_fs = sum_bs_s = sum_fs_s = 0.0
+        
+        for row in data:
+            # Βοηθητική συνάρτηση για ασφαλή μετατροπή σε αριθμό
+            def to_float(val):
+                if val in [None, "", "---"]: return 0.0
+                try: return float(val)
+                except ValueError: return 0.0
+            
+            sum_bs += to_float(row.get('backsight'))
+            sum_fs += to_float(row.get('foresight'))
+            sum_bs_s += to_float(row.get('bs_s'))
+            sum_fs_s += to_float(row.get('fs_s'))
+            
+        # Υπολογισμός Υψομετρικής Διαφοράς (dh) και Συνολικής Απόστασης (S)
+        dh = sum_bs - sum_fs
+        total_s = sum_bs_s + sum_fs_s
+        
+        return {
+            "sum_backsights": round(sum_bs, 4),
+            "sum_foresights": round(sum_fs, 4),
+            "sum_bs_s": round(sum_bs_s, 2),
+            "sum_fs_s": round(sum_fs_s, 2),
+            "dh": round(dh, 4),
+            "total_s": round(total_s, 2)
+        }
+
+    # Εφαρμογή της λογικής για Μετάβαση και Επιστροφή
+    forward_metrics = calc_leg(forward_data) if forward_data else {}
+    backward_metrics = calc_leg(backward_data) if backward_data else {}
+    
+    # Σφάλμα κλεισίματος
+    error_dh = 0.0
+    if forward_metrics and backward_metrics:
+        # Θεωρητικά το dh μετάβασης + dh επιστροφής πρέπει να είναι 0
+        error_dh = round(forward_metrics.get('dh', 0.0) + backward_metrics.get('dh', 0.0), 4)
+
+    return forward_metrics, backward_metrics, error_dh
