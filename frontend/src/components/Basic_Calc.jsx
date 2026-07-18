@@ -12,7 +12,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
         {icon}
         <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">{title}</h3>
       </div>
-      <button onClick={onClear} className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-all" title="Καθαρισμός">
+      <button onClick={onClear} className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-all" title="Επαναφορά (Διατήρηση δεδομένων)">
         <RotateCcw size={14} />
       </button>
     </div>
@@ -28,7 +28,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
         <div className="flex gap-2 animate-in fade-in zoom-in duration-200">
           {result.map((res, idx) => (
             <div key={idx} className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
-              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">{resultLabels[idx]}</p>
+              <p className="text-[11px] font-bold text-emerald-500 tracking-widest">{resultLabels[idx]}</p>
               <p className="text-sm font-mono text-emerald-400">{res}</p>
             </div>
           ))}
@@ -46,12 +46,17 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
   </div>
 );
 
-const InputField = ({ label }) => (
+// ------------------------------------------------------------------
+// COMPONENT ΓΙΑ ΤΑ INPUTS
+// ------------------------------------------------------------------
+const InputField = ({ label, value, onChange }) => (
   <div className="flex flex-col gap-1 w-full">
     <label className="text-[11px] text-slate-400 ml-1 font-bold">{label}</label>
     <input 
       type="text" 
       inputMode="decimal"
+      value={value !== undefined ? value : ''}
+      onChange={onChange}
       className="bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
     />
   </div>
@@ -64,6 +69,92 @@ const BasicCalculations = () => {
   });
 
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
+
+  // ----------------------------------------------------------------
+  // 1. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 1ο ΘΕΜΕΛΙΩΔΕΣ
+  // ----------------------------------------------------------------
+  const [prob1Data, setProb1Data] = useState({ xa: '', ya: '', d: '', gab: '' });
+
+  const handleProb1Calculation = async () => {
+    if (!prob1Data.xa || !prob1Data.ya || !prob1Data.d || !prob1Data.gab) {
+      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, prob1: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          xa: parseFloat(prob1Data.xa),
+          ya: parseFloat(prob1Data.ya),
+          d: parseFloat(prob1Data.d),
+          gab: parseFloat(prob1Data.gab)
+        }),
+      });
+
+      if (!response.ok) throw new Error('Σφάλμα δικτύου');
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        prob1: [data.xb.toFixed(3), data.yb.toFixed(3)] 
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error('Αποτυχία επικοινωνίας με το server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, prob1: false }));
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // 2. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 2ο ΘΕΜΕΛΙΩΔΕΣ
+  // ----------------------------------------------------------------
+  const [prob2Data, setProb2Data] = useState({ xa: '', ya: '', xb: '', yb: '' });
+
+  const handleProb2Calculation = async () => {
+    if (!prob2Data.xa || !prob2Data.ya || !prob2Data.xb || !prob2Data.yb) {
+      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, prob2: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          xa: parseFloat(prob2Data.xa),
+          ya: parseFloat(prob2Data.ya),
+          xb: parseFloat(prob2Data.xb),
+          yb: parseFloat(prob2Data.yb)
+        }),
+      });
+
+      if (!response.ok) throw new Error('Σφάλμα δικτύου ή ταυτιζόμενα σημεία');
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        prob2: [data.d.toFixed(3), data.gab.toFixed(4)] 
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error('Αποτυχία επικοινωνίας με το server ή λάθος δεδομένα.');
+    } finally {
+      setLoadings(prev => ({ ...prev, prob2: false }));
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-6">
@@ -97,15 +188,31 @@ const BasicCalculations = () => {
           icon={<Navigation size={18} />}
           loading={loadings.prob1}
           result={results.prob1}
-          resultLabels={["X_B (m)", "Y_B (m)"]}
-          onCalculate={() => console.log('Εκτέλεση: 1ο Θεμελιώδες')}
-          onClear={() => clearResult('prob1')}
+          resultLabels={[<span>X<sub>B</sub> [m]</span>, <span>Y<sub>B</sub> [m]</span>]}
+          onCalculate={handleProb1Calculation}
+          onClear={() => clearResult('prob1')} // <--- ΑΛΛΑΓΗ ΕΔΩ: Απλή επαναφορά αποτελέσματος
         >
           <div className="grid grid-cols-2 gap-3">
-            <InputField label={<span>X<sub>A</sub> [m]</span>} />
-            <InputField label={<span>Y<sub>A</sub> [m]</span>} />
-            <InputField label={<span>D<sub>AB</sub> [m]</span>} />
-            <InputField label={<span>G<sub>A</sub> [grad]</span>} />
+            <InputField 
+              label={<span>X<sub>A</sub> [m]</span>} 
+              value={prob1Data.xa} 
+              onChange={(e) => setProb1Data({...prob1Data, xa: e.target.value})} 
+            />
+            <InputField 
+              label={<span>Y<sub>A</sub> [m]</span>} 
+              value={prob1Data.ya} 
+              onChange={(e) => setProb1Data({...prob1Data, ya: e.target.value})} 
+            />
+            <InputField 
+              label={<span>D<sub>AB</sub> [m]</span>} 
+              value={prob1Data.d} 
+              onChange={(e) => setProb1Data({...prob1Data, d: e.target.value})} 
+            />
+            <InputField 
+              label={<span>G<sub>A</sub> [grad]</span>} 
+              value={prob1Data.gab} 
+              onChange={(e) => setProb1Data({...prob1Data, gab: e.target.value})} 
+            />
           </div>
         </CalcWidget>
 
@@ -115,15 +222,31 @@ const BasicCalculations = () => {
           icon={<MapPin size={18} />}
           loading={loadings.prob2}
           result={results.prob2}
-          resultLabels={["D_AB (m)", "ΓΩΝΙΑ a_AB (grad)"]}
-          onCalculate={() => console.log('Εκτέλεση: 2ο Θεμελιώδες')}
-          onClear={() => clearResult('prob2')}
+          resultLabels={[<span>D<sub>AB</sub> [m]</span>, <span>G<sub>AB</sub> [grad]</span>]}
+          onCalculate={handleProb2Calculation}
+          onClear={() => clearResult('prob2')} // <--- ΑΛΛΑΓΗ ΕΔΩ: Απλή επαναφορά αποτελέσματος
         >
           <div className="grid grid-cols-2 gap-3">
-            <InputField label={<span>X<sub>A</sub> [m]</span>} />
-            <InputField label={<span>Y<sub>A</sub> [m]</span>} />
-            <InputField label={<span>X<sub>B</sub> [m]</span>} />
-            <InputField label={<span>Y<sub>B</sub> [m]</span>} />
+            <InputField 
+              label={<span>X<sub>A</sub> [m]</span>} 
+              value={prob2Data.xa}
+              onChange={(e) => setProb2Data({...prob2Data, xa: e.target.value})}
+            />
+            <InputField 
+              label={<span>Y<sub>A</sub> [m]</span>} 
+              value={prob2Data.ya}
+              onChange={(e) => setProb2Data({...prob2Data, ya: e.target.value})}
+            />
+            <InputField 
+              label={<span>X<sub>B</sub> [m]</span>} 
+              value={prob2Data.xb}
+              onChange={(e) => setProb2Data({...prob2Data, xb: e.target.value})}
+            />
+            <InputField 
+              label={<span>Y<sub>B</sub> [m]</span>} 
+              value={prob2Data.yb}
+              onChange={(e) => setProb2Data({...prob2Data, yb: e.target.value})}
+            />
           </div>
         </CalcWidget>
 

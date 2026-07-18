@@ -530,5 +530,60 @@ def run_stakeout():
         print(f"Σφάλμα κατά τον υπολογισμό χάραξης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+
+# ==========================================
+# 6. ENDPOINTS ΓΙΑ ΒΑΣΙΚΟΥΣ ΥΠΟΛΟΓΙΣΜΟΥΣ
+# ==========================================
+@app.route('/api/basic_calc/prob1', methods=['POST'])
+def calc_prob1():
+    try:
+        # Παίρνουμε τα δεδομένα από το React
+        data = request.json
+        
+        # Μετατροπή σε floats (με ασφάλεια αν κάτι πάει στραβά)
+        xa = float(data.get('xa', 0))
+        ya = float(data.get('ya', 0))
+        d = float(data.get('d', 0))
+        gab = float(data.get('gab', 0))
+
+        # Καλούμε τη συνάρτησή σου από το dpr
+        xb, yb = dpr.proto_themeliodes(xa, ya, d, gab)
+
+        # Επιστρέφουμε τα αποτελέσματα
+        return jsonify({"xb": xb, "yb": yb})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στο 1ο Θεμελιώδες:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/basic_calc/prob2', methods=['POST'])
+def calc_prob2():
+    try:
+        # Παίρνουμε τα δεδομένα από το React
+        data = request.json
+        
+        # Μετατροπή σε floats
+        xa = float(data.get('xa', 0))
+        ya = float(data.get('ya', 0))
+        xb = float(data.get('xb', 0))
+        yb = float(data.get('yb', 0))
+
+        # Καλούμε τη συνάρτησή σου από το dpr
+        result = dpr.deutero_them(xa, ya, xb, yb)
+        
+        if result is None:
+            return jsonify({"error": "Τα σημεία Α και Β ταυτίζονται."}), 400
+            
+        gab, d = result
+
+        # Επιστρέφουμε τα αποτελέσματα (Γωνία Διεύθυνσης, Απόσταση)
+        return jsonify({"gab": gab, "d": d})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στο 2ο Θεμελιώδες:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
