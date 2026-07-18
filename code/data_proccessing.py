@@ -770,6 +770,7 @@ def trig_leveling(dataframe):
     
     return dataframe
 
+# μαλλον θ αβγει εκτος
 def traverse_level_calc(measurements_json):
     """
     Δέχεται τα δεδομένα (JSON) απευθείας από το UI, 
