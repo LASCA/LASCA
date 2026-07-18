@@ -569,8 +569,6 @@ def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decim
             ])
 
 #Gwniometriseis
-import numpy as np
-
 def gwn(dataframe):
     # Αντίγραφο για ασφάλεια
     df = dataframe.copy()

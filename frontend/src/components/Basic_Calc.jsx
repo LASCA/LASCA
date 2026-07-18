@@ -10,7 +10,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
     <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/50">
       <div className="flex items-center gap-2 text-indigo-400">
         {icon}
-        <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-xs font-bold text-slate-200 tracking-wider">{title}</h3>
       </div>
       <button onClick={onClear} className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-all" title="Επαναφορά (Διατήρηση δεδομένων)">
         <RotateCcw size={14} />
@@ -197,6 +197,106 @@ const BasicCalculations = () => {
     }
   };
 
+  // ----------------------------------------------------------------
+  // 4. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΕΜΠΡΟΣΘΟΤΟΜΙΑ
+  // ----------------------------------------------------------------
+  const [intersectData, setIntersectData] = useState({ xa: '', ya: '', xb: '', yb: '', a: '', b: '' });
+
+  const handleIntersectCalculation = async () => {
+    if (!intersectData.xa || !intersectData.ya || !intersectData.xb || !intersectData.yb || !intersectData.a || !intersectData.b) {
+      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, intersect: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/intersect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          xa: parseFloat(intersectData.xa),
+          ya: parseFloat(intersectData.ya),
+          xb: parseFloat(intersectData.xb),
+          yb: parseFloat(intersectData.yb),
+          a: parseFloat(intersectData.a),
+          b: parseFloat(intersectData.b)
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Σφάλμα δικτύου');
+      }
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        intersect: [data.xm.toFixed(3), data.ym.toFixed(3)] 
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error(error.message || 'Αποτυχία επικοινωνίας με το server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, intersect: false }));
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // 5. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΟΠΙΣΘΟΤΟΜΙΑ
+  // ----------------------------------------------------------------
+  const [resectData, setResectData] = useState({ 
+    xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', 
+    a: '', b: '', c: '', A: '', B: '', C: '' 
+  });
+
+  const handleResectCalculation = async () => {
+    const { xa, ya, xb, yb, xc, yc, a, b, c, A, B, C } = resectData;
+    
+    if (!xa || !ya || !xb || !yb || !xc || !yc || !a || !b || !c || !A || !B || !C) {
+      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία της Οπισθοτομίας (12 σύνολο)!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, resect: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/resect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          xa: parseFloat(xa), ya: parseFloat(ya),
+          xb: parseFloat(xb), yb: parseFloat(yb),
+          xc: parseFloat(xc), yc: parseFloat(yc),
+          a: parseFloat(a), b: parseFloat(b), c: parseFloat(c),
+          A: parseFloat(A), B: parseFloat(B), C: parseFloat(C)
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Σφάλμα δικτύου');
+      }
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        resect: [data.xm.toFixed(3), data.ym.toFixed(3)] 
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error(error.message || 'Αποτυχία επικοινωνίας με το server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, resect: false }));
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -225,7 +325,7 @@ const BasicCalculations = () => {
 
         {/* --- 2. 1ο Θεμελιώδες --- */}
         <CalcWidget 
-          title="1ο Θεμελιωδες" 
+          title="1ο Θεμελιώδες" 
           icon={<Navigation size={18} />}
           loading={loadings.prob1}
           result={results.prob1}
@@ -259,7 +359,7 @@ const BasicCalculations = () => {
 
         {/* --- 3. 2ο Θεμελιώδες --- */}
         <CalcWidget 
-          title="2ο Θεμελιωδες" 
+          title="2ο Θεμελιώδες" 
           icon={<MapPin size={18} />}
           loading={loadings.prob2}
           result={results.prob2}
@@ -293,7 +393,7 @@ const BasicCalculations = () => {
 
         {/* --- 4. 3ο Θεμελιώδες --- */}
         <CalcWidget 
-          title="3ο Θεμελιωδες" 
+          title="3ο Θεμελιώδες" 
           icon={<Calculator size={18} />}
           loading={loadings.prob3}
           result={results.prob3}
@@ -315,41 +415,83 @@ const BasicCalculations = () => {
           </div>
         </CalcWidget>
 
-        {/* --- 5. Εμπροσθοτομία --- */}
+{/* --- 5. Εμπροσθοτομία --- */}
         <CalcWidget 
-          title="Εμπροσθοτομια" 
+          title="Εμπροσθοτομία" 
           icon={<Target size={18} />}
           loading={loadings.intersect}
           result={results.intersect}
-          resultLabels={["X_P (m)", "Y_P (m)"]}
-          onCalculate={() => console.log('Εκτέλεση: Εμπροσθοτομία')}
+          resultLabels={[<span>X<sub>E</sub> [m]</span>, <span>Y<sub>E</sub>[m]</span>]}
+          onCalculate={handleIntersectCalculation}
           onClear={() => clearResult('intersect')}
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 flex gap-3"><InputField label={<span>X<sub>A</sub></span>} /><InputField label={<span>Y<sub>A</sub></span>} /></div>
-            <div className="col-span-2 flex gap-3"><InputField label={<span>X<sub>B</sub></span>} /><InputField label={<span>Y<sub>B</sub></span>} /></div>
-            <InputField label="ΓΩΝΙΑ a (A->P)" />
-            <InputField label="ΓΩΝΙΑ b (B->P)" />
+            <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 flex gap-3">
+              <InputField 
+                label={<span>X<sub>A</sub> [m]</span>} 
+                value={intersectData.xa}
+                onChange={(e) => setIntersectData({...intersectData, xa: e.target.value})}
+              />
+              <InputField 
+                label={<span>Y<sub>A</sub> [m]</span>} 
+                value={intersectData.ya}
+                onChange={(e) => setIntersectData({...intersectData, ya: e.target.value})}
+              />
+            </div>
+            <div className="col-span-2 flex gap-3">
+              <InputField 
+                label={<span>X<sub>B</sub> [m]</span>} 
+                value={intersectData.xb}
+                onChange={(e) => setIntersectData({...intersectData, xb: e.target.value})}
+              />
+              <InputField 
+                label={<span>Y<sub>B</sub> [m]</span>} 
+                value={intersectData.yb}
+                onChange={(e) => setIntersectData({...intersectData, yb: e.target.value})}
+              />
+            </div>
+            {/* ΕΔΩ ΕΓΙΝΕ Η ΔΙΟΡΘΩΣΗ: Χρήση του intersectData αντί για resectData */}
+            <InputField 
+              label={<span>a&#770; [grad]</span>} 
+              value={intersectData.a} 
+              onChange={(e) => setIntersectData({...intersectData, a: e.target.value})} 
+            />
+            <InputField 
+              label={<span>b&#770; [grad]</span>} 
+              value={intersectData.b} 
+              onChange={(e) => setIntersectData({...intersectData, b: e.target.value})} 
+            />
           </div>
         </CalcWidget>
 
         {/* --- 6. Οπισθοτομία --- */}
         <CalcWidget 
-          title="Οπισθοτομια" 
+          title="Οπισθοτομία" 
           icon={<Target size={18} className="rotate-180" />}
           loading={loadings.resect}
           result={results.resect}
-          resultLabels={["X_P (m)", "Y_P (m)"]}
-          onCalculate={() => console.log('Εκτέλεση: Οπισθοτομία')}
+          resultLabels={[<span>X<sub>O</sub> [m]</span>, <span>Y<sub>O</sub> [m]</span>]}
+          onCalculate={handleResectCalculation}
           onClear={() => clearResult('resect')}
         >
            <div className="grid grid-cols-3 gap-2">
-            <InputField label={<span>X<sub>A</sub></span>} /><InputField label={<span>X<sub>B</sub></span>} /><InputField label={<span>X<sub>C</sub></span>} />
-            <InputField label={<span>Y<sub>A</sub></span>} /><InputField label={<span>Y<sub>B</sub></span>} /><InputField label={<span>Y<sub>C</sub></span>} />
-            <div className="col-span-3 flex gap-2 mt-1">
-              <InputField label="ΜΕΤΡ. ΓΩΝΙΑ α" />
-              <InputField label="ΜΕΤΡ. ΓΩΝΙΑ β" />
-            </div>
+            <InputField label={<span>X<sub>A</sub> [m]</span>} value={resectData.xa} onChange={(e) => setResectData({...resectData, xa: e.target.value})} />
+            <InputField label={<span>X<sub>B</sub> [m]</span>} value={resectData.xb} onChange={(e) => setResectData({...resectData, xb: e.target.value})} />
+            <InputField label={<span>X<sub>C</sub> [m]</span>} value={resectData.xc} onChange={(e) => setResectData({...resectData, xc: e.target.value})} />
+
+            <InputField label={<span>Y<sub>A</sub> [m]</span>} value={resectData.ya} onChange={(e) => setResectData({...resectData, ya: e.target.value})} />
+            <InputField label={<span>Y<sub>B</sub> [m]</span>} value={resectData.yb} onChange={(e) => setResectData({...resectData, yb: e.target.value})} />
+            <InputField label={<span>Y<sub>C</sub> [m]</span>} value={resectData.yc} onChange={(e) => setResectData({...resectData, yc: e.target.value})} />
+                        
+            <div className="col-span-3 border-t border-slate-800/50 my-1"></div>
+            
+            <InputField label={<span>a&#770; [grad]</span>} value={resectData.a} onChange={(e) => setResectData({...resectData, a: e.target.value})} />
+            <InputField label={<span>b&#770; [grad]</span>} value={resectData.b} onChange={(e) => setResectData({...resectData, b: e.target.value})} />
+            <InputField label={<span>c&#770; [grad]</span>} value={resectData.c} onChange={(e) => setResectData({...resectData, c: e.target.value})} />
+
+            <InputField label={<span>A&#770; [grad]</span>} value={resectData.A} onChange={(e) => setResectData({...resectData, A: e.target.value})} />
+            <InputField label={<span>B&#770; [grad]</span>} value={resectData.B} onChange={(e) => setResectData({...resectData, B: e.target.value})} />
+            <InputField label={<span>C&#770; [grad]</span>} value={resectData.C} onChange={(e) => setResectData({...resectData, C: e.target.value})} />
           </div>
         </CalcWidget>
 

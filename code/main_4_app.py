@@ -605,5 +605,56 @@ def calc_prob3():
         print(f"Σφάλμα στο 3ο Θεμελιώδες:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+@app.route('/api/basic_calc/intersect', methods=['POST'])
+def calc_intersect():
+    try:
+        data = request.json
+        
+        # Λήψη δεδομένων από το React
+        xa = float(data.get('xa', 0))
+        ya = float(data.get('ya', 0))
+        xb = float(data.get('xb', 0))
+        yb = float(data.get('yb', 0))
+        a = float(data.get('a', 0))
+        b = float(data.get('b', 0))
+
+        # Κλήση της έτοιμης συνάρτησης από το data_proccessing (dpr)
+        xm, ym = dpr.empros(xa, ya, xb, yb, a, b)
+
+        # Επιστροφή των αποτελεσμάτων
+        return jsonify({"xm": xm, "ym": ym})
+        
+    except ZeroDivisionError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στην Εμπροσθοτομία:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/basic_calc/resect', methods=['POST'])
+def calc_resect():
+    try:
+        data = request.json
+        
+        # Λήψη και των 12 δεδομένων από το React
+        xa, ya = float(data.get('xa', 0)), float(data.get('ya', 0))
+        xb, yb = float(data.get('xb', 0)), float(data.get('yb', 0))
+        xc, yc = float(data.get('xc', 0)), float(data.get('yc', 0))
+        
+        a, b, c = float(data.get('a', 0)), float(data.get('b', 0)), float(data.get('c', 0))
+        A, B, C = float(data.get('A', 0)), float(data.get('B', 0)), float(data.get('C', 0))
+
+        # Κλήση της συνάρτησης tienstra
+        xm, ym = dpr.tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C)
+
+        return jsonify({"xm": xm, "ym": ym})
+        
+    except ZeroDivisionError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στην Οπισθοτομία:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
