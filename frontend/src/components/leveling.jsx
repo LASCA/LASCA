@@ -136,7 +136,7 @@ const Leveling = ({
       <div className="flex flex-1 flex-col gap-6 min-h-0 overflow-y-auto custom-scrollbar pr-2">
         
         {/* ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ ΧΩΡΟΣΤΑΘΜΙΣΗΣ */}
-        <div className="flex-none min-h-[480px] flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
+        <div className="flex-none flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between sticky top-0 z-30">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-4">
