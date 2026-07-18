@@ -585,5 +585,25 @@ def calc_prob2():
         print(f"Σφάλμα στο 2ο Θεμελιώδες:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+@app.route('/api/basic_calc/prob3', methods=['POST'])
+def calc_prob3():
+    try:
+        data = request.json
+        
+        # Παίρνουμε τις γωνίες από το React
+        gprev = float(data.get('gprev', 0))
+        b = float(data.get('b', 0))
+
+        # Υπολογισμός 3ου Θεμελιώδους
+        gnext = dpr.tri_them(gprev, b)
+
+        # Επιστρέφουμε τη νέα γωνία διεύθυνσης
+        return jsonify({"gnext": gnext})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στο 3ο Θεμελιώδες:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -156,6 +156,47 @@ const BasicCalculations = () => {
     }
   };
 
+  // ----------------------------------------------------------------
+  // 3. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 3ο ΘΕΜΕΛΙΩΔΕΣ
+  // ----------------------------------------------------------------
+  const [prob3Data, setProb3Data] = useState({ gprev: '', b: '' });
+
+  const handleProb3Calculation = async () => {
+    if (!prob3Data.gprev || !prob3Data.b) {
+      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!');
+      return;
+    }
+
+    setLoadings(prev => ({ ...prev, prob3: true }));
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gprev: parseFloat(prob3Data.gprev),
+          b: parseFloat(prob3Data.b)
+        }),
+      });
+
+      if (!response.ok) throw new Error('Σφάλμα δικτύου');
+
+      const data = await response.json();
+      
+      setResults(prev => ({ 
+        ...prev, 
+        prob3: [data.gnext.toFixed(4)] 
+      }));
+      toast.success('Επιτυχής υπολογισμός!');
+      
+    } catch (error) {
+      console.error("Σφάλμα:", error);
+      toast.error('Αποτυχία επικοινωνίας με το server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, prob3: false }));
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -190,7 +231,7 @@ const BasicCalculations = () => {
           result={results.prob1}
           resultLabels={[<span>X<sub>B</sub> [m]</span>, <span>Y<sub>B</sub> [m]</span>]}
           onCalculate={handleProb1Calculation}
-          onClear={() => clearResult('prob1')} // <--- ΑΛΛΑΓΗ ΕΔΩ: Απλή επαναφορά αποτελέσματος
+          onClear={() => clearResult('prob1')}
         >
           <div className="grid grid-cols-2 gap-3">
             <InputField 
@@ -224,7 +265,7 @@ const BasicCalculations = () => {
           result={results.prob2}
           resultLabels={[<span>D<sub>AB</sub> [m]</span>, <span>G<sub>AB</sub> [grad]</span>]}
           onCalculate={handleProb2Calculation}
-          onClear={() => clearResult('prob2')} // <--- ΑΛΛΑΓΗ ΕΔΩ: Απλή επαναφορά αποτελέσματος
+          onClear={() => clearResult('prob2')}
         >
           <div className="grid grid-cols-2 gap-3">
             <InputField 
@@ -256,17 +297,21 @@ const BasicCalculations = () => {
           icon={<Calculator size={18} />}
           loading={loadings.prob3}
           result={results.prob3}
-          resultLabels={["ΓΩΝΙΑ β (grad)"]}
-          onCalculate={() => console.log('Εκτέλεση: 3ο Θεμελιώδες')}
+          resultLabels={[<span>G<sub>next</sub> [grad]</span>]}
+          onCalculate={handleProb3Calculation}
           onClear={() => clearResult('prob3')}
         >
-          <div className="grid grid-cols-3 gap-3">
-            <InputField label={<span>X<sub>A</sub></span>} />
-            <InputField label={<span>X<sub>B</sub> (Κέντρο)</span>} />
-            <InputField label={<span>X<sub>C</sub></span>} />
-            <InputField label={<span>Y<sub>A</sub></span>} />
-            <InputField label={<span>Y<sub>B</sub> (Κέντρο)</span>} />
-            <InputField label={<span>Y<sub>C</sub></span>} />
+          <div className="grid grid-cols-2 gap-3">
+            <InputField 
+              label={<span>G<sub>prev</sub> [grad]</span>} 
+              value={prob3Data.gprev}
+              onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
+            />
+            <InputField 
+              label={<span>Γωνία β [grad]</span>} 
+              value={prob3Data.b}
+              onChange={(e) => setProb3Data({...prob3Data, b: e.target.value})}
+            />
           </div>
         </CalcWidget>
 
