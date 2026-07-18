@@ -108,7 +108,7 @@ const Header = ({ activeTab }) => {
           textAccent: "text-emerald-500",
           bgAccent: "bg-emerald-500",
           stats: [
-            { label: "SUBJECT", value: "TOPO I/II", valColor: "text-cyan-400" }
+            { label: "SUBJECT", value: "TOPO I/ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU", valColor: "text-cyan-400" }
           ]
         };
       

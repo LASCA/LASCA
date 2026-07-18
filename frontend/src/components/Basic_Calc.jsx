@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast';
 // ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: Το γενικό "Πλαίσιο" (Card) για κάθε υπολογισμό
 // ------------------------------------------------------------------
-const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loading, resultLabels }) => (
+const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loading, resultLabels, hideActionArea }) => (
   <div className="bg-[#0b1220] rounded-2xl border border-slate-800/60 p-5 flex flex-col shadow-lg hover:border-slate-700/80 transition-colors duration-300">
     <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/50">
       <div className="flex items-center gap-2 text-indigo-400">
@@ -22,27 +22,29 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
       {children}
     </div>
 
-    {/* Περιοχή Αποτελέσματος & Κουμπί Εκτέλεσης */}
-    <div className="mt-5 pt-4 border-t border-slate-800/50 flex flex-col gap-3">
-      {result ? (
-        <div className="flex gap-2 animate-in fade-in zoom-in duration-200">
-          {result.map((res, idx) => (
-            <div key={idx} className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
-              <p className="text-[11px] font-bold text-emerald-500 tracking-widest">{resultLabels[idx]}</p>
-              <p className="text-sm font-mono text-emerald-400">{res}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <button 
-          onClick={onCalculate}
-          disabled={loading}
-          className="w-full py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-500/10 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
-        >
-          {loading ? 'Υπολογισμός...' : <><Play size={14} fill="currentColor"/> Εκτέλεση</>}
-        </button>
-      )}
-    </div>
+    {/* Περιοχή Αποτελέσματος & Κουμπί Εκτέλεσης (Κρύβεται αν hideActionArea είναι true) */}
+    {!hideActionArea && (
+      <div className="mt-5 pt-4 border-t border-slate-800/50 flex flex-col gap-3">
+        {result ? (
+          <div className="flex gap-2 animate-in fade-in zoom-in duration-200">
+            {result.map((res, idx) => (
+              <div key={idx} className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
+                <p className="text-[11px] font-bold text-emerald-500 tracking-widest">{resultLabels[idx]}</p>
+                <p className="text-sm font-mono text-emerald-400">{res}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <button 
+            onClick={onCalculate}
+            disabled={loading}
+            className="w-full py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-500/10 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
+          >
+            {loading ? 'Υπολογισμός...' : <><Play size={14} fill="currentColor"/> Εκτέλεση</>}
+          </button>
+        )}
+      </div>
+    )}
   </div>
 );
 
@@ -65,10 +67,52 @@ const InputField = ({ label, value, onChange }) => (
 const BasicCalculations = () => {
   const [loadings, setLoadings] = useState({});
   const [results, setResults] = useState({
-    convert: null, prob1: null, prob2: null, prob3: null, scale: null, intersect: null, resect: null
+    prob1: null, prob2: null, prob3: null, scale: null, intersect: null, resect: null
   });
 
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
+
+  // ----------------------------------------------------------------
+  // 0. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ (REAL-TIME)
+  // ----------------------------------------------------------------
+  const [angles, setAngles] = useState({ rad: '', grad: '', deg: '' });
+
+  const handleAngleChange = (type, value) => {
+    // Αν ο χρήστης αδειάσει το πεδίο, καθαρίζουμε όλα τα πεδία
+    if (value === '') {
+      setAngles({ rad: '', grad: '', deg: '' });
+      return;
+    }
+
+    // Αντικατάσταση τυχόν κόμματος με τελεία για σωστό parsing
+    const normalizedValue = value.replace(',', '.');
+    const num = parseFloat(normalizedValue);
+
+    // Αν πληκτρολογεί χαρακτήρα που δεν είναι αριθμός (π.χ. '-' ή '.'), 
+    // ενημερώνουμε το τρέχον input αλλά δεν υπολογίζουμε τα άλλα
+    if (isNaN(num)) {
+      setAngles(prev => ({ ...prev, [type]: value }));
+      return;
+    }
+
+    let rad, grad, deg;
+    
+    if (type === 'rad') {
+      rad = value; // Διατηρούμε το input όπως πληκτρολογείται
+      grad = (num * 200 / Math.PI).toFixed(4);
+      deg = (num * 180 / Math.PI).toFixed(4);
+    } else if (type === 'grad') {
+      grad = value;
+      rad = (num * Math.PI / 200).toFixed(6);
+      deg = (num * 180 / 200).toFixed(4);
+    } else if (type === 'deg') {
+      deg = value;
+      rad = (num * Math.PI / 180).toFixed(6);
+      grad = (num * 200 / 180).toFixed(4);
+    }
+
+    setAngles({ rad, grad, deg });
+  };
 
   // ----------------------------------------------------------------
   // 1. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 1ο ΘΕΜΕΛΙΩΔΕΣ
@@ -345,21 +389,25 @@ const BasicCalculations = () => {
         <CalcWidget 
           title="Μετατροπές Μονάδων Γωνίας" 
           icon={<Repeat size={18} />}
-          loading={loadings.convert}
-          result={results.convert}
-          resultLabels={["GRADIANS", "DEGREES"]}
-          onCalculate={() => console.log('Εκτέλεση: Μετατροπές')}
-          onClear={() => clearResult('convert')}
+          hideActionArea={true} 
+          onClear={() => setAngles({ rad: '', grad: '', deg: '' })}
         >
           <div className="flex flex-col gap-3 h-full justify-center">
-            <InputField label="Εισαγωγή Τιμής" />
-            <div className="flex gap-2">
-              <select className="bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none w-full">
-                <option>Από Radians</option>
-                <option>Από Gradians (g)</option>
-                <option>Από Degrees (°)</option>
-              </select>
-            </div>
+            <InputField 
+              label="Ακτίνια [rad]" 
+              value={angles.rad}
+              onChange={(e) => handleAngleChange('rad', e.target.value)}
+            />
+            <InputField 
+              label="Βαθμοί [grad]" 
+              value={angles.grad}
+              onChange={(e) => handleAngleChange('grad', e.target.value)}
+            />
+            <InputField 
+              label="Μοίρες [deg]" 
+              value={angles.deg}
+              onChange={(e) => handleAngleChange('deg', e.target.value)}
+            />
           </div>
         </CalcWidget>
 
@@ -390,7 +438,7 @@ const BasicCalculations = () => {
               onChange={(e) => setProb1Data({...prob1Data, d: e.target.value})} 
             />
             <InputField 
-              label={<span>G<sub>A</sub> [grad]</span>} 
+              label={<span>G<sub>AB</sub> [grad]</span>} 
               value={prob1Data.gab} 
               onChange={(e) => setProb1Data({...prob1Data, gab: e.target.value})} 
             />
@@ -450,7 +498,7 @@ const BasicCalculations = () => {
                 onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
               />
               <InputField 
-                label={<span>β&#770; [grad]</span>} 
+                label={<span>b&#770; [grad]</span>} 
                 value={prob3Data.b}
                 onChange={(e) => setProb3Data({...prob3Data, b: e.target.value})}
               />
