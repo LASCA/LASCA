@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, PlusCircle, Play, Cpu } from 'lucide-react';
+import { Trash2, PlusCircle, Play, Cpu, ArrowLeft } from 'lucide-react';
 
 const Goniometry = ({ rows = [], setRows }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   
-  // ΝΕΑ ΕΞΥΠΝΗ ΣΥΝΑΡΤΗΣΗ: Δέχεται την τιμή και τα δεκαδικά (προεπιλογή τα 4)
   const formatDecimals = (val, decimals = 4) => {
     if (val === "" || val === null || val === undefined) return "";
     const num = parseFloat(String(val).replace(',', '.'));
@@ -128,7 +127,7 @@ const Goniometry = ({ rows = [], setRows }) => {
     }
   };
 
-  const totalColumns = showResults ? 15 : 7;
+  const totalColumns = showResults ? 14 : 7;
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#030712] p-4 sm:p-6 font-sans">
@@ -152,27 +151,38 @@ const Goniometry = ({ rows = [], setRows }) => {
                 
                 {showResults && (
                   <>
-                    <th className="px-2 py-3 text-[10px] font-black text-blue-500/80 tracking-widest whitespace-nowrap">Μέσος Όρος</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-blue-500/80 tracking-widest whitespace-nowrap">Ανηγμένη</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-emerald-500/80 tracking-widest whitespace-nowrap">Γεν. Μέσος</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-purple-500/80 tracking-widest whitespace-nowrap">v_m (cc)</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-purple-500/80 tracking-widest whitespace-nowrap">v'_j (cc)</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-purple-500/80 tracking-widest whitespace-nowrap">v_ji (cc)</th>
-                    <th className="px-2 py-3 text-[10px] font-black text-purple-500/80 tracking-widest whitespace-nowrap">vv</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Μέσος Όρος</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Ανηγμένη</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-emerald-400 tracking-widest whitespace-nowrap">Γεν. Μέσος</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_m (cc)</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v'_j (cc)</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_ji (cc)</th>
+                    <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">vv</th>
                   </>
                 )}
 
-                <th className="px-2 py-3 w-12 text-right sticky right-0 bg-[#0f172a]">
-                  <button 
-                    onClick={handleCalculate}
-                    disabled={isLoading || !rows || rows.length === 0}
-                    className={`group inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
-                      isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
-                    }`}
-                    title="Εκτέλεση Υπολογισμού"
-                  >
-                    {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
-                  </button>
+                <th className="px-2 py-3 w-20 text-right sticky right-0 bg-[#0f172a]">
+                  <div className="flex justify-end gap-2 pr-1">
+                    {showResults && (
+                      <button 
+                        onClick={() => setShowResults(false)}
+                        className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+                        title="Επιστροφή στην επεξεργασία"
+                      >
+                        <ArrowLeft size={14} />
+                      </button>
+                    )}
+                    <button 
+                      onClick={handleCalculate}
+                      disabled={isLoading || !rows || rows.length === 0}
+                      className={`group inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
+                        isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
+                      }`}
+                      title="Εκτέλεση Υπολογισμού"
+                    >
+                      {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
+                    </button>
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -192,25 +202,27 @@ const Goniometry = ({ rows = [], setRows }) => {
                     <td className="px-1 py-2">
                       <input 
                         id={`input-${index}-from`}
-                        className="w-full bg-transparent p-1.5 text-sm outline-none rounded text-amber-300/80 focus:bg-slate-800/50" 
+                        className={`w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`}
                         value={row.from || ""} 
                         onChange={(e) => handleInputChange(row.id, 'from', e.target.value)}
                         onKeyDown={(e) => handleKeyDown(e, index, 'from')}
+                        placeholder="-"
                       />
                     </td>
                     <td className="px-1 py-2">
                       <input 
                         id={`input-${index}-to`}
-                        className="w-full bg-transparent p-1.5 text-sm outline-none rounded text-amber-300/80 focus:bg-slate-800/50" 
+                        className={`w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`}
                         value={row.to || ""} 
                         onChange={(e) => handleInputChange(row.id, 'to', e.target.value)}
                         onKeyDown={(e) => handleKeyDown(e, index, 'to')}
+                        placeholder="-"
                       />
                     </td>
                     <td className="px-1 py-2">
                       <input 
                         id={`input-${index}-period`} 
-                        className="w-full bg-transparent p-1.5 text-sm font-mono text-slate-400 outline-none rounded focus:bg-slate-800/50" 
+                        className={`w-full bg-transparent p-1.5 text-left font-mono text-[13px] outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all ${showResults ? 'text-slate-600 font-medium' : 'text-slate-400 font-bold'}`}
                         value={row.period || ""} 
                         onChange={(e) => handleInputChange(row.id, 'period', e.target.value)} 
                         onKeyDown={(e) => handleKeyDown(e, index, 'period')}
@@ -219,7 +231,7 @@ const Goniometry = ({ rows = [], setRows }) => {
                     <td className="px-1 py-2">
                       <input 
                         id={`input-${index}-faceI`} 
-                        className="w-full bg-transparent p-1.5 text-sm font-mono text-slate-300 outline-none rounded focus:bg-slate-800/50" 
+                        className={`w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all ${showResults ? 'text-cyan-600/70 font-medium' : 'text-cyan-400 font-bold'}`}
                         value={row.faceI || ""} 
                         onBlur={(e) => handleBlur(row.id, 'faceI', e.target.value)} 
                         onChange={(e) => {
@@ -227,12 +239,13 @@ const Goniometry = ({ rows = [], setRows }) => {
                           setShowResults(false);
                         }} 
                         onKeyDown={(e) => handleKeyDown(e, index, 'faceI')}
+                        placeholder="-"
                       />
                     </td>
                     <td className="px-1 py-2">
                       <input 
                         id={`input-${index}-faceII`} 
-                        className="w-full bg-transparent p-1.5 text-sm font-mono text-slate-300 outline-none rounded focus:bg-slate-800/50" 
+                        className={`w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all ${showResults ? 'text-cyan-600/70 font-medium' : 'text-cyan-400 font-bold'}`}
                         value={row.faceII || ""} 
                         onBlur={(e) => handleBlur(row.id, 'faceII', e.target.value)} 
                         onChange={(e) => {
@@ -240,18 +253,19 @@ const Goniometry = ({ rows = [], setRows }) => {
                           setShowResults(false);
                         }} 
                         onKeyDown={(e) => handleKeyDown(e, index, 'faceII')}
+                        placeholder="-"
                       />
                     </td>
                     
                     {showResults && (
                       <>
-                        <td className="px-2 py-2 text-[13px] font-mono text-blue-400/80 whitespace-nowrap">{formatDecimals(row.mesos_oros, 4)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-blue-400/80 whitespace-nowrap">{formatDecimals(row.anigmeni_timi, 4)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-emerald-400/80 whitespace-nowrap">{formatDecimals(row.genikos_mesos, 4)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-purple-400/80 whitespace-nowrap">{formatDecimals(row.v_m, 0)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-purple-400/80 whitespace-nowrap">{formatDecimals(row.v_prime, 1)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-purple-400/80 whitespace-nowrap">{formatDecimals(row.v_ji, 1)}</td>
-                        <td className="px-2 py-2 text-[13px] font-mono text-purple-400/80 whitespace-nowrap">{formatDecimals(row.vv, 2)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-blue-400 whitespace-nowrap">{formatDecimals(row.mesos_oros, 4)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-blue-400 whitespace-nowrap">{formatDecimals(row.anigmeni_timi, 4)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-emerald-400 whitespace-nowrap">{formatDecimals(row.genikos_mesos, 4)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_m, 0)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_prime, 1)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_ji, 1)}</td>
+                        <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.vv, 2)}</td>
                       </>
                     )}
 

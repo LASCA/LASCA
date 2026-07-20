@@ -1,38 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
-  Play, Cpu, Image as ImageIcon, Maximize2, Download, X
+  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown
 } from 'lucide-react';
 
-// --- ΑΛΛΑΓΗ 1: Δεχόμαστε τα νέα props από το App.jsx ---
+// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
+const CustomDropdown = ({ label, value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Κλείσιμο του μενού αν ο χρήστης κάνει κλικ εκτός
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-1 group relative" ref={dropdownRef}>
+      <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-3 py-1.5 outline-none focus:border-amber-500/50 transition-all cursor-pointer font-mono hover:border-slate-700 flex items-center justify-between gap-3 min-w-[120px]"
+      >
+        <span>{options.find(opt => opt.value === value)?.label || value}</span>
+        <ChevronDown size={12} className={`text-amber-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full bg-[#0b1120] border border-slate-800/80 rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[10px] animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 transition-colors text-xs ${
+                  value === opt.value 
+                    ? 'text-amber-400 font-bold bg-amber-500/5 border-l-2 border-amber-500' 
+                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSettings }) => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // --- ΑΛΛΑΓΗ 2: Αρχικοποιούμε τα dropdowns από τα metrics ---
   const [klass, setKlass] = useState(metrics.klass || "Πρωτεύουσα");
   const [terrain, setTerrain] = useState(metrics.terrain || "Ομαλό");
   const [scale, setScale] = useState(metrics.scale || "1:1000");
 
-  // ΠΡΟΣΘΗΚΗ: Όταν φορτώνουμε το Project από τη μνήμη, τα dropdowns πρέπει να ενημερώνονται!
-  React.useEffect(() => {
+  useEffect(() => {
     if (metrics.klass) setKlass(metrics.klass);
     if (metrics.terrain) setTerrain(metrics.terrain);
     if (metrics.scale) setScale(metrics.scale);
   }, [metrics]);
 
-  // --- ΑΛΛΑΓΗ 3: Το plotImage πλέον διαβάζεται από το App.jsx ---
   const plotImage = metrics.plotImage || null;
 
   const handleInputChange = (index, field, value) => {
-    // ... (ο υπόλοιπος κώδικας συνεχίζει κανονικά)
-    const newData = [...data]; // Χρησιμοποιούμε απευθείας το prop data
+    const newData = [...data];
     newData[index] = { ...newData[index], [field]: value };
-    
-    // Ενημερώνουμε ΑΠΕΥΘΕΙΑΣ το App.jsx. Έτσι γίνεται auto-save σε κάθε πληκτρολόγηση!
     if (setData) setData(newData); 
   };
 
@@ -95,23 +145,20 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       },{
         headers: {
           'Active-Project': typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || '')
-          }
-          });
+        }
+      });
 
       if (response.data) {
-        // 1. Στέλνουμε τα διορθωμένα δεδομένα (πίνακας) στο App.jsx
         if (response.data.results && setData) {
           setData(response.data.results);
         }
-        
-        // 2. Στέλνουμε τα σφάλματα (metrics) ΚΑΙ το διάγραμμα ΚΑΙ τις ρυθμίσεις στο App.jsx!
         if (setMetrics) {
           setMetrics({
             ...(response.data.metrics || {}),
-            plotImage: response.data.plot || null, // Αποθηκεύουμε την εικόνα!
-            klass: klass,     // Σώζουμε και την επιλογή Τάξης
-            terrain: terrain, // Σώζουμε και την επιλογή Εδάφους
-            scale: scale      // Σώζουμε και την επιλογή Κλίμακας
+            plotImage: response.data.plot || null,
+            klass: klass,
+            terrain: terrain,
+            scale: scale
           });
         }
       }
@@ -141,27 +188,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
-
-         select {
-           appearance: none;
-           background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-           background-repeat: no-repeat;
-           background-position: right 0.4rem center;
-           background-size: 0.7em;
-           color-scheme: dark; 
-         }
-
-          select option {
-            background-color: #0b1120;
-            color: #94a3b8;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            padding: 12px;
-          }
-
-          select:hover {
-            border-color: rgba(251, 191, 36, 0.4);
-            background-color: rgba(15, 23, 42, 0.8);
-          }
         `
       }} />
 
@@ -181,54 +207,38 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200 uppercase">Δεδομένα Όδευσης</span>
                 </div>
 
+                {/* ΝΕΑ CUSTOM DROPDOWNS ΠΟΥ ΑΝΤΙΚΑΘΙΣΤΟΥΝ ΤΑ SELECT */}
                 <div className="flex items-center gap-5 border-l border-slate-800/60 pl-6">
-                  {/* Τάξη */}
-                  <div className="flex flex-col gap-1 group">
-                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
-                      Τάξη
-                    </label>
-                    <select 
-                      value={klass}
-                      onChange={(e) => setKlass(e.target.value)}
-                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
-                    >
-                      <option value="Πρωτεύουσα">Ι (Πρωτεύουσα)</option>
-                      <option value="Δευτερεύουσα">ΙΙ (Δευτερεύουσα)</option>
-                    </select>
-                  </div>
-
-                  {/* Έδαφος */}
-                  <div className="flex flex-col gap-1 group">
-                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
-                      Έδαφος
-                    </label>
-                    <select 
-                      value={terrain}
-                      onChange={(e) => setTerrain(e.target.value)}
-                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
-                    >
-                      <option value="Ομαλό">Ομαλό</option>
-                      <option value="Κεκλιμένο">Κεκλιμένο</option>
-                      <option value="Ανώμαλο">Ανώμαλο</option> 
-                    </select>
-                  </div>
-
-                  {/* Κλίμακα */}
-                  <div className="flex flex-col gap-1 group">
-                    <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
-                      Κλίμακα
-                    </label>
-                    <select 
-                      value={scale}
-                      onChange={(e) => setScale(e.target.value)}
-                      className="bg-slate-950/40 border border-slate-800 text-[10px] text-slate-300 rounded-md px-2 pr-6 py-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-pointer font-mono hover:border-slate-700"
-                    >
-                      <option value="1:200">1:200</option>
-                      <option value="1:500">1:500</option>
-                      <option value="1:1000">1:1000</option>
-                      <option value="1:2000">1:2000</option>
-                    </select>
-                  </div>
+                  <CustomDropdown 
+                    label="Τάξη" 
+                    value={klass} 
+                    onChange={setKlass} 
+                    options={[
+                      { value: "Πρωτεύουσα", label: "Ι (Πρωτεύουσα)" },
+                      { value: "Δευτερεύουσα", label: "ΙΙ (Δευτερεύουσα)" }
+                    ]} 
+                  />
+                  <CustomDropdown 
+                    label="Έδαφος" 
+                    value={terrain} 
+                    onChange={setTerrain} 
+                    options={[
+                      { value: "Ομαλό", label: "Ομαλό" },
+                      { value: "Κεκλιμένο", label: "Κεκλιμένο" },
+                      { value: "Ανώμαλο", label: "Ανώμαλο" }
+                    ]} 
+                  />
+                  <CustomDropdown 
+                    label="Κλίμακα" 
+                    value={scale} 
+                    onChange={setScale} 
+                    options={[
+                      { value: "1:200", label: "1:200" },
+                      { value: "1:500", label: "1:500" },
+                      { value: "1:1000", label: "1:1000" },
+                      { value: "1:2000", label: "1:2000" }
+                    ]} 
+                  />
                 </div>
               </div>
 
@@ -269,24 +279,23 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                     data.map((row, idx) => (
                       <tr key={idx} className="hover:bg-emerald-500/[0.04] active:bg-emerald-500/[0.08] transition-all duration-150 group">
                         <td className="p-2">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full flex-none ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse' : 'bg-slate-800 group-hover:bg-slate-600'}`} />
-                            <input 
-                              id={`input-${idx}-name`}
-                              type="text"
-                              value={row.name ?? ""}
-                              onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
-                              onKeyDown={(e) => handleKeyDown(e, idx, 'name')}
-                              className="bg-transparent w-full font-bold text-slate-400 group-hover:text-emerald-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-2 py-2 transition-all"
-                              placeholder="Name"
-                            />
-                          </div>
-                        </td>
-                        <td className="p-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full flex-none ${row.name?.toString().startsWith('Σ') ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)] animate-pulse' : 'bg-slate-600 group-hover:bg-slate-400 transition-colors'}`} />
+                          <input 
+                            id={`input-${idx}-name`}
+                            type="text"
+                            value={row.name ?? ""}
+                            onChange={(e) => handleInputChange(idx, 'name', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'name')}
+                            className="bg-transparent w-full font-bold text-slate-200 group-hover:text-white text-sm tracking-tight outline-none focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 rounded px-2 py-2 transition-all"
+                            placeholder="Name"
+                          />
+                        </div>
+                      </td>
+                      <td className="p-2">
                         <input 
                           id={`input-${idx}-hz`}
                           type="text"
-                          /* ΕΔΩ ΓΙΝΕΤΑΙ ΤΟ ΚΟΛΠΟ ΜΕ ΤΑ ΔΕΚΑΔΙΚΑ */
                           value={
                             document.activeElement?.id === `input-${idx}-hz`
                               ? (row.hz ?? "")
@@ -295,49 +304,49 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
                           onBlur={(e) => handleInputChange(idx, 'hz', formatVal(e.target.value, 4))}
                           onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
-                          className="bg-transparent w-full font-mono text-amber-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
+                          className="bg-transparent w-full font-mono text-cyan-400 font-bold text-center text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 rounded px-2 py-2 transition-all"
                           placeholder="-"
                         />
-                        </td>
-                        <td className="p-2">
-                          <input 
-                            id={`input-${idx}-sd`}
-                            type="text"
-                            value={
-                            document.activeElement?.id === `input-${idx}-sd`
-                              ? (row.sd ?? "")
-                              : formatVal(row.sd, 3)
-                            }
-                            onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
-                            className="bg-transparent w-full font-mono text-slate-300 text-center text-sm outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500/50 rounded px-2 py-2 transition-all"
-                            placeholder="-"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input 
-                            id={`input-${idx}-x`}
-                            type="text"
-                            value={row.x ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'x')}
-                            className="bg-transparent w-full font-mono text-cyan-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
-                            placeholder="-"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input 
-                            id={`input-${idx}-y`}
-                            type="text"
-                            value={row.y ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'y')}
-                            className="bg-transparent w-full font-mono text-cyan-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-cyan-500/50 rounded px-2 py-2 transition-all"
-                            placeholder="-"
-                          />
-                        </td>
-                        <td className="p-2">
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          id={`input-${idx}-sd`}
+                          type="text"
+                          value={
+                          document.activeElement?.id === `input-${idx}-sd`
+                            ? (row.sd ?? "")
+                            : formatVal(row.sd, 3)
+                          }
+                          onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
+                          onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
+                          onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
+                          className="bg-transparent w-full font-mono text-cyan-400 font-bold text-center text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 rounded px-2 py-2 transition-all"
+                          placeholder="-"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          id={`input-${idx}-x`}
+                          type="text"
+                          value={row.x ?? ""}
+                          onChange={(e) => handleInputChange(idx, 'x', e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, idx, 'x')}
+                          className="bg-transparent w-full font-mono text-emerald-400 font-bold text-right tabular-nums text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 rounded px-2 py-2 transition-all"
+                          placeholder="-"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          id={`input-${idx}-y`}
+                          type="text"
+                          value={row.y ?? ""}
+                          onChange={(e) => handleInputChange(idx, 'y', e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, idx, 'y')}
+                          className="bg-transparent w-full font-mono text-emerald-400 font-bold text-right tabular-nums text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 rounded px-2 py-2 transition-all"
+                          placeholder="-"
+                        />
+                      </td>
+                      <td className="p-2">
                         <input 
                           id={`input-${idx}-h`}
                           type="text"
@@ -347,10 +356,9 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                               : formatVal(row.h, 3)
                           }
                           onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
-                          /* onBlur για να στρογγυλοποιεί αμέσως μόλις βγαίνει από το πεδίο */
                           onBlur={(e) => handleInputChange(idx, 'h', formatVal(e.target.value, 3))}
                           onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
-                          className="bg-transparent w-full font-mono text-emerald-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-emerald-500/50 rounded px-2 py-2 transition-all"
+                          className="bg-transparent w-full font-mono text-emerald-400 font-bold text-right tabular-nums text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 rounded px-2 py-2 transition-all"
                           placeholder="-"
                         />
                       </td>
@@ -526,7 +534,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   );
 };
 
-// --- Sub-Components παραμένουν ίδια ---
 const CompactStat = ({ label, value, unit, icon, color }) => (
   <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
     <div className="text-slate-500">{icon}</div>

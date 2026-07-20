@@ -222,7 +222,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                       </>
                     ) : (
                       <>
-                        <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">Adj. Hz (gon)</th>
+                        <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">Adj. Hz (grad)</th>
                         <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">σ (cc)</th>
                       </>
                     )}
@@ -262,7 +262,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                           <input 
                             disabled={isAdjusted}
                             id={`input-${index}-station`}
-                            className={`w-full bg-transparent p-2 text-sm outline-none rounded ${isAdjusted ? 'text-slate-400' : 'text-amber-300/80 focus:bg-slate-800/50'}`} 
+                            className={`w-full bg-transparent p-2 text-sm tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${isAdjusted ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`} 
                             value={obs.station} 
                             onChange={(e) => handleInputChange(obs.id, 'station', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'station')}
@@ -272,7 +272,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                           <input 
                             disabled={isAdjusted}
                             id={`input-${index}-target`}
-                            className={`w-full bg-transparent p-2 text-sm outline-none rounded ${isAdjusted ? 'text-slate-400' : 'text-amber-300/80 focus:bg-slate-800/50'}`} 
+                            className={`w-full bg-transparent p-2 text-sm tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${isAdjusted ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`} 
                             value={obs.target} 
                             onChange={(e) => handleInputChange(obs.id, 'target', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'target')}
@@ -285,7 +285,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                             <td className="p-2">
                               <input 
                                 id={`input-${index}-Period`} 
-                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-400 outline-none focus:bg-slate-800/50 rounded" 
+                                className="w-full bg-transparent p-2 text-sm text-left font-mono outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-400 font-bold" 
                                 value={obs.Period} 
                                 onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} 
                                 onKeyDown={(e) => handleKeyDown(e, index, 'Period')}
@@ -294,21 +294,23 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                             <td className="p-2">
                               <input 
                                 id={`input-${index}-Face_I`} 
-                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" 
+                                className="w-full bg-transparent p-2 text-sm font-mono tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all text-cyan-400 font-bold" 
                                 value={obs.Face_I} 
                                 onBlur={(e) => handleBlur(obs.id, 'Face_I', e.target.value)} 
                                 onChange={(e) => handleInputChange(obs.id, 'Face_I', e.target.value)} 
                                 onKeyDown={(e) => handleKeyDown(e, index, 'Face_I')}
+                                placeholder="-"
                               />
                             </td>
                             <td className="p-2">
                               <input 
                                 id={`input-${index}-Face_II`} 
-                                className="w-full bg-transparent p-2 text-sm font-mono text-slate-300 outline-none focus:bg-slate-800/50 rounded" 
+                                className="w-full bg-transparent p-2 text-sm font-mono tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all text-cyan-400 font-bold" 
                                 value={obs.Face_II} 
                                 onBlur={(e) => handleBlur(obs.id, 'Face_II', e.target.value)} 
                                 onChange={(e) => handleInputChange(obs.id, 'Face_II', e.target.value)} 
                                 onKeyDown={(e) => handleKeyDown(e, index, 'Face_II')}
+                                placeholder="-"
                               />
                             </td>
                           </>
