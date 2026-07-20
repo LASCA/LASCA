@@ -96,7 +96,7 @@ const Header = ({ activeTab }) => {
           textAccent: "text-emerald-500",
           bgAccent: "bg-emerald-500",
           stats: [
-            { label: "SUBJECT", value: "ASKISEIS YPAITHROU", valColor: "text-cyan-400" }
+            { label: "SUBJECT", value: "ASKISEIS YPAITHROU / TEXNIKI TOPOGRAFIA", valColor: "text-cyan-400" }
           ]
         };
 
@@ -114,7 +114,6 @@ const Header = ({ activeTab }) => {
       
       default:
         return { 
-          code: "CORE-V2", 
           label: activeTab.toUpperCase(),
           accentLine: "border-blue-500",
           textAccent: "text-blue-500",
