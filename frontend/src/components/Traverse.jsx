@@ -283,22 +283,31 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           </div>
                         </td>
                         <td className="p-2">
-                          <input 
-                            id={`input-${idx}-hz`}
-                            type="text"
-                            value={row.hz ?? ""}
-                            onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
-                            onBlur={(e) => handleInputChange(idx, 'hz', formatVal(e.target.value, 4))}
-                            onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
-                            className="bg-transparent w-full font-mono text-amber-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
-                            placeholder="-"
-                          />
+                        <input 
+                          id={`input-${idx}-hz`}
+                          type="text"
+                          /* ΕΔΩ ΓΙΝΕΤΑΙ ΤΟ ΚΟΛΠΟ ΜΕ ΤΑ ΔΕΚΑΔΙΚΑ */
+                          value={
+                            document.activeElement?.id === `input-${idx}-hz`
+                              ? (row.hz ?? "")
+                              : formatVal(row.hz, 4)
+                          }
+                          onChange={(e) => handleInputChange(idx, 'hz', e.target.value)}
+                          onBlur={(e) => handleInputChange(idx, 'hz', formatVal(e.target.value, 4))}
+                          onKeyDown={(e) => handleKeyDown(e, idx, 'hz')}
+                          className="bg-transparent w-full font-mono text-amber-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-amber-500/50 rounded px-2 py-2 transition-all"
+                          placeholder="-"
+                        />
                         </td>
                         <td className="p-2">
                           <input 
                             id={`input-${idx}-sd`}
                             type="text"
-                            value={row.sd ?? ""}
+                            value={
+                            document.activeElement?.id === `input-${idx}-sd`
+                              ? (row.sd ?? "")
+                              : formatVal(row.sd, 3)
+                            }
                             onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
                             onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
                             onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
