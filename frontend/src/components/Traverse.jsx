@@ -234,6 +234,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
               {/* ΚΟΥΜΠΙ όδευσης */}
               <button 
+                type="button"
                 onClick={handleRunTraverse}
                 disabled={isLoading}
                 title="Εκτέλεση Όδευσης"
