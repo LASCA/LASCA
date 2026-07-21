@@ -256,7 +256,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   {/* Στήλη 2 - Κάτω: Συντελεστής Κλίμακας (Input/Custom) */}
                   <div className="flex flex-col gap-1 group relative">
                     <label className="text-[8.5px] font-black text-slate-500 tracking-[0.2em] group-hover:text-amber-500/70 transition-colors">
-                      Συντελεστής κλίμακας m<sub>ij</sub>
+                      Συντ. κλίμακας m<sub>ij</sub>
                     </label>
                     <input
                       type="text"

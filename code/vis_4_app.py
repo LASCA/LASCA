@@ -237,9 +237,9 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 9))
     
-    # Χρώματα που ταιριάζουν με το dashboard theme σου
-    fig.patch.set_facecolor('#121212')
-    ax.set_facecolor('#121212')
+    # --- ΑΛΛΑΓΗ ΕΔΩ: Χρώμα ίδιο με το bg-[#030712] του React Tailwind ---
+    fig.patch.set_facecolor('#030712')
+    ax.set_facecolor('#030712')
     
     # Plain style για να μην έχουμε εκθέτες (scientific notation) στους άξονες
     ax.ticklabel_format(useOffset=False, style='plain', axis='both')
@@ -293,8 +293,9 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
         texts.append(ax.text(row['X'] + 0.3, row['Y'] + 0.3, point_id, color="#FFFEFE", fontsize=9, fontweight='bold'))
 
     # Εφαρμογή adjust_text για την αυτόματη αποφυγή επικαλύψεων στα labels
-    if HAS_ADJUST_TEXT and texts:
+    if 'HAS_ADJUST_TEXT' in globals() and HAS_ADJUST_TEXT and texts:
         try:
+            from adjustText import adjust_text
             adjust_text(texts, 
                         x=df['X'].values,
                         y=df['Y'].values,
@@ -309,12 +310,12 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
     ax.set_aspect('equal', adjustable='datalim')
-    ax.grid(True, linestyle=':', alpha=0.3)
+    ax.grid(True, linestyle=':', alpha=0.15) # Έκανα το grid λίγο πιο διάφανο (0.15 από 0.3) για να δείχνει πιο smooth
     
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
 
-    # 5. Δημιουργία Custom Υπομνήματος με Line2D (Ενημερωμένο)
+    # 5. Δημιουργία Custom Υπομνήματος
     detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
                           markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
     cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
@@ -322,7 +323,6 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     station_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
                            markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
     
-    # Νέοι proxies για το Υπόμνημα (Προσανατολισμός και Γραμμή)
     bs_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
                         markeredgecolor='#FFA500', markersize=10, markeredgewidth=1.8)
     line_proxy = Line2D([], [], color='#FFA500', linestyle='--', linewidth=1.5)
@@ -330,7 +330,8 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     handles = [(detail_proxy, cross_proxy), station_proxy, bs_proxy, line_proxy]
     labels = ['Σημεία Λεπτομερείας', 'Στάσεις (Σταθμοί)', 'Σημεία Εξάρτησης', 'Γραμμή Εξάρτησης']
 
-    legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#1e1e1e', edgecolor='none')
+    # --- ΑΛΛΑΓΗ ΕΔΩ: Χρώμα υπομνήματος για να ταιριάζει απόλυτα ---
+    legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#0b1120', edgecolor='#1e293b')
     for text in legend.get_texts(): 
         text.set_color("white")
 
@@ -338,7 +339,10 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     
     # 6. Μετατροπή του γραφήματος σε Base64 string
     img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', dpi=120)
+    
+    # --- ΑΛΛΑΓΗ ΕΔΩ: Προσθήκη transparent=True για να μην κάνει "κουτί" στο React UI ---
+    plt.savefig(img, format='png', bbox_inches='tight', transparent=True, dpi=120)
+    
     img.seek(0)
     plot_url = base64.b64encode(img.getvalue()).decode('utf8')
     plt.close(fig)

@@ -1,11 +1,74 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
-  Crosshair, Compass, Table as TableIcon, Map as MapIcon, Info, ChevronRight, 
-  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon
+  Crosshair, Compass, LayoutGrid, Map as MapIcon, Info, ChevronRight, 
+  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+
+// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
+// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
+const CustomDropdown = ({ value, onChange, options, disabled, icon: Icon }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-1 group relative" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`bg-[#0f172a] border ${isOpen ? 'border-emerald-500' : 'border-slate-800'} text-[11px] text-slate-300 rounded-lg px-3 py-1.5 outline-none focus:border-emerald-500/50 transition-all font-mono hover:border-emerald-500/50 flex items-center justify-between gap-3 min-w-[130px] w-full ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <div className="flex items-center gap-2">
+          <span>{options.find(opt => opt.value === value)?.label || value || "Επιλογή..."}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={12} className="text-slate-500 group-hover:text-emerald-500/70 transition-colors" />}
+          <ChevronDown size={14} className={`text-emerald-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute top-full left-0 mt-1.5 w-full bg-[#0f172a] border border-slate-800 rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[11px] animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col py-1">
+            {options.map((opt) => {
+              const isActive = value === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2.5 transition-colors text-xs border-l-[3px] ${
+                    isActive
+                      ? 'border-emerald-500 bg-slate-800/60 text-emerald-500 font-bold'
+                      : 'border-transparent text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Tachymetry = ({ 
   tachymetryData = {}, 
@@ -56,6 +119,15 @@ const Tachymetry = ({
 
   const activeOrientation = selectedOrientation || (orientations.length > 0 ? orientations[0] : "");
 
+  // Προετοιμασία Options για τα Dropdowns
+  const stationOpts = stations.length === 0 
+    ? [{ value: "", label: "Χωρίς Στάσεις" }] 
+    : stations.map(s => ({ value: s, label: `Στάση: ${s}` }));
+
+  const orientationOpts = orientations.length === 0 
+    ? [{ value: "", label: "Χωρίς Προσ." }] 
+    : orientations.map(o => ({ value: o, label: `Στάση: ${o}` }));
+
   // Φιλτραρισμένα σημεία για τον πίνακα βασισμένα στα Dropdowns
   const filteredPoints = useMemo(() => {
     if (!activeStation || !activeOrientation) return [];
@@ -82,7 +154,7 @@ const Tachymetry = ({
     setIsLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:5000/api/tachymetry', {
-        project_name: projectSettings, // <-- ΠΡΟΣΘΗΚΗ: Στέλνουμε το ενεργό project
+        project_name: projectSettings, 
         measurements: filledMeasurements,    
         stations: stationsData,
         station_name: activeStation,        
@@ -176,49 +248,38 @@ const Tachymetry = ({
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        select {
-          appearance: none;
-          background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-          background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 0.8em;
-        }
       `}</style>
 
       <div className="flex flex-1 gap-6 min-h-0 pt-2">
         {/* ΑΡΙΣΤΕΡΟ ΠΑΝΕΛ */}
         <div className="flex-[1.6] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
           <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between flex-wrap gap-4">
+            
+            {/* ΝΕΟ ΕΙΚΟΝΙΔΙΟ GRID */}
             <div className="flex items-center gap-3 min-w-max">
-              <TableIcon size={16} className="text-emerald-500" />
-              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">Ταχυμετρια</span>
+              <LayoutGrid size={16} className="text-emerald-500" />
+              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em]">Ταχυμετρία</span>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <select 
-                  value={activeStation}
-                  onChange={(e) => { setSelectedStation(e.target.value); setSelectedOrientation(""); }}
-                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-emerald-500/50 transition-all min-w-[120px] font-mono cursor-pointer hover:bg-slate-900"
-                >
-                  {stations.length === 0 && <option value="">Xωρίς Στάσεις</option>}
-                  {stations.map(s => <option key={s} value={s}>Στάση: {s}</option>)}
-                </select>
-                <Crosshair size={12} className="absolute right-2.5 top-2.5 text-slate-600 pointer-events-none" />
-              </div>
+              {/* CUSTOM DROPDOWN ΣΤΑΣΗΣ */}
+              <CustomDropdown 
+                value={activeStation} 
+                onChange={(val) => { setSelectedStation(val); setSelectedOrientation(""); }} 
+                options={stationOpts} 
+                icon={Crosshair} 
+              />
 
               <ChevronRight size={12} className="text-slate-700" />
 
-              <div className="relative">
-                <select 
-                  value={activeOrientation} 
-                  disabled={!activeStation}
-                  onChange={(e) => setSelectedOrientation(e.target.value)}
-                  className="bg-slate-950/50 border border-slate-800 text-[11px] text-slate-200 rounded-lg px-3 py-1.5 pr-8 outline-none focus:border-cyan-500/50 transition-all min-w-[120px] font-mono cursor-pointer hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  {orientations.length === 0 && <option value="">Χωρίς Προσ.</option>}
-                  {orientations.map(o => <option key={o} value={o}>Προσ.: {o}</option>)}
-                </select>
-                <Compass size={12} className="absolute right-2.5 top-2.5 text-slate-600 pointer-events-none" />
-              </div>
+              {/* CUSTOM DROPDOWN ΠΡΟΣΑΝΑΤΟΛΙΣΜΟΥ */}
+              <CustomDropdown 
+                value={activeOrientation} 
+                onChange={(val) => setSelectedOrientation(val)} 
+                options={orientationOpts} 
+                disabled={!activeStation}
+                icon={Compass} 
+              />
 
               <div className="border-l border-slate-800 pl-3 ml-1 flex items-center gap-2">
                 {computedResults.length > 0 && <CheckCircle size={14} className="text-emerald-500" title="Έχει Υπολογιστεί" />}
@@ -295,8 +356,8 @@ const Tachymetry = ({
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between z-20">
             <div className="flex items-center gap-3">
               <MapIcon size={16} className="text-pink-500" />
-              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">
-                {viewMode === 'local' ? "Σκαρίφημα Στάσης" : "Συνολικό Δίκτυο"}
+              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em]">
+                {viewMode === 'local' ? "Σκαρίφημα Στάσης" : "Σκαρίφημα Στάσης"}
               </span>
             </div>
 
@@ -304,7 +365,7 @@ const Tachymetry = ({
               <div className="flex bg-slate-950/60 p-0.5 rounded-lg border border-slate-800">
                 <button
                   onClick={() => setViewMode('local')}
-                  className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider transition-all ${
                     viewMode === 'local' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -312,11 +373,11 @@ const Tachymetry = ({
                 </button>
                 <button
                   onClick={() => setViewMode('global')}
-                  className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider transition-all ${
                     viewMode === 'global' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Δίκτυο (Matplotlib)
+                  Σκαρίφημα
                 </button>
               </div>
             )}
