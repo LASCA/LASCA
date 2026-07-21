@@ -138,16 +138,16 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   const handleRunTraverse = async () => {
     setIsLoading(true);
     try {
+      // ΔΙΟΡΘΩΣΗ: Αποστολή του project_name στο JSON body
+      const projectNamePayload = typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || '');
+      
       const response = await axios.post('http://127.0.0.1:5000/api/traverse', {
         measurements: data,
         scale: scale,
         terrain: terrain,
         klass: klass,
-        scale_factor: scaleFactor
-      },{
-        headers: {
-          'Active-Project': typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || '')
-        }
+        scale_factor: scaleFactor,
+        project_name: projectNamePayload
       });
 
       if (response.data) {
