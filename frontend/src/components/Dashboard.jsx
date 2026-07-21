@@ -122,33 +122,20 @@ const Dashboard = ({
           }
         }
 
-        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+       // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
         if (traverseSheetName && setTraverseData) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          const table1Rows = dataTraverse.filter(row => row['Stations'] || row['Station'] || row['Hz [grad]']);
-          const table2Rows = dataTraverse
-            .filter(row => row['From'] || row['To'])
-            .map(row => ({
-              From: row['From'] || "",
-              To: row['To'] || "",
-              Slope_D: row['Slope_D'] || "",
-              Z_grad: row['Z[grad]'] || row['Z [grad]'] || "",
-              H_station: row['H_station'] || "",
-              H_target: row['H_target'] || ""
-            }));
-
-          const formattedTraverse = table1Rows.map((row, index) => ({
+          // Πλέον διαβάζουμε απευθείας τη νέα μορφή με τις 5 στήλες (χωρίς υψομετρικά/leveling)
+          const formattedTraverse = dataTraverse.map((row, index) => ({
             id: Date.now() + index,
             name: row['Stations'] || row['Station'] || "",
             hz: row['Hz [grad]'] || "",
             sd: row['Slope_D [m]'] || "", 
             x: row['X [m]'] || "",
-            y: row['Y [m]'] || "",
-            h: row['H[m]'] || row['H [m]'] || row['H(m)'] || "",
-            levelingNetwork: index === 0 ? table2Rows : undefined
+            y: row['Y [m]'] || ""
           }));
           
           setTraverseData(formattedTraverse);
