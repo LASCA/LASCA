@@ -130,7 +130,7 @@ const Goniometry = ({ rows = [], setRows }) => {
   const totalColumns = showResults ? 14 : 7;
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] bg-[#030712] p-4 sm:p-6 font-sans">
+    <div className="w-full min-h-[calc(100vh-64px)] p-4 sm:p-6 font-sans">
       <style>
         {`.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

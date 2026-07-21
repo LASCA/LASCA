@@ -15,6 +15,12 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
     setIsCalculated(!!stakeoutData.plot);
   }, [stakeoutData.plot]);
 
+  const formatVal = (val, decimals = 3) => {
+    if (val === "" || val === undefined || val === null) return "";
+    const num = parseFloat(val);
+    return isNaN(num) ? val : num.toFixed(decimals);
+  };
+
   const setStation = (field, val) => {
     setStakeoutData(prev => ({ ...prev, station: { ...prev.station, [field]: val } }));
   };
@@ -225,7 +231,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
-                    <span className="text-[10px] font-mono text-slate-400 font-bold">mij =</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold">m<sub>ij</sub> =</span>
                     <span className="text-emerald-400 text-xs text-center outline-none font-mono font-bold">
                       {stakeoutData.mij !== undefined && stakeoutData.mij !== null ? Number(stakeoutData.mij).toFixed(5) : '---'}
                     </span>
@@ -292,28 +298,44 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                           placeholder={`P${idx+1}`}
                         />
                       </td>
+
+                      {/* X [m] με 3 δεκαδικά */}
                       <td className="p-1.5">
                         <input 
+                          id={`input-pt-x-${idx}`}
                           disabled={isCalculated}
-                          type="number" 
-                          value={pt.x !== undefined ? pt.x : ''} 
+                          type="text" 
+                          value={
+                            document.activeElement?.id === `input-pt-x-${idx}`
+                              ? (pt.x ?? '')
+                              : formatVal(pt.x, 3)
+                          } 
                           onChange={(e) => handlePointChange(idx, 'x', e.target.value)} 
+                          onBlur={(e) => handlePointChange(idx, 'x', formatVal(e.target.value, 3))}
                           className={`w-full bg-transparent px-1.5 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
                           placeholder="0.000" 
                         />
                       </td>
+
+                      {/* Y [m] με 3 δεκαδικά */}
                       <td className="p-1.5">
                         <input 
+                          id={`input-pt-y-${idx}`}
                           disabled={isCalculated}
-                          type="number" 
-                          value={pt.y !== undefined ? pt.y : ''} 
+                          type="text" 
+                          value={
+                            document.activeElement?.id === `input-pt-y-${idx}`
+                              ? (pt.y ?? '')
+                              : formatVal(pt.y, 3)
+                          } 
                           onChange={(e) => handlePointChange(idx, 'y', e.target.value)} 
+                          onBlur={(e) => handlePointChange(idx, 'y', formatVal(e.target.value, 3))}
                           className={`w-full bg-transparent px-1.5 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
                           placeholder="0.000" 
                         />
                       </td>
                       
-                      {/* Στήλες Αποτελεσμάτων: Εμφανίζονται μόνο αν isCalculated */}
+                      {/* Στήλες Αποτελεσμάτων */}
                       {isCalculated && (
                         <>
                           <td className="p-1.5 animate-in fade-in slide-in-from-left-2 duration-500">

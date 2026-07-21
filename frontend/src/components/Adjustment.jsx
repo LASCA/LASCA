@@ -196,7 +196,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden relative">
+    <div className="flex flex-col h-[calc(100vh-64px)] p-6 gap-6 overflow-hidden relative">
       <style>
         {`.custom-scrollbar::-webkit-scrollbar { width: 4px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
