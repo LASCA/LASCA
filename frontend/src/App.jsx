@@ -266,7 +266,8 @@ function App() {
               <Tachymetry 
                 tachymetryData={tachymetryData} 
                 setTachymetryData={setTachymetryData} 
-                projectSettings={currentProject} 
+                projectSettings={currentProject}
+                traverseData={traverseData}
               />
             )}
 

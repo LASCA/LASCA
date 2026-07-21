@@ -343,11 +343,10 @@ def run_traverse():
 
 # ==========================================
 # 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) 
-# Πλέον καλεί απευθείας την dpr.tachymetry()!
 # ==========================================
 @app.route('/api/tachymetry', methods=['POST'])
 def run_tachymetry():
-    data = request.json
+    data = request.json or {}
     measurements = data.get('measurements', [])
     stations = data.get('stations', [])
     
@@ -361,7 +360,7 @@ def run_tachymetry():
     df_meas = pd.DataFrame(measurements)
     df_st = pd.DataFrame(stations)
     
-    # 2. Εξασφάλιση ότι τα ονόματα στηλών στους σταθμούς ταιριάζουν με αυτά που περιμένει η dpr
+    # 2. Εξασφάλιση ότι τα ονόματα στηλών στους σταθμούς ταιριάζουν
     rename_st = {}
     for col in df_st.columns:
         if col.lower() in ['station_name', 'station']: rename_st[col] = 'Station_Name'
@@ -370,35 +369,58 @@ def run_tachymetry():
         if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
     df_st.rename(columns=rename_st, inplace=True)
 
-    project_name = request.headers.get('Active-Project') or request.args.get('project') or request.headers.get('active-project')
+    # 3. ΕΥΡΕΣΗ ΦΑΚΕΛΟΥ PROJECT & ΑΝΑΓΝΩΣΗ ΔΕΔΟΜΕΝΩΝ ΑΠΟ .JSON
+    project_name = get_active_project_name()
     project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
     traverse_file = project_dir / "latest_traverse.json"
+    project_state_file = project_dir / "project_state.json"
     
+    traverse_stations = []
+    
+    # 1η Προσπάθεια: Ανάγνωση από το latest_traverse.json
     if traverse_file.exists():
         try:
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
-            
-            if traverse_stations:
-                df_trav = pd.DataFrame(traverse_stations)
-                
-                # 1. Καθαρισμός ονομάτων
-                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
-                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
-                
-                # 2. Ένωση
-                df_st = pd.concat([df_st, df_trav], ignore_index=True)
-                
-                # 3. Διαγραφή διπλοτύπων (κρατάμε την Όδευση)
-                df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
-                
-                print(f"✅ ΓΕΦΥΡΑ: Συγχωνεύτηκαν στάσεις από το project '{project_name}'! Συνολικές μοναδικές: {len(df_st)}")
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων από το project: {e}")
-    # --------------------------------------------------------------
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            
+    # 2η Προσπάθεια (Fallback): Ανάγνωση από το project_state.json
+    elif project_state_file.exists():
+        try:
+            with open(project_state_file, 'r', encoding='utf-8') as f:
+                p_state = json.load(f)
+                t_data = p_state.get('traverse_data', [])
+                for pt in t_data:
+                    if pt.get('name') and pt.get('x') and pt.get('y'):
+                        traverse_stations.append({
+                            "Station_Name": str(pt['name']),
+                            "XS": float(pt['x']),
+                            "YS": float(pt['y']),
+                            "ZS": 0.0
+                        })
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+
+    # Συγχώνευση των στάσεων στο df_st
+    if traverse_stations:
+        try:
+            df_trav = pd.DataFrame(traverse_stations)
+            
+            if 'Station_Name' in df_st.columns:
+                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
+            if 'Station_Name' in df_trav.columns:
+                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
+            
+            df_st = pd.concat([df_st, df_trav], ignore_index=True)
+            df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
+            
+            print(f"✅ ΓΕΦΥΡΑ ΤΑΧΥΜΕΤΡΙΑΣ: Φορτώθηκαν στάσεις από το project '{project_name}'! Σύνολο: {len(df_st)}")
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
 
     try:
-        # 3. ΚΑΛΟΥΜΕ ΤΗ ΔΙΚΗ ΣΟΥ ΕΛΕΓΜΕΝΗ ΣΥΝΑΡΤΗΣΗ!
+        # 4. Εκτέλεση υπολογισμού Ταχυμετρίας
         results_df, _, _ = dpr.tachymetry(
             data_meas=df_meas, 
             data_st=df_st, 
@@ -408,7 +430,6 @@ def run_tachymetry():
         
         calculated_points = results_df.to_dict('records') if not results_df.empty else []
 
-        # 4. Φτιάχνουμε το st_lookup για το γράφημα (Matplotlib)
         st_lookup = df_st.set_index('Station_Name').to_dict('index')
         st_lookup_vis = {k: {'x': v['XS'], 'y': v['YS'], 'z': v['ZS']} for k, v in st_lookup.items()}
 

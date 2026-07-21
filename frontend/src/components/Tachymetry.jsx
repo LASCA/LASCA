@@ -7,7 +7,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
+const Tachymetry = ({ 
+  tachymetryData = {}, 
+  setTachymetryData, 
+  projectSettings,
+  traverseData = [] 
+}) => {
   const [selectedStation, setSelectedStation] = useState("");
   const [selectedOrientation, setSelectedOrientation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -69,14 +74,15 @@ const Tachymetry = ({ tachymetryData = {}, setTachymetryData }) => {
 
   // 2. ΕΠΙΛΥΣΗ & ΥΠΟΛΟΓΙΣΜΟΣ (API CALL)
   const handleCalculate = async () => {
-    if (!measurements.length || !stationsData.length) {
-      toast.error("Λείπουν δεδομένα μετρήσεων ή στάσεων από το Excel.");
+    if (!measurements.length) {
+      toast.error("Λείπουν δεδομένα μετρήσεων.");
       return;
     }
     
     setIsLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:5000/api/tachymetry', {
+        project_name: projectSettings, // <-- ΠΡΟΣΘΗΚΗ: Στέλνουμε το ενεργό project
         measurements: filledMeasurements,    
         stations: stationsData,
         station_name: activeStation,        
