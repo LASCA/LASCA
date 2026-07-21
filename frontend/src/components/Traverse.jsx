@@ -11,7 +11,6 @@ const CustomDropdown = ({ label, value, onChange, options }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Κλείσιμο του μενού αν ο χρήστης κάνει κλικ εκτός
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -87,7 +86,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   };
 
   const handleKeyDown = (e, rowIndex, colName) => {
-    const columns = ['name', 'hz', 'sd', 'x', 'y', 'h'];
+    const columns = ['name', 'hz', 'sd', 'x', 'y'];
     const colIndex = columns.indexOf(colName);
     
     let nextRow = rowIndex;
@@ -181,7 +180,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#030712] p-6 gap-6 overflow-hidden relative">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-transparent p-6 gap-6 overflow-hidden relative">
       <style dangerouslySetInnerHTML={{
         __html: `
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -204,10 +203,9 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   <div className="p-2 bg-amber-500/10 rounded-lg">
                     <Database size={18} className="text-amber-500" />
                   </div>
-                  <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200 uppercase">Δεδομένα Όδευσης</span>
+                  <span className="font-bold text-[11px] tracking-[0.2em] text-slate-200">Δεδομένα Όδευσης</span>
                 </div>
 
-                {/* ΝΕΑ CUSTOM DROPDOWNS ΠΟΥ ΑΝΤΙΚΑΘΙΣΤΟΥΝ ΤΑ SELECT */}
                 <div className="flex items-center gap-5 border-l border-slate-800/60 pl-6">
                   <CustomDropdown 
                     label="Τάξη" 
@@ -266,12 +264,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                   <tr className="border-b border-slate-800/60">
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest">Station</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Hz [grad]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Slope_D [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">X [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">Y [m]</th>
-                    <th className="w-[16.6%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">H [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest">Station</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Hz [grad]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Slope_D [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">X [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">Y [m]</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20">
@@ -346,27 +343,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           placeholder="-"
                         />
                       </td>
-                      <td className="p-2">
-                        <input 
-                          id={`input-${idx}-h`}
-                          type="text"
-                          value={
-                            document.activeElement?.id === `input-${idx}-h`
-                              ? (row.h ?? "")
-                              : formatVal(row.h, 3)
-                          }
-                          onChange={(e) => handleInputChange(idx, 'h', e.target.value)}
-                          onBlur={(e) => handleInputChange(idx, 'h', formatVal(e.target.value, 3))}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 'h')}
-                          className="bg-transparent w-full font-mono text-emerald-400 font-bold text-right tabular-nums text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 rounded px-2 py-2 transition-all"
-                          placeholder="-"
-                        />
-                      </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="6" className="p-24 text-center">
+                      <td colSpan="5" className="p-24 text-center">
                         <div className="flex flex-col items-center opacity-20">
                           <Info size={30} className="text-slate-700 mx-auto mb-3" />
                           <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest">Αναμονή Δεδομένων</p>
@@ -395,6 +376,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                 <DetailedAngleGroup 
                   title="Γωνιακό Σφάλμα (Wβ)"
                   target={metrics.gTarget} actual={metrics.gActual} error={metrics.fb} wbi={metrics.wbi}
+                  maxError={metrics.Wb_max}
                   labels={["G (πρέπει)", "G (είναι)", "Wβ", "Wβi"]}
                 />
               </div>
@@ -405,6 +387,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   xTarget={metrics.dxTarget} xActual={metrics.dxActual} xError={metrics.dx}
                   yTarget={metrics.dyTarget} yActual={metrics.dyActual} yError={metrics.dy}
                   ds={metrics.w}
+                  maxDs={metrics.ds_max}
                   labels={["ΔX (πρέπει)", "ΔX (είναι)", "δx", "ΔY (πρέπει)", "ΔY (είναι)", "δy", "δs (W)"]}
                 />
               </div>
@@ -414,11 +397,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                <div className="grid grid-cols-2 gap-6">
                  <div className="flex flex-col gap-1">
                    <span className="text-[10px] text-slate-500 font-black tracking-tighter">Μέγιστο Γωνιακό (Wβ Max)</span>
-                   <span className="text-xs font-mono font-bold text-amber-500">{metrics.Wb_max || "---"} grad</span>
+                   <span className="text-xs font-mono font-bold text-fuchsia-500">{metrics.Wb_max || "---"} grad</span>
                  </div>
                  <div className="flex flex-col gap-1 border-l border-slate-800/50 px-6">
                    <span className="text-[10px] text-slate-500 font-black tracking-tighter">Μέγιστο Γραμμικό (δs Max)</span>
-                   <span className="text-xs font-mono font-bold text-emerald-500">{metrics.ds_max || "---"} m</span>
+                   <span className="text-xs font-mono font-bold text-fuchsia-500">{metrics.ds_max || "---"} m</span>
                  </div>
                </div>
             </div>
@@ -475,7 +458,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                </div>
              </div>
           ) : (
-             <div className="flex-1 bg-[#030712] m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
+             <div className="flex-1 bg-transparent m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:30px_30px]"></div>
                 <div className="text-center z-10">
                    <ImageIcon size={32} className="mx-auto mb-3 text-slate-800 group-hover:text-pink-500/40 transition-all duration-700" />
@@ -546,69 +529,87 @@ const CompactStat = ({ label, value, unit, icon, color }) => (
   </div>
 );
 
-const DetailedAngleGroup = ({ title, target, actual, error, wbi, labels }) => (
-  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3">
-    <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
-    
-    <div className="grid grid-cols-2 gap-4 text-center border-b border-slate-800/30 pb-3">
-      <div className="flex flex-col gap-1">
-        <span className="text-[9px] text-slate-500 font-bold">{labels[0]}</span>
-        <span className="text-[12px] font-mono text-slate-200">{target || "---"}</span>
-      </div>
-      <div className="flex flex-col gap-1 border-l border-slate-800/50">
-        <span className="text-[9px] text-slate-500 font-bold">{labels[1]}</span>
-        <span className="text-[12px] font-mono text-slate-200">{actual || "---"}</span>
-      </div>
-    </div>
+const DetailedAngleGroup = ({ title, target, actual, error, wbi, maxError, labels }) => {
+  const valError = parseFloat(error);
+  const valMax = parseFloat(maxError);
+  const hasExceeded = !isNaN(valError) && !isNaN(valMax) && Math.abs(valError) > valMax;
+  const resultColor = (error === undefined || error === null || error === "") 
+    ? 'text-slate-200' 
+    : (hasExceeded ? 'text-red-500' : 'text-emerald-500');
 
-    <div className="grid grid-cols-2 gap-4 pt-1">
-      <div className="flex justify-between items-center px-2">
-        <span className="text-[9px] text-amber-500/70 font-bold">{labels[2]}</span>
-        <span className="text-[13px] font-mono text-amber-500 font-bold">{error || "---"}</span>
-      </div>
-      <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
-        <span className="text-[9px] text-amber-500/70 font-bold">{labels[3]}</span>
-        <span className="text-[13px] font-mono text-amber-500/90">{wbi || "---"}</span>
-      </div>
-    </div>
-  </div>
-);
-
-const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual, yError, ds, labels }) => (
-  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3 h-full">
-    <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
-    
-    {[0, 3].map((startIndex) => {
-      const targetVal = startIndex === 0 ? xTarget : yTarget;
-      const actualVal = startIndex === 0 ? xActual : yActual;
-      const errorVal = startIndex === 0 ? xError : yError;
-
-      return (
-        <div 
-          key={startIndex} 
-          className={`grid grid-cols-3 gap-2 text-center ${startIndex === 0 ? 'border-b border-slate-800/30 pb-3' : ''}`}
-        >
-          <div className="flex flex-col gap-1">
-            <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex]}</span>
-            <span className="text-[12px] font-mono text-slate-200">{targetVal || "---"}</span>
-          </div>
-          <div className="flex flex-col gap-1 border-x border-slate-800/50">
-            <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex+1]}</span>
-            <span className="text-[12px] font-mono text-slate-200">{actualVal || "---"}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[9px] text-amber-500/70 font-bold">{labels[startIndex+2]}</span>
-            <span className="text-[12px] font-mono text-amber-500 font-bold">{errorVal || "---"}</span>
-          </div>
+  return (
+    <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3">
+      <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
+      
+      <div className="grid grid-cols-2 gap-4 text-center border-b border-slate-800/30 pb-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-slate-500 font-bold">{labels[0]}</span>
+          <span className="text-[12px] font-mono text-slate-200">{target || "---"}</span>
         </div>
-      );
-    })}
+        <div className="flex flex-col gap-1 border-l border-slate-800/50">
+          <span className="text-[9px] text-slate-500 font-bold">{labels[1]}</span>
+          <span className="text-[12px] font-mono text-slate-200">{actual || "---"}</span>
+        </div>
+      </div>
 
-    <div className="flex justify-between items-center px-2 mt-auto pt-4 border-t border-slate-800/50">
-      <span className="text-[10px] font-bold text-slate-500 tracking-wider">{labels[6]}</span>
-      <span className="text-[14px] font-mono font-black text-emerald-400">{ds || "---"} m</span>
+      <div className="grid grid-cols-2 gap-4 pt-1">
+        <div className="flex justify-between items-center px-2">
+          <span className="text-[9px] text-slate-500 font-bold">{labels[2]}</span>
+          <span className={`text-[13px] font-mono font-bold ${resultColor}`}>{error || "---"}</span>
+        </div>
+        <div className="flex justify-between items-center px-2 border-l border-slate-800/50">
+          <span className="text-[9px] text-slate-500 font-bold">{labels[3]}</span>
+          <span className="text-[13px] font-mono text-slate-200">{wbi || "---"}</span>
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+const DetailedLinearGroup = ({ title, xTarget, xActual, xError, yTarget, yActual, yError, ds, maxDs, labels }) => {
+  const valDs = parseFloat(ds);
+  const valMaxDs = parseFloat(maxDs);
+  const hasExceeded = !isNaN(valDs) && !isNaN(valMaxDs) && Math.abs(valDs) > valMaxDs;
+  const resultColor = (ds === undefined || ds === null || ds === "") 
+    ? 'text-slate-200' 
+    : (hasExceeded ? 'text-red-500' : 'text-emerald-500');
+
+  return (
+    <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-3 h-full">
+      <span className="text-[11px] font-bold text-slate-400 italic border-b border-slate-800 pb-2">{title}</span>
+      
+      {[0, 3].map((startIndex) => {
+        const targetVal = startIndex === 0 ? xTarget : yTarget;
+        const actualVal = startIndex === 0 ? xActual : yActual;
+        const errorVal = startIndex === 0 ? xError : yError;
+
+        return (
+          <div 
+            key={startIndex} 
+            className={`grid grid-cols-3 gap-2 text-center ${startIndex === 0 ? 'border-b border-slate-800/30 pb-3' : ''}`}
+          >
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex]}</span>
+              <span className="text-[12px] font-mono text-slate-200">{targetVal || "---"}</span>
+            </div>
+            <div className="flex flex-col gap-1 border-x border-slate-800/50">
+              <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex+1]}</span>
+              <span className="text-[12px] font-mono text-slate-200">{actualVal || "---"}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] text-slate-500 font-bold">{labels[startIndex+2]}</span>
+              <span className="text-[12px] font-mono text-slate-200 font-bold">{errorVal || "---"}</span>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="flex justify-between items-center px-2 mt-auto pt-4 border-t border-slate-800/50">
+        <span className="text-[10px] font-bold text-slate-500 tracking-wider">{labels[6]}</span>
+        <span className={`text-[14px] font-mono font-black ${resultColor}`}>{ds || "---"} m</span>
+      </div>
+    </div>
+  );
+};
 
 export default Traverse;
