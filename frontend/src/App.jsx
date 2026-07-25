@@ -6,6 +6,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Adjustment from './components/Adjustment';
 import Traverse from './components/Traverse';
+import TraverseHeight from './components/traverse_height';
 import Tachymetry from './components/Tachymetry'; 
 import ProjectManager from './components/project_manager'; 
 import Charaxi from './components/charaxi'; 
@@ -259,6 +260,17 @@ function App() {
                 metrics={traverseMetrics} 
                 setMetrics={setTraverseMetrics}   
                 projectSettings={currentProject} 
+              />
+            )}
+
+            {activeTab === 'traverse_height' && (
+              <TraverseHeight 
+                // Προσωρινά περνάμε κενά arrays για να δούμε το UI. 
+                // Στο επόμενο βήμα θα φτιάξουμε τα states για να τα συνδέσουμε με πραγματικά δεδομένα!
+                observations={[]} 
+                stations={[]}
+                onCalculate={() => console.log("Πάτησες Επίλυση!")}
+                onSave={() => console.log("Πάτησες Αποθήκευση!")}
               />
             )}
             

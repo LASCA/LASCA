@@ -76,6 +76,17 @@ const Header = ({ activeTab }) => {
           ] 
         };
 
+        case 'traverse_height':
+        return {  
+          label: "Traverse Leveling",
+          accentLine: "border-amber-500",
+          textAccent: "text-amber-500",
+          bgAccent: "bg-amber-500",
+          stats: [
+            { label: "SUBJECT", value: "TOPO ΙΙ, RYMOTOMIKA, ASKISEIS YPAITHROU ", valColor: "text-cyan-400" }
+          ] 
+        };
+
       case 'tachymetry':
         return { 
           code: "", 

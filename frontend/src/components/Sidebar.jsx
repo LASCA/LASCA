@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers, ChevronDown, Calculator } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
-  // Νέο state για να ελέγχουμε αν το dropdown των μετρήσεων είναι ανοιχτό
+  // State για να ελέγχουμε ποια dropdown είναι ανοιχτά
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
+  const [isTraverseMenuOpen, setIsTraverseMenuOpen] = useState(false);
 
-  // Ανανεωμένη δομή μενού με υπο-καρτέλες
+  // Ανανεωμένη δομή μενού
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     
@@ -20,8 +21,20 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση' }
       ]
     },
+    
     { id: 'basic_calc', label: 'Βασικοί Υπολογισμοί', icon: <Calculator size={20} /> },
-    { id: 'traverse', label: 'Όδευση', icon: <Compass size={20} /> },
+    
+    // Νέα μορφή της Όδευσης με υποκαρτέλες
+    { 
+      id: 'traverse_menu', 
+      label: 'Όδευση', 
+      icon: <Compass size={20} />,
+      subItems: [
+        { id: 'traverse', label: 'Οριζοντιογραφία (X,Y)' },
+        { id: 'traverse_height', label: 'Υψομετρία (H)' }
+      ]
+    },
+    
     { id: 'tachymetry', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
     { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> },
   ];
@@ -30,8 +43,13 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
     if (item.subItems) {
       // Αν το sidebar είναι κλειστό, το ανοίγουμε αυτόματα
       if (!isOpen) setIsOpen(true);
-      // Ανοιγοκλείνουμε το dropdown
-      setIsStationMenuOpen(!isStationMenuOpen);
+      
+      // Ανοιγοκλείνουμε το αντίστοιχο dropdown
+      if (item.id === 'station_measurements') {
+        setIsStationMenuOpen(!isStationMenuOpen);
+      } else if (item.id === 'traverse_menu') {
+        setIsTraverseMenuOpen(!isTraverseMenuOpen);
+      }
     } else {
       setActiveTab(item.id);
     }
@@ -68,6 +86,11 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
           const hasActiveSubItem = item.subItems?.some(sub => sub.id === activeTab);
           const isParentActive = activeTab === item.id || hasActiveSubItem;
 
+          // Ελέγχουμε αν το συγκεκριμένο dropdown είναι ανοιχτό
+          const isThisMenuOpen = 
+            (item.id === 'station_measurements' && isStationMenuOpen) || 
+            (item.id === 'traverse_menu' && isTraverseMenuOpen);
+
           return (
             <div key={item.id} className="flex flex-col gap-1">
               <button
@@ -87,14 +110,14 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
                 {isOpen && item.subItems && (
                   <ChevronDown 
                     size={16} 
-                    className={`transition-transform duration-300 ${isStationMenuOpen ? 'rotate-180 text-blue-400' : 'opacity-50'}`} 
+                    className={`transition-transform duration-300 ${isThisMenuOpen ? 'rotate-180 text-blue-400' : 'opacity-50'}`} 
                   />
                 )}
                 {isOpen && !item.subItems && activeTab === item.id && <ChevronRight size={16} className="opacity-50" />}
               </button>
 
               {/* Sub-Items (Dropdown) */}
-              {item.subItems && isStationMenuOpen && isOpen && (
+              {item.subItems && isThisMenuOpen && isOpen && (
                 <div className="flex flex-col gap-1 pl-11 pr-2 py-1 mt-1 animate-in slide-in-from-top-2 fade-in duration-200">
                   {item.subItems.map((subItem) => (
                     <button
