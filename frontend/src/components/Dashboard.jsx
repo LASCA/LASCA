@@ -44,6 +44,8 @@ const Dashboard = ({
   setTachymetryData, 
   setStakeoutData, 
   setGoniometryData,
+  setLevelingObservations, // ΝΕΟ PROP: Για τον Πίνακα 1
+  setLevelingStations,     // ΝΕΟ PROP: Για τον Πίνακα 2
   onOpenProjectManager,
   
   projectSettings,
@@ -122,23 +124,61 @@ const Dashboard = ({
           }
         }
 
-       // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
-        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse'));
-        if (traverseSheetName && setTraverseData) {
+        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
+        if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
           const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-          // Πλέον διαβάζουμε απευθείας τη νέα μορφή με τις 5 στήλες (χωρίς υψομετρικά/leveling)
           const formattedTraverse = dataTraverse.map((row, index) => ({
             id: Date.now() + index,
             name: row['Stations'] || row['Station'] || "",
             hz: row['Hz [grad]'] || "",
             sd: row['Slope_D [m]'] || "", 
             x: row['X [m]'] || "",
-            y: row['Y [m]'] || ""
+            y: row['Y [m]'] || "",
+            h: row['H [m]'] || ""
           }));
           
-          setTraverseData(formattedTraverse);
+          if (setTraverseData) setTraverseData(formattedTraverse);
+
+          // --- Εξαγωγή μοναδικών στάσεων με υψόμετρο για τον 2ο Πίνακα (Leveling Stations) ---
+          if (setLevelingStations) {
+            const uniqueStations =new window.Map();
+            formattedTraverse.forEach(row => {
+              if (row.name && row.h !== undefined && row.h !== "") {
+                uniqueStations.set(row.name, row.h);
+              }
+            });
+
+            const extractedStations = Array.from(uniqueStations.entries()).map(([name, h], index) => ({
+              id: Date.now() + 1000 + index,
+              name: String(name),
+              h: String(h)
+            }));
+            
+            setLevelingStations(extractedStations);
+          }
+        }
+
+        // 2.5 ΔΙΑΒΑΣΜΑ TRAVERSE LEVELING
+        const traverseLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse_leveling'));
+        if (traverseLevelingSheetName && setLevelingObservations) {
+          const wsLeveling = wb.Sheets[traverseLevelingSheetName];
+          const dataLeveling = XLSX.utils.sheet_to_json(wsLeveling);
+
+          if (dataLeveling.length > 0) {
+            const formattedLevelingObs = dataLeveling.map((row, index) => ({
+              id: Date.now() + 2000 + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              s: row['Slope_D'] !== undefined ? String(row['Slope_D']) : "",
+              z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
+              hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
+              ht: row['H_target'] !== undefined ? String(row['H_target']) : ""
+            }));
+            setLevelingObservations(formattedLevelingObs);
+          }
         }
 
         // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ

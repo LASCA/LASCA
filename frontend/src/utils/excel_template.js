@@ -66,21 +66,25 @@ export const downloadSurveyTemplate = () => {
 
     // 2. Όδευση (traverse)
     const wsTrav = XLSX.utils.aoa_to_sheet([
-      ["Stations", "Hz [grad]", "Slope_D [m]", "X [m]", "Y [m]"]]);
+      ["Stations", "Hz [grad]", "Slope_D [m]", "X [m]", "Y [m]", "H [m]"]]);
     applyProfessionalStyles(wsTrav);
     XLSX.utils.book_append_sheet(wb, wsTrav, "traverse");
 
+    //  Υψομετρία Όδευσης (traverse_height)
+    const wsTrav_h = XLSX.utils.aoa_to_sheet([
+      ["From", "To", "Slope_D", "Z[grad]", "H_station", "H_target"]]);
+    applyProfessionalStyles(wsTrav_h);
+    XLSX.utils.book_append_sheet(wb, wsTrav_h, "traverse_leveling");
+
     // 3. Στάσεις Ταχυμετρίας (stations_taxymetria)
     const wsStat = XLSX.utils.aoa_to_sheet([
-      ["Station_Name", "XS", "YS", "ZS"]
-    ]);
+      ["Station_Name", "XS", "YS", "ZS"]]);
     applyProfessionalStyles(wsStat);
     XLSX.utils.book_append_sheet(wb, wsStat, "stations_taxymetria");
 
     // 4. Μετρήσεις Ταχυμετρίας (measurements_taxymetria)
     const wsMeas = XLSX.utils.aoa_to_sheet([
-      ["Station", "Orientation", "HZ_O", "Station_Height", "", "From", "O", "Point_ID", "Hz", "Z", "SD", "TargetHeight"]
-    ]);
+      ["Station", "Orientation", "HZ_O", "Station_Height", "", "From", "O", "Point_ID", "Hz", "Z", "SD", "TargetHeight"]]);
     applyProfessionalStyles(wsMeas);
     XLSX.utils.book_append_sheet(wb, wsMeas, "measurements_taxymetria");
 

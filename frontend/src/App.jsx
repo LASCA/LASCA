@@ -43,6 +43,10 @@ function App() {
   // ΝΕΟ STATE ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ
   const [goniometryData, setGoniometryData] = useState([]);
 
+  // --- ΝΕΑ STATES ΓΙΑ ΤΗΝ ΥΨΟΜΕΤΡΙΚΗ ΟΔΕΥΣΗ (Traverse Height) ---
+  const [levelingObservations, setLevelingObservations] = useState([]);
+  const [levelingStations, setLevelingStations] = useState([]);
+
   // --- ΝΕΑ STATES ΓΙΑ ΤΗ ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ ---
   const [levelingForward, setLevelingForward] = useState([
     { id: 1, point: 'BM1', backsight: '', foresight: '', dh: '', elevation: '' },
@@ -82,10 +86,14 @@ function App() {
             points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
           });
 
-          // Φόρτωση γωνιομετρήσεων από το backend JSON
+          // Φόρτωση γωνιομετρήσεων
           setGoniometryData(backendData.goniometryData || []);
 
-          // Φόρτωση χωροστάθμισης από το backend JSON
+          // Φόρτωση Υψομετρικής Όδευσης
+          setLevelingObservations(backendData.levelingObservations || []);
+          setLevelingStations(backendData.levelingStations || []);
+
+          // Φόρτωση χωροστάθμισης
           setLevelingForward(backendData.levelingForward || []);
           setLevelingBackward(backendData.levelingBackward || []);
           setLevelingMetrics(backendData.levelingMetrics || {});
@@ -118,7 +126,12 @@ function App() {
       tachymetryData: tachymetryData,
       stakeoutData: stakeoutData,
       goniometryData: goniometryData,
-      // Προσθήκη χωροστάθμισης στη δομή αποθήκευσης
+      
+      // Προσθήκη Υψομετρικής Όδευσης
+      levelingObservations: levelingObservations,
+      levelingStations: levelingStations,
+
+      // Προσθήκη χωροστάθμισης
       levelingForward: levelingForward,
       levelingBackward: levelingBackward,
       levelingMetrics: levelingMetrics
@@ -140,7 +153,7 @@ function App() {
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
-        console.log(`💾 Auto-save: Το αρχείο .json ενημερώθηκε και με τη Χωροστάθμιση!`);
+        console.log(`💾 Auto-save: Το αρχείο .json ενημερώθηκε!`);
       }
     })
     .catch(err => console.error("❌ Το Auto-save απέτυχε στο Backend:", err));
@@ -156,11 +169,12 @@ function App() {
     tachymetryData, 
     stakeoutData, 
     goniometryData,
-    levelingForward,  // Παρακολούθηση για auto-save
-    levelingBackward, // Παρακολούθηση για auto-save
-    levelingMetrics   // Παρακολούθηση για auto-save
+    levelingObservations, // Παρακολούθηση για auto-save
+    levelingStations,     // Παρακολούθηση για auto-save
+    levelingForward,  
+    levelingBackward, 
+    levelingMetrics   
   ]);
-
 
   // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
   const handleProjectLoaded = (projectData) => {
@@ -180,10 +194,9 @@ function App() {
       points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
     });
 
-    // Φόρτωση γωνιομετρήσεων κατά την αλλαγή project
     setGoniometryData(projectData.goniometryData || []);
-
-    // Φόρτωση χωροστάθμισης κατά την αλλαγή project
+    setLevelingObservations(projectData.levelingObservations || []);
+    setLevelingStations(projectData.levelingStations || []);
     setLevelingForward(projectData.levelingForward || []);
     setLevelingBackward(projectData.levelingBackward || []);
     setLevelingMetrics(projectData.levelingMetrics || {});
@@ -236,6 +249,9 @@ function App() {
                 setTachymetryData={setTachymetryData}
                 setStakeoutData={setStakeoutData}
                 setGoniometryData={setGoniometryData}
+                // Προσθήκη setters για φόρτωση από Excel
+                setLevelingObservations={setLevelingObservations}
+                setLevelingStations={setLevelingStations}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
             )}
@@ -265,12 +281,10 @@ function App() {
 
             {activeTab === 'traverse_height' && (
               <TraverseHeight 
-                // Προσωρινά περνάμε κενά arrays για να δούμε το UI. 
-                // Στο επόμενο βήμα θα φτιάξουμε τα states για να τα συνδέσουμε με πραγματικά δεδομένα!
-                observations={[]} 
-                stations={[]}
-                onCalculate={() => console.log("Πάτησες Επίλυση!")}
-                onSave={() => console.log("Πάτησες Αποθήκευση!")}
+                observations={levelingObservations} 
+                setObservations={setLevelingObservations}
+                stations={levelingStations}
+                setStations={setLevelingStations}
               />
             )}
             
@@ -297,7 +311,6 @@ function App() {
               />
             )}
 
-            {/* CONDITIONAL RENDERING ΓΙΑ ΤΗ ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ */}
             {activeTab === 'geom_leveling' && (
               <Leveling 
                 forwardData={levelingForward}
