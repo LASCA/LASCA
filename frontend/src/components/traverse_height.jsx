@@ -11,10 +11,30 @@ const TraverseHeight = ({
   const [localObs, setLocalObs] = useState([]);
   const [localStations, setLocalStations] = useState([]);
 
+  // --- HELPERS ΓΙΑ ΔΕΚΑΔΙΚΑ ---
+  const to3 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(3);
+  };
+
+  const to4 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(4);
+  };
+
   // --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΠΑΡΑΤΗΡΗΣΕΩΝ ---
   useEffect(() => {
     if (observations && observations.length > 0) {
-      setLocalObs(observations);
+      const formattedObs = observations.map(obs => ({
+        ...obs,
+        s: to3(obs.s),
+        z: to4(obs.z),
+        hi: to3(obs.hi),
+        ht: to3(obs.ht)
+      }));
+      setLocalObs(formattedObs);
     } else if (localObs.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
         id: Date.now() + index, 
@@ -28,7 +48,11 @@ const TraverseHeight = ({
   // --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΣΤΑΣΕΩΝ ---
   useEffect(() => {
     if (stations && stations.length > 0) {
-      setLocalStations(stations);
+      const formattedStations = stations.map(st => ({
+        ...st,
+        h: to3(st.h)
+      }));
+      setLocalStations(formattedStations);
     } else if (localStations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
         id: Date.now() + 1000 + index, 
@@ -50,19 +74,6 @@ const TraverseHeight = ({
     const finalData = typeof newData === 'function' ? newData(localStations) : newData;
     setLocalStations(finalData);
     if (setStations) setStations(finalData);
-  };
-
-  // --- HELPERS ΓΙΑ ΔΕΚΑΔΙΚΑ ---
-  const to3 = (val) => {
-    if (val === "" || val === null || val === undefined) return "";
-    const num = parseFloat(String(val).replace(',', '.'));
-    return isNaN(num) ? val : num.toFixed(3);
-  };
-
-  const to4 = (val) => {
-    if (val === "" || val === null || val === undefined) return "";
-    const num = parseFloat(String(val).replace(',', '.'));
-    return isNaN(num) ? val : num.toFixed(4);
   };
 
   // --- HANDLERS ΓΙΑ ΠΑΡΑΤΗΡΗΣΕΙΣ ---
@@ -154,7 +165,6 @@ const TraverseHeight = ({
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }`}
       </style>
 
-      {/* Αλλάξαμε την εσωτερική δομή ώστε να μην κάνει stretch (εκτείνεται) */}
       <div className="grid grid-cols-[2.5fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4">
         
         {/* === ΠΙΝΑΚΑΣ 1: ΠΑΡΑΤΗΡΗΣΕΙΣ === */}
@@ -163,19 +173,18 @@ const TraverseHeight = ({
             <Target size={14} className="text-blue-400" />
             1. Πινακας Παρατηρησεων
           </h3>
-          {/* Το h-fit max-h-full είναι το κλειδί για να μην πιάνει όλη την οθόνη */}
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
             <div className="overflow-y-auto custom-scrollbar">
               <table className="w-full text-left border-collapse table-auto relative">
                 <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
                   <tr className="border-b border-slate-800/50">
                     <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">Απο</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">Προς</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">S (m)</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z (grad)</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Υ.Ο. (m)</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Υ.Σ. (m)</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">From</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">To</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope D [m]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
                     <th className="p-4 w-12"></th>
                   </tr>
                 </thead>
@@ -183,13 +192,13 @@ const TraverseHeight = ({
                   {localObs.length > 0 ? (
                     localObs.map((obs, index) => (
                       <React.Fragment key={obs.id || index}>
-                        <tr className="group hover:bg-blue-600/[0.03] transition-all">
+                        <tr className="group hover:bg-slate-800/20 transition-all">
                           <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
                           
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-from`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-blue-400/80 transition-all text-blue-400" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" 
                               value={obs.from} 
                               onChange={(e) => handleInputChange(obs.id, 'from', e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, index, 'from')}
@@ -199,7 +208,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-to`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 transition-all text-emerald-400" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" 
                               value={obs.to} 
                               onChange={(e) => handleInputChange(obs.id, 'to', e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, index, 'to')}
@@ -209,7 +218,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-s`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-mono outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all text-slate-200" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={obs.s} 
                               onBlur={(e) => handleBlur(obs.id, 's', e.target.value)}
                               onChange={(e) => handleInputChange(obs.id, 's', e.target.value)}
@@ -220,7 +229,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-z`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-mono outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all text-slate-200" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={obs.z} 
                               onBlur={(e) => handleBlur(obs.id, 'z', e.target.value)}
                               onChange={(e) => handleInputChange(obs.id, 'z', e.target.value)}
@@ -231,7 +240,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-hi`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-mono outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-amber-400/80 transition-all text-amber-100/70" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={obs.hi} 
                               onBlur={(e) => handleBlur(obs.id, 'hi', e.target.value)}
                               onChange={(e) => handleInputChange(obs.id, 'hi', e.target.value)}
@@ -242,7 +251,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-th-${index}-ht`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-mono outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-amber-400/80 transition-all text-amber-100/70" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={obs.ht} 
                               onBlur={(e) => handleBlur(obs.id, 'ht', e.target.value)}
                               onChange={(e) => handleInputChange(obs.id, 'ht', e.target.value)}
@@ -306,12 +315,12 @@ const TraverseHeight = ({
                   {localStations.length > 0 ? (
                     localStations.map((st, index) => (
                       <React.Fragment key={st.id || index}>
-                        <tr className="group hover:bg-slate-800/30 transition-colors">
+                        <tr className="group hover:bg-slate-800/20 transition-colors">
                           
                           <td className="p-2">
                             <input 
                               id={`input-st-${index}-name`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 transition-all text-slate-200" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" 
                               value={st.name} 
                               onChange={(e) => handleStationChange(st.id, 'name', e.target.value)}
                               onKeyDown={(e) => handleStationKeyDown(e, index, 'name')}
@@ -322,7 +331,7 @@ const TraverseHeight = ({
                           <td className="p-2">
                             <input 
                               id={`input-st-${index}-h`}
-                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-amber-400/80 transition-all text-amber-400" 
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={st.h} 
                               onBlur={(e) => handleStationBlur(st.id, 'h', e.target.value)}
                               onChange={(e) => handleStationChange(st.id, 'h', e.target.value)}
