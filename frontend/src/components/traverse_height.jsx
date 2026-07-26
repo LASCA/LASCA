@@ -79,7 +79,6 @@ const TraverseHeight = ({
     if (setStations) setStations(finalData);
   };
 
-  // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API CALL) ---
 // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API CALL) ---
   const handleTraverseHeightCalc = async () => {
     setIsLoading(true);
@@ -204,9 +203,9 @@ const TraverseHeight = ({
         
         {/* === ΠΙΝΑΚΑΣ 1: ΠΑΡΑΤΗΡΗΣΕΙΣ === */}
         <div className="flex flex-col gap-3 min-h-0 max-h-full">
-          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
+          <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
             <Target size={14} className="text-blue-400" />
-            1. Πινακας Παρατηρησεων
+            1. Πίνακας Παρατηρήσεων
           </h3>
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
             <div className="overflow-y-auto custom-scrollbar">
@@ -346,17 +345,17 @@ const TraverseHeight = ({
 
         {/* === ΠΙΝΑΚΑΣ 2: ΣΤΑΣΕΙΣ (EDITABLE) === */}
         <div className="flex flex-col gap-3 min-h-0 max-h-full">
-          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
+          <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
             <MapPin size={14} className="text-emerald-400" />
-            2. Πινακας Στασεων
+            2. Πίνακας Στάσεων
           </h3>
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
             <div className="overflow-y-auto custom-scrollbar">
               <table className="w-full text-left border-collapse table-auto relative">
                 <thead className="sticky top-0 bg-[#0F172A] border-b border-slate-800/50 z-10 shadow-sm">
                   <tr>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-500 tracking-widest uppercase text-center">Σταση</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-500 tracking-widest uppercase text-center">Υψομετρο H (m)</th>
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Στάση</th>
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Υψόμετρο H (m)</th>
                     <th className="px-4 w-10"></th>
                   </tr>
                 </thead>
