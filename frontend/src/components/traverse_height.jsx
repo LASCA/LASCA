@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Target, MapPin, Database, PlusCircle, Trash2 } from 'lucide-react';
+import { Target, MapPin, Database, PlusCircle, Trash2, Play, Cpu } from 'lucide-react';
+import axios from 'axios';
 
 const TraverseHeight = ({ 
   observations = [], 
@@ -10,6 +11,7 @@ const TraverseHeight = ({
   // --- ΕΣΩΤΕΡΙΚΑ STATES --- 
   const [localObs, setLocalObs] = useState([]);
   const [localStations, setLocalStations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // --- HELPERS ΓΙΑ ΔΕΚΑΔΙΚΑ ---
   const to3 = (val) => {
@@ -74,6 +76,31 @@ const TraverseHeight = ({
     const finalData = typeof newData === 'function' ? newData(localStations) : newData;
     setLocalStations(finalData);
     if (setStations) setStations(finalData);
+  };
+
+  // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API CALL) ---
+  const handleTraverseHeightCalc = async () => {
+    setIsLoading(true);
+    try {
+      const payload = {
+        observations: localObs, 
+        stations: localStations 
+      };
+
+      const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
+
+      if (response.data && response.data.status === "success") {
+        // Ενημερώνουμε ΑΠΕΥΘΕΙΑΣ τον 2ο Πίνακα με τα νέα υψόμετρα
+        updateStationsData(response.data.stations);
+      } else {
+        alert(response.data.error || "Προέκυψε σφάλμα.");
+      }
+    } catch (error) {
+      console.error("Σφάλμα στην Τριγωνομετρική Υψομετρία:", error);
+      alert("Αποτυχία σύνδεσης με το backend.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // --- HANDLERS ΓΙΑ ΠΑΡΑΤΗΡΗΣΕΙΣ ---
@@ -185,7 +212,21 @@ const TraverseHeight = ({
                     <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
                     <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
                     <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
-                    <th className="p-4 w-12"></th>
+                    {/* Κουμπί Επίλυσης όπως στο Adjustment */}
+                    <th className="p-3 w-16">
+                      <div className="flex justify-end pr-2 gap-2">
+                        <button 
+                          onClick={handleTraverseHeightCalc}
+                          disabled={isLoading}
+                          className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
+                            isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
+                          }`}
+                          title="Υπολογισμός Υψομέτρων"
+                        >
+                          {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">

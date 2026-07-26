@@ -819,35 +819,58 @@ def traverse_level_calc(measurements_json):
         df_meas_clean['dh'] = (df_meas_clean['Slope_D'] * np.cos(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
         df_meas_clean['dh'] = df_meas_clean['dh'].round(3)
 
-        # 5. Δυναμική ενοποίηση περιόδων
-        df_meas_clean['pair_key'] = df_meas_clean.apply(
-            lambda row: "_".join(sorted([str(row['From']), str(row['To'])])), axis=1
-        )
-        
-        df_meas_clean['dh_for_mean'] = df_meas_clean['dh']
-        df_meas_clean.iloc[1::2, df_meas_clean.columns.get_loc('dh_for_mean')] = -df_meas_clean.iloc[1::2]['dh']
-        
-        global_mean = df_meas_clean.groupby('pair_key')['dh_for_mean'].transform('mean')
-        df_meas_clean['dh_mean'] = global_mean
-        df_meas_clean.iloc[1::2, df_meas_clean.columns.get_loc('dh_mean')] = -df_meas_clean.iloc[1::2]['dh_mean']
+        # 5 & 6. Δυναμική ενοποίηση περιόδων (Mean dh) με απόλυτη ασφάλεια
+        pair_dict = {}
+        for _, row in df_meas_clean.iterrows():
+            start = row['From']
+            end = row['To']
+            dh = row['dh']
+            
+            pair = (start, end)
+            rev_pair = (end, start)
+            
+            # Αν υπάρχει ήδη το ζευγάρι, προσθέτουμε το dh.
+            if pair in pair_dict:
+                pair_dict[pair].append(dh)
+            # Αν υπάρχει το ανάποδο (backward), προσθέτουμε το dh με ΑΝΤΙΘΕΤΟ πρόσημο
+            elif rev_pair in pair_dict:
+                pair_dict[rev_pair].append(-dh) 
+            # Διαφορετικά, είναι η πρώτη φορά που βλέπουμε αυτή τη μετάβαση
+            else:
+                pair_dict[pair] = [dh]
+                
+        # Φτιάχνουμε τα τελικά vectors με τους μέσους όρους
+        final_vectors = []
+        for (start, end), dh_list in pair_dict.items():
+            dh_mean = sum(dh_list) / len(dh_list)
+            final_vectors.append({'From': start, 'To': end, 'dh_mean': dh_mean})
+            
+        df_final_vectors = pd.DataFrame(final_vectors)
 
-        # 6. Φιλτράρισμα για το τελικό DataFrame μόνο με τις μεταβάσεις
-        df_forward_only = df_meas_clean.iloc[0::2].copy()
-        df_final_vectors = df_forward_only[['From', 'To', 'dh_mean']].reset_index(drop=True)
-
-        # 7. Αλυσιδωτός υπολογισμός των υψομέτρων
+        # 7. Αλυσιδωτός (Δυναμικός) υπολογισμός των υψομέτρων
         known_heights = df_stations.dropna(subset=['H_m']).set_index('Stations')['H_m'].to_dict()
         
-        for _, vector in df_final_vectors.iterrows():
-            start_node = vector['From']
-            end_node = vector['To']
-            dh = vector['dh_mean']
-            
-            if start_node in known_heights and pd.notnull(dh):
-                calculated_height = known_heights[start_node] + dh
-                if end_node not in known_heights or end_node.startswith('S') or end_node.isdigit():
-                    known_heights[end_node] = round(calculated_height, 3)
-
+        # Επαναλαμβάνουμε μέχρι να μην προστεθεί καμία νέα στάση (κλασικός network solver)
+        added_new = True
+        while added_new:
+            added_new = False
+            for _, vector in df_final_vectors.iterrows():
+                start_node = vector['From']
+                end_node = vector['To']
+                dh = vector['dh_mean']
+                
+                # Συνθήκη 1: Ξέρουμε την αρχή, ψάχνουμε το τέλος
+                if start_node in known_heights and end_node not in known_heights:
+                    if end_node.startswith('S') or end_node.isdigit():
+                        known_heights[end_node] = round(known_heights[start_node] + dh, 3)
+                        added_new = True
+                
+                # Συνθήκη 2 (Έξτρα ασφάλεια): Ξέρουμε το τέλος, ψάχνουμε την αρχή
+                elif end_node in known_heights and start_node not in known_heights:
+                    if start_node.startswith('S') or start_node.isdigit():
+                        known_heights[start_node] = round(known_heights[end_node] - dh, 3)
+                        added_new = True
+                        
         # 8. Περνάμε τα συμπληρωμένα H πίσω στο αρχικό JSON που ήρθε από το UI
         for row in measurements_json:
             st_name = str(row.get('name', '')).strip()

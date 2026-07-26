@@ -124,7 +124,7 @@ const Dashboard = ({
           }
         }
 
-        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+// 2. ΔΙΑΒΑΣΜΑ TRAVERSE
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
@@ -142,21 +142,25 @@ const Dashboard = ({
           
           if (setTraverseData) setTraverseData(formattedTraverse);
 
-          // --- Εξαγωγή μοναδικών στάσεων με υψόμετρο για τον 2ο Πίνακα (Leveling Stations) ---
+          // --- Εξαγωγή ΟΛΩΝ των στάσεων με τη σειρά που εμφανίζονται στο Excel (συμπεριλαμβανομένων διπλότυπων) ---
           if (setLevelingStations) {
-            const uniqueStations =new window.Map();
-            formattedTraverse.forEach(row => {
-              if (row.name && row.h !== undefined && row.h !== "") {
-                uniqueStations.set(row.name, row.h);
+            const extractedStations = [];
+            
+            formattedTraverse.forEach((row, index) => {
+              // Αν η γραμμή έχει όνομα στάσης
+              if (row.name) {
+                // Παίρνουμε το H αν υπάρχει, αλλιώς βάζουμε κενό string
+                const currentH = (row.h !== undefined && row.h !== null) ? row.h : "";
+                
+                // Προσθέτουμε τη στάση στον πίνακα όπως ακριβώς διαβάστηκε
+                extractedStations.push({
+                  id: Date.now() + 1000 + index, // Δίνουμε μοναδικό ID στη γραμμή, ακόμα κι αν το όνομα υπάρχει ήδη
+                  name: String(row.name),
+                  h: String(currentH)
+                });
               }
             });
 
-            const extractedStations = Array.from(uniqueStations.entries()).map(([name, h], index) => ({
-              id: Date.now() + 1000 + index,
-              name: String(name),
-              h: String(h)
-            }));
-            
             setLevelingStations(extractedStations);
           }
         }

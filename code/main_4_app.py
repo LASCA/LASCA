@@ -342,6 +342,64 @@ def run_traverse():
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
+#  ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ (TRAVERSE HEIGHT)
+# ==========================================
+@app.route('/api/traverse_height', methods=['POST'])
+def run_traverse_height():
+    try:
+        data = request.json
+        observations = data.get('observations', [])
+        stations = data.get('stations', [])
+
+        if not observations or not stations:
+             return jsonify({"error": "Λείπουν δεδομένα παρατηρήσεων ή στάσεων."}), 400
+
+        measurements_json = []
+
+        # 1. Προσθήκη των Στάσεων στο JSON (μετατροπή ονομάτων στα κλειδιά που περιμένει το dpr)
+        for st in stations:
+            measurements_json.append({
+                "name": st.get("name", ""),
+                "h": st.get("h", "")
+            })
+
+        # 2. Προσθήκη των Παρατηρήσεων στο JSON (μετατροπή ονομάτων)
+        for obs in observations:
+            measurements_json.append({
+                "From": obs.get("from", ""),
+                "To": obs.get("to", ""),
+                "Slope_D [m]": obs.get("s", ""),
+                "Z[grad]": obs.get("z", ""),
+                "H_station": obs.get("hi", ""),
+                "H_target": obs.get("ht", "")
+            })
+
+        # 3. Κλήση της συνάρτησης υπολογισμού από το dpr
+        calculated_data = dpr.traverse_level_calc(measurements_json)
+
+        # 4. Εξαγωγή ΜΟΝΟ των στάσεων με τα νέα υψόμετρα για να τα στείλουμε πίσω στο UI
+        updated_stations = []
+        # Χρησιμοποιούμε index counter για να φτιάξουμε unique IDs για το React
+        for idx, row in enumerate(calculated_data):
+            # Αν υπάρχει το κλειδί 'name', είναι γραμμή στάσης
+            if 'name' in row and row['name'] != "":
+                updated_stations.append({
+                    "id": 1000 + idx,  # Ή κρατάμε το αρχικό αν θέλουμε, αλλά αυτό είναι πιο safe
+                    "name": row.get("name", ""),
+                    "h": row.get("h", "")
+                })
+
+        return jsonify({
+            "status": "success",
+            "stations": updated_stations
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+# ==========================================
 # 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) 
 # ==========================================
 @app.route('/api/tachymetry', methods=['POST'])
