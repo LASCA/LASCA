@@ -285,6 +285,7 @@ function App() {
                 setObservations={setLevelingObservations}
                 stations={levelingStations}
                 setStations={setLevelingStations}
+                projectSettings={currentProject}
               />
             )}
             

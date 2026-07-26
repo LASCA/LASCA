@@ -6,7 +6,8 @@ const TraverseHeight = ({
   observations = [], 
   setObservations,   
   stations = [],
-  setStations
+  setStations,
+  projectSettings
 }) => {
   // --- ΕΣΩΤΕΡΙΚΑ STATES --- 
   const [localObs, setLocalObs] = useState([]);
@@ -79,12 +80,19 @@ const TraverseHeight = ({
   };
 
   // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API CALL) ---
+// --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API CALL) ---
   const handleTraverseHeightCalc = async () => {
     setIsLoading(true);
     try {
+      // 2α. Εξαγωγή του ονόματος του ενεργού project
+      const projectNamePayload = typeof projectSettings === 'string' 
+        ? projectSettings 
+        : (projectSettings?.name || '');
+
       const payload = {
         observations: localObs, 
-        stations: localStations 
+        stations: localStations,
+        project_name: projectNamePayload // <--- 2β. ΠΡΟΣΘΕΣΕ ΤΟ ΟΝΟΜΑ ΣΤΟ PAYLOAD
       };
 
       const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
