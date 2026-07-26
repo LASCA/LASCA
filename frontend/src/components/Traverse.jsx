@@ -179,7 +179,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       const processedMeasurements = data.map(row => {
         if (scaleMode === "Με" && row.sd && !isNaN(parseFloat(row.sd))) {
           const originalSd = parseFloat(row.sd);
-          // ΔΙΟΡΘΩΣΗ: Διαίρεση με τον συντελεστή κλίμακας για το API
           const reducedSd = originalSd / currentScaleFactor;
           return { ...row, sd: reducedSd.toFixed(4) };
         }
@@ -418,16 +417,13 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           document.activeElement?.id === `input-${idx}-sd`
                             ? (row.sd ?? "") 
                             : (scaleMode === "Με" && row.sd && !isNaN(parseFloat(row.sd))
-                                // ΔΙΟΡΘΩΣΗ: Διαίρεση με τον συντελεστή κλίμακας για το UI
                                 ? (parseFloat(row.sd) / (parseFloat(scaleFactor) || 1.0)).toFixed(3)
                                 : formatVal(row.sd, 3))
                           }
                           onChange={(e) => handleInputChange(idx, 'sd', e.target.value)}
                           onBlur={(e) => handleInputChange(idx, 'sd', formatVal(e.target.value, 3))}
                           onKeyDown={(e) => handleKeyDown(e, idx, 'sd')}
-                          className={`bg-transparent w-full font-mono font-bold text-center text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400/80 rounded px-2 py-2 transition-all ${
-                            scaleMode === 'Με' && row.sd ? 'text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]' : 'text-cyan-400'
-                          }`}
+                          className="bg-transparent w-full font-mono text-cyan-400 font-bold text-center text-sm tracking-wide outline-none focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 rounded px-2 py-2 transition-all"
                           placeholder="-"
                         />
                       </td>
