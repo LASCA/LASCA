@@ -44,8 +44,9 @@ const Dashboard = ({
   setTachymetryData, 
   setStakeoutData, 
   setGoniometryData,
-  setLevelingObservations, // ΝΕΟ PROP: Για τον Πίνακα 1
-  setLevelingStations,     // ΝΕΟ PROP: Για τον Πίνακα 2
+  setLevelingObservations, 
+  setLevelingStations,     
+  setTrigLevelingData, // ΝΕΟ PROP: Για τον Πίνακα Τριγωνομετρικής Υψομετρίας
   onOpenProjectManager,
   
   projectSettings,
@@ -63,7 +64,6 @@ const Dashboard = ({
 
   // Επεξεργασία δεδομένων για τον χάρτη (ΜΟΝΟ Στάσεις & Αποτύπωση)
   const mapData = useMemo(() => {
-    // 1. Στάσεις (Traverse)
     const stations = traverseData
       .filter(pt => pt.x && pt.y && !isNaN(pt.x) && !isNaN(pt.y))
       .map(pt => ({
@@ -73,7 +73,6 @@ const Dashboard = ({
         type: 'station'
       }));
 
-    // 2. Σημεία Αποτύπωσης (Tachymetry)
     const details = (tachymetryData?.measurements || [])
       .filter(pt => (pt['E[m]'] || pt.x) && (pt['N[m]'] || pt.y))
       .map(pt => ({
@@ -124,7 +123,7 @@ const Dashboard = ({
           }
         }
 
-// 2. ΔΙΑΒΑΣΜΑ TRAVERSE
+        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
@@ -142,31 +141,24 @@ const Dashboard = ({
           
           if (setTraverseData) setTraverseData(formattedTraverse);
 
-          // --- Εξαγωγή ΟΛΩΝ των στάσεων με τη σειρά που εμφανίζονται στο Excel (συμπεριλαμβανομένων διπλότυπων) ---
           if (setLevelingStations) {
             const extractedStations = [];
-            
             formattedTraverse.forEach((row, index) => {
-              // Αν η γραμμή έχει όνομα στάσης
               if (row.name) {
-                // Παίρνουμε το H αν υπάρχει, αλλιώς βάζουμε κενό string
                 const currentH = (row.h !== undefined && row.h !== null) ? row.h : "";
-                
-                // Προσθέτουμε τη στάση στον πίνακα όπως ακριβώς διαβάστηκε
                 extractedStations.push({
-                  id: Date.now() + 1000 + index, // Δίνουμε μοναδικό ID στη γραμμή, ακόμα κι αν το όνομα υπάρχει ήδη
+                  id: Date.now() + 1000 + index,
                   name: String(row.name),
                   h: String(currentH)
                 });
               }
             });
-
             setLevelingStations(extractedStations);
           }
         }
 
-        // 2.5 ΔΙΑΒΑΣΜΑ TRAVERSE LEVELING
-        const traverseLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('traverse_leveling'));
+        // 2.5 ΔΙΑΒΑΣΜΑ TRAVERSE LEVELING (Γεωμετρική Χωροστάθμιση / Υφιστάμενο)
+        const traverseLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse_leveling');
         if (traverseLevelingSheetName && setLevelingObservations) {
           const wsLeveling = wb.Sheets[traverseLevelingSheetName];
           const dataLeveling = XLSX.utils.sheet_to_json(wsLeveling);
@@ -232,6 +224,28 @@ const Dashboard = ({
               faceII: row['Face II'] !== undefined ? String(row['Face II']) : ""
             }));
             setGoniometryData(formattedGoniometry);
+          }
+        }
+
+        // 6. ΔΙΑΒΑΣΜΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (ΝΕΟ ΦΥΛΛΟ)
+        const trigLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('trig_leveling'));
+        if (trigLevelingSheetName && setTrigLevelingData) {
+          const wsTrig = wb.Sheets[trigLevelingSheetName];
+          const dataTrig = XLSX.utils.sheet_to_json(wsTrig);
+
+          if (dataTrig.length > 0) {
+            const formattedTrig = dataTrig.map((row, index) => ({
+              id: Date.now() + 3000 + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              s: row['Slope_D'] !== undefined ? String(row['Slope_D']) : "",
+              z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
+              hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
+              ht: row['H_target'] !== undefined ? String(row['H_target']) : "",
+              dh: "",      // Αρχικοποίηση κενών πεδίων για τα αποτελέσματα
+              dh_avg: "" 
+            }));
+            setTrigLevelingData(formattedTrig);
           }
         }
 

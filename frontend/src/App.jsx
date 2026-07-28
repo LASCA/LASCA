@@ -253,6 +253,7 @@ function App() {
             
             {activeTab === 'dashboard' && (
               <Dashboard
+                // Ενημέρωση Δεδομένων από το Dashboard
                 setObservations={setObservations}
                 setTraverseData={setTraverseData}
                 setTachymetryData={setTachymetryData}
@@ -260,9 +261,15 @@ function App() {
                 setGoniometryData={setGoniometryData}
                 setLevelingObservations={setLevelingObservations}
                 setLevelingStations={setLevelingStations}
-                // Optionals setters if handled from Dashboard
-                setTrigHeightData={setTrigHeightData}
+                setTrigLevelingData={setTrigHeightData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
+                
+                // Πέρασμα Δεδομένων για τον Χάρτη και τα Στατιστικά
+                projectSettings={{ name: currentProject }}
+                traverseData={traverseData}
+                tachymetryData={tachymetryData}
+                stakeoutData={stakeoutData}
+                levelingMetrics={levelingMetrics}
               />
             )}
 
@@ -299,7 +306,7 @@ function App() {
               />
             )}
 
-            {/* --- ΝΕΑ ΚΑΡΤΕΛΑ: ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ --- */}
+            {/* --- ΚΑΡΤΕΛΑ: ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ --- */}
             {activeTab === 'trig_leveling' && (
               <TrigonometricHeight 
                 data={trigHeightData}
