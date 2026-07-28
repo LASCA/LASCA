@@ -326,7 +326,7 @@ def run_traverse():
 
         plot_base64 = None
         try:
-            plot_base64 = vis.plot_traverse_base64(results_rr)
+            plot_base64 = vis.plot_traverse_base64(results_rr, measurements, scale)
         except Exception as e:
             print(f"Σφάλμα γραφήματος όδευσης: {e}")
 
