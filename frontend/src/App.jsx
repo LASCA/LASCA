@@ -13,6 +13,9 @@ import Charaxi from './components/charaxi';
 import Goniometry from './components/gwniometriseis'; 
 import Leveling from './components/leveling';
 import BasicCalculations from './components/Basic_Calc';
+import TrigonometricHeight from './components/trig_leveling';
+
+// Αν θέλεις εικόνα/λογότυπο, κάνε import εδώ (π.χ. import myLogo from './assets/logo.png';)
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -32,7 +35,7 @@ function App() {
   const [traverseMetrics, setTraverseMetrics] = useState({}); 
   const [tachymetryData, setTachymetryData] = useState({ measurements: [], stations: [], results: [] }); 
   
-  // ΝΕΟ STATE ΓΙΑ ΤΗ ΧΑΡΑΞΗ
+  // ΧΑΡΑΞΗ
   const [stakeoutData, setStakeoutData] = useState({
     station: { name: 'St1', x: '', y: '' },
     backsight: { name: 'BS1', x: '', y: '' },
@@ -40,14 +43,14 @@ function App() {
     points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
   });
 
-  // ΝΕΟ STATE ΓΙΑ ΤΙΣ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ
+  // ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ
   const [goniometryData, setGoniometryData] = useState([]);
 
-  // --- ΝΕΑ STATES ΓΙΑ ΤΗΝ ΥΨΟΜΕΤΡΙΚΗ ΟΔΕΥΣΗ (Traverse Height) ---
+  // ΥΨΟΜΕΤΡΙΚΗ ΟΔΕΥΣΗ (Traverse Height)
   const [levelingObservations, setLevelingObservations] = useState([]);
   const [levelingStations, setLevelingStations] = useState([]);
 
-  // --- ΝΕΑ STATES ΓΙΑ ΤΗ ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ ---
+  // ΓΕΩΜΕΤΡΙΚΗ ΧΩΡΟΣΤΑΘΜΙΣΗ
   const [levelingForward, setLevelingForward] = useState([
     { id: 1, point: 'BM1', backsight: '', foresight: '', dh: '', elevation: '' },
   ]);
@@ -55,6 +58,9 @@ function App() {
     { id: 1, point: 'BM2', backsight: '', foresight: '', dh: '', elevation: '' },
   ]);
   const [levelingMetrics, setLevelingMetrics] = useState({});
+
+  // --- ΝΕΟ STATE ΓΙΑ ΤΗΝ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ ---
+  const [trigHeightData, setTrigHeightData] = useState([]);
 
   // "Κλειδαριά" για το Auto-Save
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -86,17 +92,15 @@ function App() {
             points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
           });
 
-          // Φόρτωση γωνιομετρήσεων
           setGoniometryData(backendData.goniometryData || []);
-
-          // Φόρτωση Υψομετρικής Όδευσης
           setLevelingObservations(backendData.levelingObservations || []);
           setLevelingStations(backendData.levelingStations || []);
-
-          // Φόρτωση χωροστάθμισης
           setLevelingForward(backendData.levelingForward || []);
           setLevelingBackward(backendData.levelingBackward || []);
           setLevelingMetrics(backendData.levelingMetrics || {});
+
+          // Φόρτωση Τριγωνομετρικής Υψομετρίας
+          setTrigHeightData(backendData.trigHeightData || []);
 
           console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
           setIsDataLoaded(true);
@@ -109,7 +113,7 @@ function App() {
     } else {
       setIsDataLoaded(true);
     }
-  }, []);
+  }, [currentProject]);
 
   // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
   useEffect(() => {
@@ -126,15 +130,14 @@ function App() {
       tachymetryData: tachymetryData,
       stakeoutData: stakeoutData,
       goniometryData: goniometryData,
-      
-      // Προσθήκη Υψομετρικής Όδευσης
       levelingObservations: levelingObservations,
       levelingStations: levelingStations,
-
-      // Προσθήκη χωροστάθμισης
       levelingForward: levelingForward,
       levelingBackward: levelingBackward,
-      levelingMetrics: levelingMetrics
+      levelingMetrics: levelingMetrics,
+      
+      // Αποθήκευση Τριγωνομετρικής Υψομετρίας
+      trigHeightData: trigHeightData
     };
 
     savedProjects[currentProject] = projectState;
@@ -169,11 +172,12 @@ function App() {
     tachymetryData, 
     stakeoutData, 
     goniometryData,
-    levelingObservations, // Παρακολούθηση για auto-save
-    levelingStations,     // Παρακολούθηση για auto-save
+    levelingObservations, 
+    levelingStations,     
     levelingForward,  
     levelingBackward, 
-    levelingMetrics   
+    levelingMetrics,
+    trigHeightData // Παρακολούθηση για την Τριγωνομετρική
   ]);
 
   // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
@@ -200,6 +204,9 @@ function App() {
     setLevelingForward(projectData.levelingForward || []);
     setLevelingBackward(projectData.levelingBackward || []);
     setLevelingMetrics(projectData.levelingMetrics || {});
+    
+    // Φόρτωση Τριγωνομετρικής
+    setTrigHeightData(projectData.trigHeightData || []);
 
     setIsDataLoaded(true);
     setIsProjectModalOpen(false);
@@ -223,6 +230,8 @@ function App() {
       <div className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         
         <div className="absolute top-4 right-6 z-50 flex items-center gap-3">
+          {/* <img src={myLogo} alt="Λογότυπο" className="h-8 w-auto mr-2" /> */}
+          
           {currentProject && (
             <span className="text-[10px] font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 rounded-lg shadow-sm">
               Project: {currentProject}
@@ -249,9 +258,10 @@ function App() {
                 setTachymetryData={setTachymetryData}
                 setStakeoutData={setStakeoutData}
                 setGoniometryData={setGoniometryData}
-                // Προσθήκη setters για φόρτωση από Excel
                 setLevelingObservations={setLevelingObservations}
                 setLevelingStations={setLevelingStations}
+                // Optionals setters if handled from Dashboard
+                setTrigHeightData={setTrigHeightData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
               />
             )}
@@ -285,6 +295,15 @@ function App() {
                 setObservations={setLevelingObservations}
                 stations={levelingStations}
                 setStations={setLevelingStations}
+                projectSettings={currentProject}
+              />
+            )}
+
+            {/* --- ΝΕΑ ΚΑΡΤΕΛΑ: ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ --- */}
+            {activeTab === 'trig_leveling' && (
+              <TrigonometricHeight 
+                data={trigHeightData}
+                setData={setTrigHeightData}
                 projectSettings={currentProject}
               />
             )}
