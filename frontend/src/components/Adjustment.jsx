@@ -169,7 +169,8 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         if (setAdjMetrics) {
           setAdjMetrics({
             isAdjusted: true,
-            plotImage: response.data.plot || null
+            plotImage: response.data.plot || null,
+            stats: response.data.stats || response.data.station_stats || null
           });
         }
       }
@@ -352,6 +353,55 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
               </table>
             </div>
           </div>
+
+          {/* ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΣΤΑΘΜΟΥ / LOG (Εμφανίζεται μετά τη συνόρθωση) */}
+          {isAdjusted && (
+            <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
+              <div className="flex items-center justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-[10px] font-black text-slate-400 tracking-[0.2em]">
+                  Στατιστικα Συνορθωσης Στασεων (Log)
+                </span>
+              </div>
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse table-auto text-xs">
+                  <thead className="bg-[#0f172a] text-slate-500 text-[10px] font-black tracking-widest">
+                    <tr className="border-b border-slate-800/50">
+                      <th className="p-3">Στάση</th>
+                      <th className="p-3 text-center">Βαθμοί Ελευθερίας (f)</th>
+                      <th className="p-3 text-center">Κριτήριο Βελτιστοποίησης [vv]</th>
+                      <th className="p-3 text-center">a-posteriori μεταβλητότητα (σ₀²)</th>
+                      <th className="p-3 text-center">a-posteriori τυπική απόκλιση σ₀ (cc)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/30 font-mono">
+                    {Array.isArray(adjMetrics.stats) ? (
+                      adjMetrics.stats.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/20">
+                          <td className="p-3 font-bold text-slate-200">{row.station || row.stationName || "-"}</td>
+                          <td className="p-3 text-center text-cyan-400 font-bold">{row.f ?? "-"}</td>
+                          <td className="p-3 text-center text-emerald-400">{row.vv !== undefined && row.vv !== null ? to4(row.vv) : "-"}</td>
+                          <td className="p-3 text-center text-emerald-400">{row.var !== undefined && row.var !== null ? to4(row.var) : "-"}</td>
+                          <td className="p-3 text-center text-emerald-400 font-bold">{row.std !== undefined && row.std !== null ? to2(row.std) : "-"}</td>
+                        </tr>
+                      ))
+                    ) : adjMetrics.stats ? (
+                      <tr className="hover:bg-slate-800/20">
+                        <td className="p-3 font-bold text-slate-200">{adjMetrics.stats.station || adjMetrics.stats.stationName || "-"}</td>
+                        <td className="p-3 text-center text-cyan-400 font-bold">{adjMetrics.stats.f ?? "-"}</td>
+                        <td className="p-3 text-center text-emerald-400">{adjMetrics.stats.vv !== undefined && adjMetrics.stats.vv !== null ? to4(adjMetrics.stats.vv) : "-"}</td>
+                        <td className="p-3 text-center text-emerald-400">{adjMetrics.stats.var !== undefined && adjMetrics.stats.var !== null ? to4(adjMetrics.stats.var) : "-"}</td>
+                        <td className="p-3 text-center text-emerald-400 font-bold">{adjMetrics.stats.std !== undefined && adjMetrics.stats.std !== null ? to2(adjMetrics.stats.std) : "-"}</td>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-slate-500 italic">Δεν βρέθηκαν στατιστικά.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Visualizer */}
