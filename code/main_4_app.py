@@ -447,6 +447,7 @@ def run_traverse_height():
         import traceback
         print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+    
 # ==========================================
 # 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) 
 # ==========================================
@@ -788,6 +789,40 @@ def run_leveling():
     except Exception as e:
         import traceback
         print(f"Σφάλμα κατά την αποθήκευση/υπολογισμό Χωροστάθμισης:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+# ==========================================
+# 8. ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ
+# ==========================================
+@app.route('/api/trig_leveling', methods=['POST'])
+def run_trig_leveling():
+    data = request.json
+    rows = data.get('rows', [])
+    
+    if not rows:
+        return jsonify({"results": []})
+        
+    try:
+        # 1. Μετατροπή των δεδομένων από το React σε pandas DataFrame
+        df = pd.DataFrame(rows)
+        
+        # 2. Εξασφάλιση ότι οι κρίσιμες στήλες είναι αριθμητικές
+        numeric_cols = ['Slope_D', 'Z[grad]', 'H_station', 'H_target']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+        # 3. Κλήση της συνάρτησης υπολογισμού από το data_proccessing
+        res_df = dpr.trig_leveling(df)
+        
+        # 4. Μετατροπή του DataFrame πίσω σε JSON (αντικαθιστούμε τα NaN με "")
+        results = res_df.fillna("").to_dict('records')
+        
+        return jsonify({"results": results})
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 if __name__ == '__main__':

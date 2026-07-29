@@ -115,6 +115,7 @@ const TrigonometricHeight = ({
   };
 
   // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API) ---
+// --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API) ---
   const handleCalculate = async () => {
     setIsLoading(true);
     try {
@@ -122,15 +123,36 @@ const TrigonometricHeight = ({
         ? projectSettings 
         : (projectSettings?.name || '');
 
+      // 1. Μετατροπή των δεδομένων του React στη μορφή που περιμένει το Python DataFrame
+      const formattedForBackend = localData.map(row => ({
+        "From": row.from,
+        "To": row.to,
+        "Slope_D": row.s,
+        "Z[grad]": row.z,
+        "H_station": row.hi,
+        "H_target": row.ht
+      }));
+
+      // Στέλνουμε το κλειδί 'rows' που περιμένει το backend
       const payload = {
-        data: localData,
+        rows: formattedForBackend, 
         project_name: projectNamePayload
       };
 
-      const response = await axios.post('http://127.0.0.1:5000/api/trigonometric_height', payload);
+      // Βεβαιώσου ότι το URL ταιριάζει με το όνομα του endpoint στο Flask (π.χ. /api/trig_leveling)
+      const response = await axios.post('http://127.0.0.1:5000/api/trig_leveling', payload);
 
-      if (response.data && response.data.status === "success") {
-        updateData(response.data.results || response.data.data);
+      if (response.data && response.data.results) {
+        // 2. Μετατροπή των αποτελεσμάτων της Python πίσω στη μορφή του React
+        const calculatedData = response.data.results.map((row, index) => ({
+          ...localData[index], // Διατηρούμε το id και τα αρχικά δεδομένα
+          from: row["From"] || localData[index].from,
+          to: row["To"] || localData[index].to,
+          dh: row["dh"] !== undefined ? row["dh"] : "",
+          dh_avg: row["dh_mean"] !== undefined ? row["dh_mean"] : "" // Προσοχή: Η Python το ονομάζει dh_mean
+        }));
+        
+        updateData(calculatedData);
       } else {
         alert(response.data?.error || "Προέκυψε σφάλμα κατά τον υπολογισμό.");
       }
