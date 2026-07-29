@@ -374,7 +374,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/30 font-mono">
-                    {Array.isArray(adjMetrics.stats) ? (
+                    {Array.isArray(adjMetrics.stats) && adjMetrics.stats.length > 0 ? (
                       adjMetrics.stats.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-800/20">
                           <td className="p-3 font-bold text-slate-200">{row.station || row.stationName || "-"}</td>

@@ -617,7 +617,12 @@ def gwn(dataframe):
     return df
 
 # SYNORTHOSI STATHMOY
-def solve_lsa_detailed(observations):
+import pandas as pd
+import numpy as np
+
+# 1. Η ΔΙΟΡΘΩΜΕΝΗ solve_lsa_detailed
+# Πρόσθεσα το st_name="Unknown" ως δεύτερη παράμετρο!
+def solve_lsa_detailed(observations, st_name="Unknown"):
     """
     Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
     Διατηρεί τον πραγματικό προσανατολισμό του 1ου σημείου χωρίς να αλλοιώνει τα σφάλματα.
@@ -699,7 +704,14 @@ def solve_lsa_detailed(observations):
     # Εδώ τροφοδοτείται ο πίνακας του frontend με τα σωστά στραμμένα final_means!
     results = [[pt, f"{final_means[i]:.5f}", std_display] for i, pt in enumerate(points)]
     
-    stats = {'var': total_vv/f if f>0 else 0, 'std': sigma_0, 'f': f, 'vv': total_vv}
+    # ΤΟ ΣΦΑΛΜΑ ΛΥΘΗΚΕ: Το st_name έρχεται πλέον από την αρχή της συνάρτησης!
+    stats = {
+        'station': st_name, 
+        'var': total_vv/f if f > 0 else 0, 
+        'std': sigma_0, 
+        'f': f, 
+        'vv': total_vv
+    }
     
     return results, stats, section_3_rows
 

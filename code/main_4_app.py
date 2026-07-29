@@ -173,6 +173,7 @@ def run_adjustment():
             
         df[['From', 'To', 'Period']] = df[['From', 'To', 'Period']].ffill()
 
+        # Εδώ η συνάρτηση επιστρέφει το adj_df και το adj_meta
         adj_df, adj_meta = dpr.process_network_data(df)
         
         plot_base64 = None
@@ -200,16 +201,38 @@ def run_adjustment():
                 "std_dev": std_dev_val
             })
             
+        # --- ΝΕΑ ΛΟΓΙΚΗ: Εξαγωγή και καθαρισμός Στατιστικών ---
+        stats_list = []
+        # Το adj_meta είναι λεξικό με κλειδιά τα IDs των σταθμών (π.χ. '8', '15', '61')
+        for station_id, data_dict in adj_meta.items():
+            station_stats = data_dict.get('stats', {})
+            
+            # Δημιουργούμε το καθαρό object με python native types (float, int)
+            clean_stats = {
+                'station': station_id if station_stats.get('station') == 'Unknown' else station_stats.get('station', station_id),
+                'var': float(station_stats.get('var', 0.0)),
+                'std': float(station_stats.get('std', 0.0)),
+                'f': int(station_stats.get('f', 0)),
+                'vv': float(station_stats.get('vv', 0.0))
+            }
+            stats_list.append(clean_stats)
+
+        # ΠΡΟΣΘΗΚΗ: Εκτυπώνουμε τη λίστα που θα σταλεί στο React για έλεγχο
+        print("====== DEBUGGING ΤΕΛΙΚΩΝ ΣΤΑΤΙΣΤΙΚΩΝ ΠΡΟΣ REACT ======")
+        print(f"Τελική Λίστα (stats_list): {stats_list}")
+        print("======================================================")
+            
+        # Επιστρέφουμε τα αποτελέσματα στο Frontend
         return jsonify({
             "results": results,
-            "plot": plot_base64
+            "plot": plot_base64,
+            "stats": stats_list  # <--- Τώρα στέλνουμε την καθαρή λίστα 'stats_list' αντί για το raw adj_meta
         })
         
     except Exception as e:
         import traceback
         print(f"Σφάλμα κατά την εκτέλεση της συνόρθωσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
 
 # ==========================================
 # 2. ENDPOINT ΓΙΑ ΟΔΕΥΣΗ (TRAVERSE)
