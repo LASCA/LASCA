@@ -46,7 +46,7 @@ const Dashboard = ({
   setGoniometryData,
   setLevelingObservations, 
   setLevelingStations,     
-  setTrigLevelingData, // ΝΕΟ PROP: Για τον Πίνακα Τριγωνομετρικής Υψομετρίας
+  setTrigLevelingData,
   onOpenProjectManager,
   
   projectSettings,
@@ -62,7 +62,7 @@ const Dashboard = ({
   const projectName = projectSettings?.name || 'My_Survey_Project.lasca';
   const hasData = stationCount > 0 || measurementCount > 0 || stakeoutCount > 0;
 
-  // Επεξεργασία δεδομένων για τον χάρτη (ΜΟΝΟ Στάσεις & Αποτύπωση)
+  // Επεξεργασία δεδομένων για τον χάρτη
   const mapData = useMemo(() => {
     const stations = traverseData
       .filter(pt => pt.x && pt.y && !isNaN(pt.x) && !isNaN(pt.y))
@@ -102,7 +102,6 @@ const Dashboard = ({
         const bstr = event.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
 
-        // 1. ΔΙΑΒΑΣΜΑ ADJUSTMENT
         const adjSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('synorthosi_stathmou'));
         if (adjSheetName && setObservations) {
           const wsAdjustment = wb.Sheets[adjSheetName];
@@ -123,7 +122,6 @@ const Dashboard = ({
           }
         }
 
-        // 2. ΔΙΑΒΑΣΜΑ TRAVERSE
         const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
         if (traverseSheetName) {
           const wsTraverse = wb.Sheets[traverseSheetName];
@@ -157,7 +155,6 @@ const Dashboard = ({
           }
         }
 
-        // 2.5 ΔΙΑΒΑΣΜΑ TRAVERSE LEVELING (Γεωμετρική Χωροστάθμιση / Υφιστάμενο)
         const traverseLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse_leveling');
         if (traverseLevelingSheetName && setLevelingObservations) {
           const wsLeveling = wb.Sheets[traverseLevelingSheetName];
@@ -177,7 +174,6 @@ const Dashboard = ({
           }
         }
 
-        // 3. ΔΙΑΒΑΣΜΑ ΤΑΧΥΜΕΤΡΙΑΣ
         const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_taxymetria'));
         const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
 
@@ -189,7 +185,6 @@ const Dashboard = ({
           });
         }
 
-        // 4. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΧΑΡΑΞΗΣ
         const charaxiSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('charaxi'));
         if (charaxiSheetName && setStakeoutData) {
           const wsCharaxi = wb.Sheets[charaxiSheetName];
@@ -208,7 +203,6 @@ const Dashboard = ({
           }
         }
 
-        // 5. ΔΙΑΒΑΣΜΑ ΦΥΛΛΟΥ ΓΩΝΙΟΜΕΤΡΗΣΕΩΝ
         const goniometrySheetName = wb.SheetNames.find(n => n.toLowerCase().includes('gwniometriseis'));
         if (goniometrySheetName && setGoniometryData) {
           const wsGoniometry = wb.Sheets[goniometrySheetName];
@@ -227,7 +221,6 @@ const Dashboard = ({
           }
         }
 
-        // 6. ΔΙΑΒΑΣΜΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (ΝΕΟ ΦΥΛΛΟ)
         const trigLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('trig_leveling'));
         if (trigLevelingSheetName && setTrigLevelingData) {
           const wsTrig = wb.Sheets[trigLevelingSheetName];
@@ -242,7 +235,7 @@ const Dashboard = ({
               z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
               hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
               ht: row['H_target'] !== undefined ? String(row['H_target']) : "",
-              dh: "",      // Αρχικοποίηση κενών πεδίων για τα αποτελέσματα
+              dh: "",      
               dh_avg: "" 
             }));
             setTrigLevelingData(formattedTrig);
@@ -261,12 +254,12 @@ const Dashboard = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-200 flex flex-col font-sans h-screen overflow-y-auto custom-scrollbar">
+    <div className="min-h-screen bg-transparent text-slate-200 flex flex-col font-sans h-screen overflow-y-auto custom-scrollbar">
       <style>
         {`
           /* Καθολικό Scrollbar (πιάνει το window/body) */
           ::-webkit-scrollbar { width: 6px; height: 6px; }
-          ::-webkit-scrollbar-track { background: #030712; }
+          ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
           ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
@@ -276,16 +269,6 @@ const Dashboard = ({
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
         `}
       </style>
-      
-      {/* HEADER */}
-      <header className="h-16 shrink-0 flex items-center justify-between px-10 border-b border-slate-800/80 bg-[#030712]">
-        <div className="flex flex-col items-start gap-0.5">
-          <h2 className="text-2xl font-black text-white tracking-tight flex items-baseline gap-1">
-            <span>Project</span>
-            <span className="text-blue-500">Setup</span>
-          </h2>
-        </div>
-      </header>
 
       {/* MAIN CONTAINER */}
       <main className="flex-1 py-6 px-10 overflow-hidden flex flex-col">
@@ -302,14 +285,14 @@ const Dashboard = ({
                 <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
                   <ActionButton 
                     icon={<Plus size={18} />} 
-                    title="CREATE NEW" 
-                    subtitle="Νέο αρχείο .lasca" 
+                    title="Create New" 
+                    subtitle="Νέο αρχείο" 
                     theme="primary" 
                     onClick={onOpenProjectManager}
                   />
                   <ActionButton 
                     icon={<FolderOpen size={18} />} 
-                    title="OPEN PROJECT" 
+                    title="Open Project" 
                     subtitle="Ανάκτηση από δίσκο" 
                     theme="default"
                     onClick={onOpenProjectManager}
@@ -323,8 +306,8 @@ const Dashboard = ({
                 <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
                   <ActionButton 
                     icon={<FileSpreadsheet size={18} />} 
-                    title="EXCEL TEMPLATE" 
-                    subtitle="Λήψη κενού αρχείου" 
+                    title="Excel Template" 
+                    subtitle="Λήψη πρότυπου αρχείου" 
                     theme="emerald"
                     onClick={downloadSurveyTemplate}
                   />
@@ -349,7 +332,7 @@ const Dashboard = ({
                 </div>
                 
                 {/* ΧΩΡΟΣ ΧΑΡΤΗ */}
-                <div className="flex-1 bg-[#030712] rounded-xl border border-slate-800/50 relative flex items-center justify-center overflow-hidden [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px]">
+                <div className="flex-1 bg-[#080E1A] rounded-xl border border-slate-800/50 relative flex items-center justify-center overflow-hidden [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px]">
                   
                   {mapData.hasPoints ? (
                     <div className="w-full h-full p-2">
@@ -376,7 +359,6 @@ const Dashboard = ({
                           />
                           <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#334155' }} content={<MapTooltip />} />
                           
-                          {/* Σημεία Αποτύπωσης (Πράσινα) */}
                           <Scatter 
                             name="Αποτύπωση" 
                             data={mapData.details} 
@@ -384,7 +366,6 @@ const Dashboard = ({
                             shape="circle"
                           />
                           
-                          {/* Στάσεις (Μπλε) με γραμμή (line) να τις ενώνει */}
                           <Scatter 
                             name="Στάσεις" 
                             data={mapData.stations} 
@@ -404,7 +385,6 @@ const Dashboard = ({
                     </div>
                   )}
 
-                  {/* Corner Accents */}
                   <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-slate-700/50 pointer-events-none" />
                   <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-slate-700/50 pointer-events-none" />
                   <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-slate-700/50 pointer-events-none" />
@@ -420,7 +400,6 @@ const Dashboard = ({
             <SectionTitle title="ACTIVE PROJECT OVERVIEW" />
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-6 shadow-lg h-full">
               
-              {/* Project Header */}
               <div className="flex flex-col gap-4 border-b border-slate-800/50 pb-5 shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-500">
@@ -441,7 +420,7 @@ const Dashboard = ({
 
               {/* Vertical Stats */}
               <div className="flex flex-col gap-3 flex-1">
-                 <div className="bg-[#030712]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Target size={18} className={`${stationCount > 0 ? 'text-blue-500' : 'text-slate-700'}`} />
                       <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Στασεις / Οδευσεις</span>
@@ -449,7 +428,7 @@ const Dashboard = ({
                     <span className={`text-2xl font-mono font-black ${stationCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{stationCount}</span>
                  </div>
                  
-                 <div className="bg-[#030712]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <MapPin size={18} className={`${measurementCount > 0 ? 'text-emerald-500' : 'text-slate-700'}`} />
                       <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημ. Αποτυπωσης</span>
@@ -457,7 +436,7 @@ const Dashboard = ({
                     <span className={`text-2xl font-mono font-black ${measurementCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{measurementCount}</span>
                  </div>
                  
-                 <div className="bg-[#030712]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <MapPin size={18} className={`${stakeoutCount > 0 ? 'text-amber-500' : 'text-slate-700'}`} />
                       <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημεια Χαραξης</span>
@@ -468,13 +447,13 @@ const Dashboard = ({
 
               {/* Status Indicators at the bottom */}
               <div className="flex flex-col gap-2 shrink-0 pt-2 border-t border-slate-800/50">
-                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-[#030712] border-slate-800/80 text-slate-500'}`}>
+                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
                      {hasData ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
                      <span className="text-[11px] font-bold tracking-wide">
                        {hasData ? 'Συγχρονισμός Δίσκου: OK' : 'Απαιτείται Εισαγωγή'}
                      </span>
                   </div>
-                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#030712] border-slate-800/80 text-slate-500'}`}>
+                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
                      {levelingMetrics?.error_dh !== undefined ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
                      <span className="text-[11px] font-bold tracking-wide">
                        {levelingMetrics?.error_dh !== undefined ? 'Υψόμετρα: Εντός Ανοχής' : 'Χωροστάθμιση: Εκκρεμεί'}
@@ -521,7 +500,8 @@ const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => 
         {icon}
       </div>
       <div className="overflow-hidden">
-        <h4 className={`text-[12px] font-bold uppercase tracking-wide truncate transition-colors group-hover:text-white ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
+        {/* Αφαιρέθηκε η κλάση uppercase ώστε να διατηρείται το πεζό/κεφαλαίο στυλ */}
+        <h4 className={`text-[12px] font-bold tracking-wide truncate transition-colors group-hover:text-white ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
           {title}
         </h4>
         <p className={`text-[10px] mt-0.5 truncate ${isPrimary ? 'text-blue-100' : 'text-slate-500'}`}>
@@ -538,8 +518,8 @@ const ImportButton = ({ onChange }) => (
       <Upload size={16} />
     </div>
     <div className="overflow-hidden">
-      <h4 className="text-[12px] font-bold uppercase tracking-wide truncate group-hover:text-white transition-colors text-slate-200">
-        IMPORT DATA
+      <h4 className="text-[12px] font-bold tracking-wide truncate group-hover:text-white transition-colors text-slate-200">
+        Import Data
       </h4>
       <p className="text-[10px] mt-0.5 truncate text-slate-500">
         Εισαγωγή δεδομένων μορφής .xlsx

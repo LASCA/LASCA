@@ -11,6 +11,30 @@
     overflow: hidden;
   }
 
+  /* --- ΕΔΩ ΜΠΑΙΝΕΙ Ο ΚΩΔΙΚΑΣ ΓΙΑ ΤΟΝ ΚΕΡΣΟΡΑ --- */
+  
+  /* Εμφανίζει το "χεράκι" σε όλα τα στοιχεία που συνήθως πατιούνται */
+  button, 
+  a, 
+  select, 
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  label {
+    cursor: pointer;
+  }
+
+  /* Επαναφέρει τον κέρσορα στο απαγορευτικό όταν ένα στοιχείο είναι απενεργοποιημένο */
+  button:disabled,
+  input:disabled,
+  [disabled] {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  /* ----------------------------------------------- */
+
   /* GLOBAL CUSTOM SCROLLBAR για όλο το app */
   *::-webkit-scrollbar {
     width: 5px !important;  
