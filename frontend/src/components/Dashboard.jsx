@@ -178,8 +178,31 @@ const Dashboard = ({
         const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
 
         if (setTachymetryData) {
+          // 1. Προετοιμάζουμε έναν άδειο πίνακα
+          let cleanMeasurements = [];
+          
+          // 2. Αν βρεθεί το φύλλο μετρήσεων, το διαβάζουμε και το καθαρίζουμε
+          if (measSheetName) {
+            const rawMeas = XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]);
+            
+            cleanMeasurements = rawMeas
+              // Κρατάμε ΑΥΣΤΗΡΑ μόνο τις γραμμές που έχουν τιμή στη στήλη 'From' και 'Point_ID'
+              .filter(row => row['From'] !== undefined && row['Point_ID'] !== undefined)
+              // Φτιάχνουμε νέο καθαρό αντικείμενο, αγνοώντας τις στήλες 'Station', 'Orientation' κτλ (αριστερός πίνακας)
+              .map(row => ({
+                From: String(row['From']).trim(),
+                O: row['O'],
+                Point_ID: row['Point_ID'],
+                Hz: row['Hz'],
+                Z: row['Z'],
+                SD: row['SD'],
+                TargetHeight: row['TargetHeight']
+              }));
+          }
+
+          // 3. Ενημερώνουμε το state με τα καθαρισμένα δεδομένα
           setTachymetryData({
-            measurements: measSheetName ? XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]) : [],
+            measurements: cleanMeasurements,
             stations: stationsSheetName ? XLSX.utils.sheet_to_json(wb.Sheets[stationsSheetName]) : [],
             results: [] 
           });
