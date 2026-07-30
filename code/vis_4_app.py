@@ -330,7 +330,7 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 9))
     
-    # --- ΑΛΛΑΓΗ ΕΔΩ: Χρώμα ίδιο με το bg-[#030712] του React Tailwind ---
+    # Χρώμα ίδιο με το bg-[#030712] του React Tailwind
     fig.patch.set_facecolor('#030712')
     ax.set_facecolor('#030712')
     
@@ -341,7 +341,7 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     ax.scatter(df['X'], df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
     ax.scatter(df['X'], df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
 
-    # 2. Σχεδίαση όλων των Στάσεων, των Προσανατολισμών και των Γραμμών Εξάρτησης
+    # 2. Σχεδίαση όλων των Στάσεων και Προσανατολισμών (Όλα σε Cyan #00FFFF)
     unique_stations = df['Στάση'].unique()
     drawn_orientations = set()  # Για να μην ξανασχεδιάζουμε το ίδιο σημείο αν συμπίπτει
 
@@ -350,7 +350,7 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
             st_x = st_lookup[st_name]['x']
             st_y = st_lookup[st_name]['y']
             
-            # Σχεδίαση κυανού τριγώνου στάσης
+            # Σχεδίαση κυανού τριγώνου κύριας στάσης
             ax.scatter(st_x, st_y, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, zorder=10)
             ax.text(st_x, st_y, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
 
@@ -364,13 +364,10 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
                         bs_x = st_lookup[bs_name]['x']
                         bs_y = st_lookup[bs_name]['y']
                         
-                        # α) Σχεδίαση Διακεκομμένης Γραμμής Εξάρτησης (Στάση -> Προσανατολισμός)
-                        ax.plot([st_x, bs_x], [st_y, bs_y], color='#FFA500', linestyle='--', linewidth=1.5, alpha=0.8, zorder=3)
-                        
-                        # β) Σχεδίαση του Σημείου Προσανατολισμού (αν δεν είναι ήδη κύρια στάση)
+                        # Σχεδίαση του Σημείου Προσανατολισμού με Cyan (χωρίς τη γραμμή σύνδεσης)
                         if bs_name not in unique_stations and bs_name not in drawn_orientations:
-                            ax.scatter(bs_x, bs_y, marker='^', s=160, facecolors='none', edgecolors='#FFA500', linewidths=1.8, zorder=9)
-                            ax.text(bs_x, bs_y, f"  {bs_name}", color='#FFA500', fontsize=11, fontweight='bold', va='top', zorder=11)
+                            ax.scatter(bs_x, bs_y, marker='^', s=160, facecolors='none', edgecolors='#00FFFF', linewidths=1.8, zorder=9)
+                            ax.text(bs_x, bs_y, f"  {bs_name}", color='#00FFFF', fontsize=11, fontweight='bold', va='top', zorder=11)
                             drawn_orientations.add(bs_name)
 
     # 3. Δυναμικά Labels Σημείων χωρίς δεκαδικά
@@ -403,28 +400,23 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
     ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
     ax.set_aspect('equal', adjustable='datalim')
-    ax.grid(True, linestyle=':', alpha=0.15) # Έκανα το grid λίγο πιο διάφανο (0.15 από 0.3) για να δείχνει πιο smooth
+    ax.grid(True, linestyle=':', alpha=0.15)
     
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
 
-    # 5. Δημιουργία Custom Υπομνήματος
+    # 5. Δημιουργία Προσαρμοσμένου Υπομνήματος (σε βέλτιστη θέση - loc='best')
     detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
                           markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
     cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
-                         markersize=6, markeredgewidth=1.2)
+                          markersize=6, markeredgewidth=1.2)
     station_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
                            markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
     
-    bs_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
-                        markeredgecolor='#FFA500', markersize=10, markeredgewidth=1.8)
-    line_proxy = Line2D([], [], color='#FFA500', linestyle='--', linewidth=1.5)
-    
-    handles = [(detail_proxy, cross_proxy), station_proxy, bs_proxy, line_proxy]
-    labels = ['Σημεία Λεπτομερείας', 'Στάσεις (Σταθμοί)', 'Σημεία Εξάρτησης', 'Γραμμή Εξάρτησης']
+    handles = [(detail_proxy, cross_proxy), station_proxy]
+    labels = ['Σημεία Λεπτομερείας', 'Στάσεις & Σημεία Εξάρτησης']
 
-    # --- ΑΛΛΑΓΗ ΕΔΩ: Χρώμα υπομνήματος για να ταιριάζει απόλυτα ---
-    legend = ax.legend(handles, labels, loc='upper right', frameon=True, facecolor='#0b1120', edgecolor='#1e293b')
+    legend = ax.legend(handles, labels, loc='best', frameon=True, facecolor='#0b1120', edgecolor='#1e293b')
     for text in legend.get_texts(): 
         text.set_color("white")
 
@@ -432,8 +424,6 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     
     # 6. Μετατροπή του γραφήματος σε Base64 string
     img = io.BytesIO()
-    
-    # --- ΑΛΛΑΓΗ ΕΔΩ: Προσθήκη transparent=True για να μην κάνει "κουτί" στο React UI ---
     plt.savefig(img, format='png', bbox_inches='tight', transparent=True, dpi=120)
     
     img.seek(0)

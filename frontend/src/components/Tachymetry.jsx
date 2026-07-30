@@ -126,7 +126,7 @@ const Tachymetry = ({
 
   const orientationOpts = orientations.length === 0 
     ? [{ value: "", label: "Χωρίς Προσ." }] 
-    : orientations.map(o => ({ value: o, label: `Στάση: ${o}` }));
+    : orientations.map(o => ({ value: o, label: `Προσανατολισμός: ${o}` }));
 
   // Φιλτραρισμένα σημεία για τον πίνακα βασισμένα στα Dropdowns
   const filteredPoints = useMemo(() => {
