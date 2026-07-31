@@ -131,7 +131,7 @@ const Dashboard = ({
             id: Date.now() + index,
             name: row['Stations'] || row['Station'] || "",
             hz: row['Hz [grad]'] || "",
-            sd: row['Slope_D [m]'] || "", 
+            sd: row['D [m]'] || "", 
             x: row['X [m]'] || "",
             y: row['Y [m]'] || "",
             h: row['H [m]'] || ""

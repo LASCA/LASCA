@@ -370,7 +370,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   <tr className="border-b border-slate-800/60">
                     <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest">Station</th>
                     <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Hz [grad]</th>
-                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">Slope_D [m]</th>
+                    <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-center">D [m]</th>
                     <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">X [m]</th>
                     <th className="w-[20%] p-4 text-[10px] font-black text-slate-400 tracking-widest text-right">Y [m]</th>
                   </tr>
