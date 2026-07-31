@@ -180,7 +180,60 @@ function App() {
     trigHeightData // Παρακολούθηση για την Τριγωνομετρική
   ]);
 
-  // --- 2. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
+  // --- 2. GLOBAL TOOLTIP LOGIC ---
+// --- 2. GLOBAL TOOLTIP LOGIC (ΑΠΟΛΥΤΟ ΠΡΩΤΟ ΠΛΑΝΟ) ---
+  useEffect(() => {
+    // Δημιουργία ενός μοναδικού στοιχείου απευθείας στο body (εκτός των scrollbars)
+    const tooltipEl = document.createElement('div');
+    tooltipEl.className = 'global-custom-tooltip';
+    document.body.appendChild(tooltipEl);
+
+    const handleMouseOver = (e) => {
+      const target = e.target.closest('[title], [data-tooltip]'); 
+      if (!target) return;
+      
+      const text = target.getAttribute('title') || target.getAttribute('data-tooltip');
+      if (!text) return;
+
+      target.setAttribute('data-tooltip', text);
+      target.removeAttribute('title'); 
+
+      // Τοποθέτηση του tooltip
+      const rect = target.getBoundingClientRect();
+      tooltipEl.textContent = text;
+      
+      // Βρίσκουμε το κέντρο του κουμπιού
+      const x = rect.left + (rect.width / 2);
+      const y = rect.bottom + 8; // 8px κάτω από το κουμπί
+
+      tooltipEl.style.left = `${x}px`;
+      tooltipEl.style.top = `${y}px`;
+      tooltipEl.style.opacity = '1';
+      tooltipEl.style.visibility = 'visible';
+    };
+
+    const handleMouseOut = (e) => {
+      const target = e.target.closest('[data-tooltip]'); 
+      if (target) {
+        tooltipEl.style.opacity = '0';
+        tooltipEl.style.visibility = 'hidden';
+      }
+    };
+
+    document.addEventListener('mouseover', handleMouseOver);
+    document.addEventListener('mouseout', handleMouseOut);
+
+    return () => {
+      document.removeEventListener('mouseover', handleMouseOver);
+      document.removeEventListener('mouseout', handleMouseOut);
+      // Καθαρισμός όταν κλείνει το component
+      if (document.body.contains(tooltipEl)) {
+        document.body.removeChild(tooltipEl);
+      }
+    };
+  }, []);
+
+  // --- 3. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
   const handleProjectLoaded = (projectData) => {
     const pName = projectData.project_name;
     setCurrentProject(pName);

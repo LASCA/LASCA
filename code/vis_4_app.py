@@ -316,6 +316,273 @@ def plot_traverse_base64(results: list, measurements: list = None, scale: str = 
     
     return f"data:image/png;base64,{plot_url}"
 
+import base64
+import io
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
+from matplotlib.patches import Arc
+
+def plot_traverse_base64_2(results: list, measurements: list = None, scale: str = '1:1000') -> str:
+    def get_val(obj, *keys):
+        for k in keys:
+            if isinstance(obj, dict):
+                if k in obj and obj[k] is not None:
+                    return obj[k]
+            else:
+                val = getattr(obj, k, None)
+                if val is None and hasattr(obj, 'get') and callable(getattr(obj, 'get')):
+                    val = obj.get(k, None)
+                if val is not None:
+                    return val
+        return None
+
+    valid_points = [p for p in results if get_val(p, 'X', 'Xi', 'x') is not None and get_val(p, 'Y', 'Yi', 'y') is not None]
+    
+    if not valid_points: 
+        return ""
+
+    X = [float(get_val(p, 'X', 'Xi', 'x')) for p in valid_points]
+    Y = [float(get_val(p, 'Y', 'Yi', 'y')) for p in valid_points]
+    names = [str(get_val(p, 'name', 'Name') or f"P{i}").strip() for i, p in enumerate(valid_points)]
+
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(10, 8))
+    fig.patch.set_facecolor('#121212')
+    ax.set_facecolor('#121212')
+    ax.ticklabel_format(useOffset=False, style='plain', axis='both')
+    
+    n = len(valid_points)
+    
+    orient_indices = []
+    fixed_indices = [0, 1, n-2, n-1] if n >= 4 else [0, n-1]
+
+    for i in range(n):
+        is_fixed = i in fixed_indices
+        if is_fixed or "Σ" in names[i].upper():
+            orient_indices.append(i)
+
+    station_indices = [i for i in range(n) if i not in orient_indices]
+
+    # --- 1. ΑΝΑΓΡΑΦΗ ΑΠΟΣΤΑΣΕΩΝ ΠΑΝΩ ΣΤΙΣ ΠΛΕΥΡΕΣ ---
+    for i in range(n - 1):
+        p1_name = names[i]
+        p2_name = names[i+1]
+        dist_str = None
+        
+        if measurements:
+            if i + 1 < len(measurements) and measurements[i+1].get('sd'):
+                dist_str = str(measurements[i+1].get('sd')).strip()
+            elif i < len(measurements) and measurements[i].get('sd'):
+                dist_str = str(measurements[i].get('sd')).strip()
+            else:
+                for row in measurements:
+                    if str(row.get('name', '')).strip() == p2_name and row.get('sd'):
+                        dist_str = str(row.get('sd')).strip()
+                        break
+
+        if not dist_str or dist_str == "" or dist_str == "-":
+            geom_dist = np.sqrt((X[i+1]-X[i])**2 + (Y[i+1]-Y[i])**2)
+            dist_str = f"{geom_dist:.3f}"
+        else:
+            try:
+                dist_str = f"{float(dist_str):.3f}"
+            except ValueError:
+                pass 
+
+        mid_x, mid_y = (X[i] + X[i+1]) / 2, (Y[i] + Y[i+1]) / 2
+        angle = np.degrees(np.arctan2(Y[i+1]-Y[i], X[i+1]-X[i]))
+        if angle > 90: angle -= 180
+        if angle < -90: angle += 180
+        
+        txt_color = 'gray' if (i == 0 or i == n-2) else "#FFFFFF"
+        
+        ax.annotate(dist_str, (mid_x, mid_y), 
+                    xytext=(0, 5), textcoords='offset points',
+                    color=txt_color, fontsize=6.0, fontweight='bold',
+                    ha='center', va='bottom', rotation=angle, 
+                    rotation_mode='anchor')
+
+    # --- 2. ΣΧΕΔΙΑΣΗ ΓΩΝΙΩΝ ΘΛΑΣΗΣ ---
+    ANGLE_COLOR = '#90A4AE'
+
+    for i in range(1, n - 1):
+        if i in orient_indices:
+            continue
+
+        hz_str = None
+        
+        if measurements and i < len(measurements):
+            m_row = measurements[i]
+            if str(m_row.get('name', '')).strip() == names[i] and m_row.get('hz'):
+                hz_str = str(m_row.get('hz')).strip()
+
+        if not hz_str and measurements:
+            for row in measurements:
+                if str(row.get('name', '')).strip() == names[i] and row.get('hz'):
+                    hz_str = str(row.get('hz')).strip()
+                    break
+                    
+        if hz_str and hz_str != "" and hz_str != "-":
+            try:
+                hz_text = f"{float(hz_str):.4f}g"
+            except ValueError:
+                hz_text = hz_str
+
+            dx1, dy1 = X[i-1] - X[i], Y[i-1] - Y[i]
+            dx2, dy2 = X[i+1] - X[i], Y[i+1] - Y[i]
+            
+            d1 = np.hypot(dx1, dy1)
+            d2 = np.hypot(dx2, dy2)
+            if d1 == 0 or d2 == 0: continue
+            
+            angle1 = np.degrees(np.arctan2(dy1, dx1)) % 360
+            angle2 = np.degrees(np.arctan2(dy2, dx2)) % 360
+            
+            diff = (angle2 - angle1) % 360
+            if diff > 180:
+                theta1, theta2 = angle2, angle1
+                bisector = angle2 - (360 - diff) / 2
+            else:
+                theta1, theta2 = angle1, angle2
+                bisector = angle1 + diff / 2
+                
+            bisector_rad = np.radians(bisector)
+            r = min(d1, d2) * 0.14
+            
+            arc = Arc((X[i], Y[i]), r*2, r*2, angle=0, theta1=theta1, theta2=theta2, 
+                      color=ANGLE_COLOR, linestyle='--', linewidth=0.9, zorder=4)
+            ax.add_patch(arc)
+            
+            txt_x = X[i] + (r * 1.8) * np.cos(bisector_rad)
+            txt_y = Y[i] + (r * 1.8) * np.sin(bisector_rad)
+            
+            ax.text(txt_x, txt_y, hz_text, color=ANGLE_COLOR, fontsize=5.5, 
+                    fontweight='normal', ha='center', va='center',
+                    bbox=dict(facecolor='#121212', edgecolor='none', pad=0.2, alpha=0.5))
+
+    # --- 3. Σχεδίαση Σημείων (Κόμβοι) ---
+    if orient_indices:
+        ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
+                   marker='^', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
+    
+    if station_indices:
+        ax.scatter([X[i] for i in station_indices], [Y[i] for i in station_indices], 
+                   marker='+', s=40, color='#00FFFF', linewidths=1.2, zorder=5)
+        ax.scatter([X[i] for i in station_indices], [Y[i] for i in station_indices], 
+                   marker='o', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.2, zorder=6)
+
+    for i, txt in enumerate(names):
+        ax.annotate(str(txt), (X[i], Y[i]), xytext=(6, 6), textcoords='offset points',
+                    fontsize=9.5, fontweight='bold', color="#FFFEFE")
+
+    # --- 4. Σχεδίαση γραμμών ---
+    if n >= 4:
+        ax.plot(X[0:2], Y[0:2], color='gray', linestyle='--', linewidth=1.2)
+        ax.plot(X[1:n-1], Y[1:n-1], color="#FF00BB", linestyle='-', linewidth=1.5)
+        ax.plot(X[n-2:n], Y[n-2:n], color='gray', linestyle='--')
+    else:
+        ax.plot(X, Y, color="#FF00BB", linestyle='-', linewidth=1.5)
+    
+    ax.margins(0.12)
+    ax.set_title("ΔΙΑΓΡΑΜΜΑ ΟΔΕΥΣΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20, color="white")
+    ax.set_aspect('equal', adjustable='datalim')
+
+    # --- Υπολογισμός Κλίμακας ---
+    try:
+        scale_num = int(scale.split(':')[-1])
+    except (ValueError, AttributeError):
+        scale_num = 1000
+
+    if scale_num <= 200:
+        grid_interval = 20
+    elif scale_num <= 500:
+        grid_interval = 50
+    elif scale_num <= 1000:
+        grid_interval = 100
+    else:
+        grid_interval = max(100, scale_num // 10)
+        
+    ax.xaxis.set_major_locator(MultipleLocator(grid_interval))
+    ax.yaxis.set_major_locator(MultipleLocator(grid_interval))
+    ax.grid(False) 
+
+    # --- Περιστροφή αριθμών άξονα Χ ---
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+    # --- ΔΗΜΙΟΥΡΓΙΑ ΣΤΑΥΡΩΝ ΚΑΝΝΑΒΟΥ ΑΝΤΙ ΓΙΑ ΣΥΝΕΧΕΙΣ ΓΡΑΜΜΕΣ ---
+    plt.draw() 
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    
+    start_x = (int(xmin) // grid_interval) * grid_interval
+    end_x = (int(xmax) // grid_interval + 1) * grid_interval
+    start_y = (int(ymin) // grid_interval) * grid_interval
+    end_y = (int(ymax) // grid_interval + 1) * grid_interval
+    
+    gx = np.arange(start_x, end_x, grid_interval)
+    gy = np.arange(start_y, end_y, grid_interval)
+    
+    # ΠΡΟΣΘΗΚΗ: Πιο αχνοί σταυροί (μικρότερο markersize, alpha=0.4, markeredgewidth=0.8)
+    for x_val in gx:
+        for y_val in gy:
+            ax.plot(x_val, y_val, marker='+', color='#555555', markersize=6, markeredgewidth=0.8, alpha=0.4, zorder=1)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ ---
+    ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
+                xycoords='axes fraction', textcoords='axes fraction',
+                arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
+                ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
+
+    # --- 6. ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ (ΚΑΤΩ ΑΡΙΣΤΕΡΑ) ---
+    if scale_num <= 200:
+        bar_len = 10
+    elif scale_num <= 500:
+        bar_len = 25
+    elif scale_num <= 1000:
+        bar_len = 50
+    else:
+        bar_len = 100
+
+    x_range = xmax - xmin
+    y_range = ymax - ymin
+
+    bar_x = xmin + (x_range * 0.05)
+    bar_y = ymin + (y_range * 0.09)
+    tick_h = y_range * 0.012  
+
+    ax.plot([bar_x, bar_x + bar_len], [bar_y, bar_y], color='white', linewidth=2, zorder=10)
+    
+    ax.plot([bar_x, bar_x], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
+    ax.plot([bar_x + bar_len/2, bar_x + bar_len/2], [bar_y, bar_y + tick_h], color='white', linewidth=1, zorder=10)
+    ax.plot([bar_x + bar_len, bar_x + bar_len], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
+
+    txt_y = bar_y + tick_h * 1.5
+    ax.text(bar_x, txt_y, "0", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+    
+    if bar_len >= 20:
+        ax.text(bar_x + bar_len/2, txt_y, f"{bar_len/2:g}", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+        
+    ax.text(bar_x + bar_len, txt_y, f"{bar_len}m", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+
+    legend_y = bar_y - tick_h * 1.5
+    line_spacing = y_range * 0.025
+    ax.text(bar_x, legend_y, f"ΚΛΙΜΑΚΑ: 1:{scale_num}", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
+    ax.text(bar_x, legend_y - line_spacing, "Σ.Α.: ΕΓΣΑ '87", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
+
+    plt.tight_layout(pad=3.0)
+    
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', dpi=150)
+    img.seek(0)
+    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
+    plt.close(fig)
+    
+    return f"data:image/png;base64,{plot_url}"
+
 def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     """
     Δημιουργεί το τοπογραφικό σκαρίφημα της ταχυμετρίας σε Matplotlib (dark mode)
