@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, MapPin, Target, Navigation, Repeat, Play, RotateCcw } from 'lucide-react';
+import { Calculator, MapPin, Target, Navigation, Repeat, Play, RotateCcw, Plus, Minus } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // ------------------------------------------------------------------
@@ -22,7 +22,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
       {children}
     </div>
 
-    {/* Περιοχή Αποτελέσματος & Κουμπί Εκτέλεσης (Κρύβεται αν hideActionArea είναι true) */}
+    {/* Περιοχή Αποτελέσματος & Κουμπί Εκτέλεσης */}
     {!hideActionArea && (
       <div className="mt-5 pt-4 border-t border-slate-800/50 flex flex-col gap-3">
         {result ? (
@@ -73,23 +73,19 @@ const BasicCalculations = () => {
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
 
   // ----------------------------------------------------------------
-  // 0. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ (REAL-TIME)
+  // 0. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ
   // ----------------------------------------------------------------
   const [angles, setAngles] = useState({ rad: '', grad: '', deg: '' });
 
   const handleAngleChange = (type, value) => {
-    // Αν ο χρήστης αδειάσει το πεδίο, καθαρίζουμε όλα τα πεδία
     if (value === '') {
       setAngles({ rad: '', grad: '', deg: '' });
       return;
     }
 
-    // Αντικατάσταση τυχόν κόμματος με τελεία για σωστό parsing
     const normalizedValue = value.replace(',', '.');
     const num = parseFloat(normalizedValue);
 
-    // Αν πληκτρολογεί χαρακτήρα που δεν είναι αριθμός (π.χ. '-' ή '.'), 
-    // ενημερώνουμε το τρέχον input αλλά δεν υπολογίζουμε τα άλλα
     if (isNaN(num)) {
       setAngles(prev => ({ ...prev, [type]: value }));
       return;
@@ -98,7 +94,7 @@ const BasicCalculations = () => {
     let rad, grad, deg;
     
     if (type === 'rad') {
-      rad = value; // Διατηρούμε το input όπως πληκτρολογείται
+      rad = value;
       grad = (num * 200 / Math.PI).toFixed(4);
       deg = (num * 180 / Math.PI).toFixed(4);
     } else if (type === 'grad') {
@@ -115,7 +111,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 1. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 1ο ΘΕΜΕΛΙΩΔΕΣ
+  // 1. 1ο ΘΕΜΕΛΙΩΔΕΣ
   // ----------------------------------------------------------------
   const [prob1Data, setProb1Data] = useState({ xa: '', ya: '', d: '', gab: '' });
 
@@ -158,7 +154,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 2. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 2ο ΘΕΜΕΛΙΩΔΕΣ
+  // 2. 2ο ΘΕΜΕΛΙΩΔΕΣ
   // ----------------------------------------------------------------
   const [prob2Data, setProb2Data] = useState({ xa: '', ya: '', xb: '', yb: '' });
 
@@ -201,13 +197,15 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 3. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΤΟ 3ο ΘΕΜΕΛΙΩΔΕΣ
+  // 3. 3ο ΘΕΜΕΛΙΩΔΕΣ (ΠΟΛΛΑΠΛΕΣ ΓΩΝΙΕΣ ΘΛΑΣΗΣ)
   // ----------------------------------------------------------------
-  const [prob3Data, setProb3Data] = useState({ gprev: '', b: '' });
+  const [prob3Data, setProb3Data] = useState({ gprev: '', b_angles: [''] });
 
   const handleProb3Calculation = async () => {
-    if (!prob3Data.gprev || !prob3Data.b) {
-      toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!');
+    const validAngles = prob3Data.b_angles.filter(b => b && b.trim() !== '');
+
+    if (!prob3Data.gprev || validAngles.length === 0) {
+      toast.error('Παρακαλώ συμπληρώστε την G_prev και τουλάχιστον μία γωνία θλάσης!');
       return;
     }
 
@@ -219,7 +217,7 @@ const BasicCalculations = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gprev: parseFloat(prob3Data.gprev),
-          b: parseFloat(prob3Data.b)
+          b_angles: validAngles.map(b => parseFloat(b))
         }),
       });
 
@@ -242,7 +240,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 4. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΣΥΝΤΕΛΕΣΤΗ ΚΛΙΜΑΚΑΣ
+  // 4. ΣΥΝΤΕΛΕΣΤΗΣ ΚΛΙΜΑΚΑΣ
   // ----------------------------------------------------------------
   const [scaleData, setScaleData] = useState({ input1: '' });
 
@@ -282,7 +280,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 5. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΕΜΠΡΟΣΘΟΤΟΜΙΑ
+  // 5. ΕΜΠΡΟΣΘΟΤΟΜΙΑ
   // ----------------------------------------------------------------
   const [intersectData, setIntersectData] = useState({ xa: '', ya: '', xb: '', yb: '', a: '', b: '' });
 
@@ -330,7 +328,7 @@ const BasicCalculations = () => {
   };
 
   // ----------------------------------------------------------------
-  // 6. STATE & ΣΥΝΑΡΤΗΣΕΙΣ ΓΙΑ ΟΠΙΣΘΟΤΟΜΙΑ
+  // 6. ΟΠΙΣΘΟΤΟΜΙΑ
   // ----------------------------------------------------------------
   const [resectData, setResectData] = useState({ 
     xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', 
@@ -479,51 +477,77 @@ const BasicCalculations = () => {
           </div>
         </CalcWidget>
 
-        {/* ================= ΣΤΗΛΗ 4: ΟΜΑΔΟΠΟΙΗΜΕΝΑ WIDGETS ================= */}
-        <div className="flex flex-col gap-6 h-full">
-          {/* --- 4. 3ο Θεμελιώδες --- */}
-          <CalcWidget 
-            title="3ο Θεμελιώδες" 
-            icon={<Calculator size={18} />}
-            loading={loadings.prob3}
-            result={results.prob3}
-            resultLabels={[<span>G<sub>next</sub> [grad]</span>]}
-            onCalculate={handleProb3Calculation}
-            onClear={() => clearResult('prob3')}
-          >
-            <div className="grid grid-cols-2 gap-3">
-              <InputField 
-                label={<span>G<sub>prev</sub> [grad]</span>} 
-                value={prob3Data.gprev}
-                onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
-              />
-              <InputField 
-                label={<span>b&#770; [grad]</span>} 
-                value={prob3Data.b}
-                onChange={(e) => setProb3Data({...prob3Data, b: e.target.value})}
-              />
+        {/* --- 4. 3ο Θεμελιώδες (Πολλαπλές Γωνίες Θλάσης) --- */}
+        <CalcWidget 
+          title="3ο Θεμελιώδες" 
+          icon={<Calculator size={18} />}
+          loading={loadings.prob3}
+          result={results.prob3}
+          resultLabels={[<span>G<sub>τελική</sub> [grad]</span>]}
+          onCalculate={handleProb3Calculation}
+          onClear={() => { 
+            clearResult('prob3'); 
+            setProb3Data({ gprev: '', b_angles: [''] }); 
+          }}
+        >
+          <div className="flex flex-col gap-3">
+            <InputField 
+              label={<span>G<sub>prev</sub> [grad]</span>} 
+              value={prob3Data.gprev}
+              onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})}
+            />
+            
+            <div className="border-t border-slate-800/50 my-1 relative">
+              <span className="absolute -top-2 left-2 bg-[#0b1220] px-2 text-[10px] text-slate-500 font-bold tracking-widest">
+                Γωνίες Θλάσης
+              </span>
             </div>
-          </CalcWidget>
-
-          {/* --- 7. Συντελεστής Κλίμακας --- */}
-          <CalcWidget 
-            title="Συντελεστής Κλίμακας m" 
-            icon={<MapPin size={18} />}
-            loading={loadings.scale}
-            result={results.scale}
-            resultLabels={[<span>m<sub>ij</sub></span>]}
-            onCalculate={handleScaleCalculation}
-            onClear={() => clearResult('scale')}
-          >
-            <div className="grid grid-cols-1 gap-3">
-              <InputField 
-                label={<span>Συνιστώσα E [m]</span>} 
-                value={scaleData.input1}
-                onChange={(e) => setScaleData({...scaleData, input1: e.target.value})}
-              />
-            </div>
-          </CalcWidget>
-        </div>
+            
+            {prob3Data.b_angles.map((b, index) => (
+              <div key={index} className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <InputField 
+                    label={<span>b&#770;<sub>{index + 1}</sub> [grad]</span>} 
+                    value={b}
+                    onChange={(e) => {
+                      const newAngles = [...prob3Data.b_angles];
+                      newAngles[index] = e.target.value;
+                      setProb3Data({...prob3Data, b_angles: newAngles});
+                    }}
+                  />
+                </div>
+                
+                {/* Action Buttons (Minus / Plus) */}
+                <div className="flex gap-1 mb-[2px]">
+                  {prob3Data.b_angles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAngles = prob3Data.b_angles.filter((_, i) => i !== index);
+                        setProb3Data({...prob3Data, b_angles: newAngles});
+                      }}
+                      className="h-[34px] w-[34px] flex items-center justify-center bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all hover:scale-105"
+                      title="Αφαίρεση"
+                    >
+                      <Minus size={16} />
+                    </button>
+                  )}
+                  
+                  {index === prob3Data.b_angles.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setProb3Data({...prob3Data, b_angles: [...prob3Data.b_angles, '']})}
+                      className="h-[34px] w-[34px] flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all hover:scale-105"
+                      title="Προσθήκη"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CalcWidget>
 
         {/* --- 5. Εμπροσθοτομία --- */}
         <CalcWidget 
@@ -531,7 +555,7 @@ const BasicCalculations = () => {
           icon={<Target size={18} />}
           loading={loadings.intersect}
           result={results.intersect}
-          resultLabels={[<span>X<sub>E</sub> [m]</span>, <span>Y<sub>E</sub>[m]</span>]}
+          resultLabels={[<span>X<sub>E</sub> [m]</span>, <span>Y<sub>E</sub> [m]</span>]}
           onCalculate={handleIntersectCalculation}
           onClear={() => clearResult('intersect')}
         >
@@ -602,6 +626,25 @@ const BasicCalculations = () => {
             <InputField label={<span>A&#770; [grad]</span>} value={resectData.A} onChange={(e) => setResectData({...resectData, A: e.target.value})} />
             <InputField label={<span>B&#770; [grad]</span>} value={resectData.B} onChange={(e) => setResectData({...resectData, B: e.target.value})} />
             <InputField label={<span>C&#770; [grad]</span>} value={resectData.C} onChange={(e) => setResectData({...resectData, C: e.target.value})} />
+          </div>
+        </CalcWidget>
+
+        {/* --- 7. Συντελεστής Κλίμακας --- */}
+        <CalcWidget 
+          title="Συντελεστής Κλίμακας m" 
+          icon={<MapPin size={18} />}
+          loading={loadings.scale}
+          result={results.scale}
+          resultLabels={[<span>m<sub>ij</sub></span>]}
+          onCalculate={handleScaleCalculation}
+          onClear={() => clearResult('scale')}
+        >
+          <div className="grid grid-cols-1 gap-3">
+            <InputField 
+              label={<span>Συνιστώσα E [m]</span>} 
+              value={scaleData.input1}
+              onChange={(e) => setScaleData({...scaleData, input1: e.target.value})}
+            />
           </div>
         </CalcWidget>
 

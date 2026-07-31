@@ -677,15 +677,19 @@ def calc_prob3():
     try:
         data = request.json
         
-        # Παίρνουμε τις γωνίες από το React
+        # Παίρνουμε την αρχική γωνία και τη λίστα με τις γωνίες θλάσης
         gprev = float(data.get('gprev', 0))
-        b = float(data.get('b', 0))
+        b_angles = data.get('b_angles', [])
+        
+        # Αρχικοποίηση της τρέχουσας γωνίας
+        current_g = gprev
+        
+        # Επαναληπτικός υπολογισμός 3ου Θεμελιώδους για κάθε γωνία θλάσης
+        for b in b_angles:
+            current_g = dpr.tri_them(current_g, float(b))
 
-        # Υπολογισμός 3ου Θεμελιώδους
-        gnext = dpr.tri_them(gprev, b)
-
-        # Επιστρέφουμε τη νέα γωνία διεύθυνσης
-        return jsonify({"gnext": gnext})
+        # Επιστρέφουμε την τελική γωνία διεύθυνσης
+        return jsonify({"gnext": current_g})
         
     except Exception as e:
         import traceback
