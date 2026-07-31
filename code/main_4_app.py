@@ -579,6 +579,150 @@ def run_tachymetry():
         print(f"Σφάλμα κατά τον υπολογισμό ταχυμετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+# =========================================================
+# 3b. ENDPOINT ΓΙΑ ΜΑΖΙΚΗ ΕΞΑΓΩΓΗ ΤΑΧΥΜΕΤΡΙΑΣ ΣΕ .TXT
+# =========================================================
+@app.route('/api/tachymetry/export', methods=['POST'])
+def export_tachymetry_txt():
+    data = request.json or {}
+    measurements = data.get('measurements', [])
+    stations = data.get('stations', [])
+
+    if not measurements:
+        return jsonify({"error": "Δεν βρέθηκαν μετρήσεις"}), 400
+
+    # 1. Μετατροπή σε DataFrames & renaming
+    df_meas = pd.DataFrame(measurements)
+    df_st = pd.DataFrame(stations)
+    
+    rename_st = {}
+    for col in df_st.columns:
+        if col.lower() in ['station_name', 'station']: rename_st[col] = 'Station_Name'
+        if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
+        if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
+        if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
+    df_st.rename(columns=rename_st, inplace=True)
+
+    # 2. Ανάγνωση στάσεων από τα αρχεία του project (latest_traverse / project_state)
+    project_name = get_active_project_name()
+    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+    traverse_file = project_dir / "latest_traverse.json"
+    project_state_file = project_dir / "project_state.json"
+    
+    traverse_stations = []
+    
+    if traverse_file.exists():
+        try:
+            with open(traverse_file, 'r', encoding='utf-8') as f:
+                traverse_stations = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            
+    elif project_state_file.exists():
+        try:
+            with open(project_state_file, 'r', encoding='utf-8') as f:
+                p_state = json.load(f)
+                t_data = p_state.get('traverse_data', [])
+                for pt in t_data:
+                    if pt.get('name') and pt.get('x') and pt.get('y'):
+                        traverse_stations.append({
+                            "Station_Name": str(pt['name']),
+                            "XS": float(pt['x']),
+                            "YS": float(pt['y']),
+                            "ZS": 0.0
+                        })
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+
+    # Συγχώνευση των στάσεων
+    if traverse_stations:
+        try:
+            df_trav = pd.DataFrame(traverse_stations)
+            if 'Station_Name' in df_st.columns:
+                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
+            if 'Station_Name' in df_trav.columns:
+                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
+            
+            df_st = pd.concat([df_st, df_trav], ignore_index=True)
+            df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+
+    # 3. Εντοπισμός στηλών Στάσης & Προσανατολισμού
+    st_col = None
+    or_col = None
+    for c in df_meas.columns:
+        if c.lower() in ['_filledstation', 'station', 'from']: st_col = c
+        if c.lower() in ['_filledorientation', 'orientation', 'o', 'backsight']: or_col = c
+
+    all_calculated_points = []
+    seen_keys = set()
+
+    if st_col and or_col:
+        # Fill down για σιγουριά
+        df_meas[st_col] = df_meas[st_col].replace('', None).ffill()
+        df_meas[or_col] = df_meas[or_col].replace('', None).ffill()
+
+        # Εύρεση μοναδικών συνδυασμών Στάσης - Προσανατολισμού
+        unique_pairs = df_meas[[st_col, or_col]].dropna().drop_duplicates().to_dict('records')
+
+        for pair in unique_pairs:
+            target_st = str(pair[st_col]).strip()
+            target_or = str(pair[or_col]).strip()
+
+            try:
+                res_df, _, _ = dpr.tachymetry(
+                    data_meas=df_meas,
+                    data_st=df_st,
+                    target_station=target_st,
+                    target_orientation=target_or
+                )
+                if res_df is not None and not res_df.empty:
+                    for rec in res_df.to_dict('records'):
+                        pt_name = str(rec.get('Σημείο', rec.get('Point_ID', '')))
+                        st_name = str(rec.get('Στάση', target_st))
+                        dedup_key = (st_name.upper(), pt_name.upper())
+
+                        if dedup_key not in seen_keys:
+                            seen_keys.add(dedup_key)
+                            all_calculated_points.append({
+                                'station': st_name,
+                                'point': pt_name,
+                                'x': float(rec.get('X', 0.0)),
+                                'y': float(rec.get('Y', 0.0)),
+                                'z': float(rec.get('Z', 0.0))
+                            })
+            except Exception as err:
+                print(f"⚠️ Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
+
+    # 4. Δημιουργία δομημένου περιεχομένου .txt
+    lines = []
+    # lines.append("==============================================================================")
+    # lines.append(f"ΑΠΟΤΕΛΕΣΜΑΤΑ ΤΑΧΥΜΕΤΡΙΑΣ - ΣΥΝΟΛΟ ΣΤΑΜΕΝΩΝ ΣΗΜΕΙΩΝ")
+    # lines.append(f"Έργο: {project_name if project_name else 'Default'}")
+    # lines.append("==============================================================================")
+    lines.append(f"{'Στάση':<12} {'Σημείο':<12} {'X (m)':>14} {'Y (m)':>14} {'Z (m)':>12}")
+    # lines.append("-" * 78)
+
+    for p in all_calculated_points:
+        st_str = f"{p['station']:<12}"
+        pt_str = f"{p['point']:<12}"
+        x_str = f"{p['x']:>14.3f}"
+        y_str = f"{p['y']:>14.3f}"
+        z_str = f"{p['z']:>12.3f}"
+        lines.append(f"{st_str} {pt_str} {x_str} {y_str} {z_str}")
+
+    lines.append("-" * 78)
+    lines.append(f"Σύνολο Υπολογισμένων Σημείων: {len(all_calculated_points)}")
+
+    txt_content = "\n".join(lines)
+    filename = f"tachymetry_all_points_{project_name if project_name else 'export'}.txt"
+
+    return jsonify({
+        "txt_content": txt_content,
+        "filename": filename,
+        "total_points": len(all_calculated_points)
+    })
 
 # CHARAXI
 

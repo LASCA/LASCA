@@ -3,12 +3,11 @@ import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
   Crosshair, Compass, LayoutGrid, Map as MapIcon, Info, ChevronRight, 
-  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown
+  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown, FileText
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
-// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
+// --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ value, onChange, options, disabled, icon: Icon }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -79,6 +78,7 @@ const Tachymetry = ({
   const [selectedStation, setSelectedStation] = useState("");
   const [selectedOrientation, setSelectedOrientation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [viewMode, setViewMode] = useState('local'); 
   const [isFullscreen, setIsFullscreen] = useState(false); 
 
@@ -99,7 +99,7 @@ const Tachymetry = ({
     });
   }, [measurements]);
 
-  // Λίστα μοναδικών σταθμών για το 1ο Dropdown
+  // Λίστα μοναδικών στάσεων
   const stations = useMemo(() => {
     const unique = filledMeasurements.map(p => p._filledStation).filter(Boolean);
     return [...new Set(unique)].sort();
@@ -107,7 +107,7 @@ const Tachymetry = ({
 
   const activeStation = selectedStation || (stations.length > 0 ? stations[0] : "");
 
-  // Λίστα προσανατολισμών για το 2ο Dropdown (φιλτραρισμένα με βάση τον σταθμό)
+  // Λίστα προσανατολισμών
   const orientations = useMemo(() => {
     if (!activeStation) return [];
     const unique = filledMeasurements
@@ -119,7 +119,6 @@ const Tachymetry = ({
 
   const activeOrientation = selectedOrientation || (orientations.length > 0 ? orientations[0] : "");
 
-  // Προετοιμασία Options για τα Dropdowns
   const stationOpts = stations.length === 0 
     ? [{ value: "", label: "Χωρίς Στάσεις" }] 
     : stations.map(s => ({ value: s, label: `Στάση: ${s}` }));
@@ -128,7 +127,6 @@ const Tachymetry = ({
     ? [{ value: "", label: "Χωρίς Προσ." }] 
     : orientations.map(o => ({ value: o, label: `Προσανατολισμός: ${o}` }));
 
-  // Φιλτραρισμένα σημεία για τον πίνακα βασισμένα στα Dropdowns
   const filteredPoints = useMemo(() => {
     if (!activeStation || !activeOrientation) return [];
     return filledMeasurements.filter(p => 
@@ -137,14 +135,13 @@ const Tachymetry = ({
     );
   }, [filledMeasurements, activeStation, activeOrientation]);
 
-  // Δυναμικό διάβασμα του Matplotlib plot με βάση τον τρέχοντα συνδυασμό
   const plotImage = useMemo(() => {
     if (!activeStation || !activeOrientation) return null;
     const key = `${activeStation}_${activeOrientation}`;
     return tachymetryData.plots?.[key] || tachymetryData.plot || null;
   }, [tachymetryData.plots, tachymetryData.plot, activeStation, activeOrientation]);
 
-  // 2. ΕΠΙΛΥΣΗ & ΥΠΟΛΟΓΙΣΜΟΣ (API CALL)
+  // 2. ΕΠΙΛΥΣΗ ΜΙΑΣ ΣΤΑΣΗΣ (UI DISPLAY)
   const handleCalculate = async () => {
     if (!measurements.length) {
       toast.error("Λείπουν δεδομένα μετρήσεων.");
@@ -192,6 +189,44 @@ const Tachymetry = ({
       toast.error("Αποτυχία υπολογισμού. Ελέγξτε το Backend.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 3. ΕΞΑΓΩΓΗ ΟΛΩΝ ΤΩΝ ΣΗΜΕΙΩΝ ΣΕ .TXT
+  const handleExportAll = async () => {
+    if (!measurements.length) {
+      toast.error("Δεν υπάρχουν διαθέσιμα δεδομένα μετρήσεων.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry/export', {
+        project_name: projectSettings,
+        measurements: filledMeasurements,
+        stations: stationsData
+      });
+
+      if (response.data && response.data.txt_content) {
+        const blob = new Blob([response.data.txt_content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = response.data.filename || 'tachymetry_all_points.txt';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .txt!`);
+      } else {
+        toast.error("Δεν επιστράφηκαν αποτελέσματα για εξαγωγή.");
+      }
+    } catch (error) {
+      console.error("Σφάλμα κατά την εξαγωγή:", error);
+      toast.error("Αποτυχία εξαγωγής αρχείου TXT.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -255,14 +290,12 @@ const Tachymetry = ({
         <div className="flex-[1.6] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
           <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between flex-wrap gap-4">
             
-            {/* ΝΕΟ ΕΙΚΟΝΙΔΙΟ GRID */}
             <div className="flex items-center gap-3 min-w-max">
               <LayoutGrid size={16} className="text-emerald-500" />
               <span className="text-[10px] font-black text-slate-300 tracking-[0.2em]">Ταχυμετρία</span>
             </div>
 
             <div className="flex items-center gap-3">
-              {/* CUSTOM DROPDOWN ΣΤΑΣΗΣ */}
               <CustomDropdown 
                 value={activeStation} 
                 onChange={(val) => { setSelectedStation(val); setSelectedOrientation(""); }} 
@@ -272,7 +305,6 @@ const Tachymetry = ({
 
               <ChevronRight size={12} className="text-slate-700" />
 
-              {/* CUSTOM DROPDOWN ΠΡΟΣΑΝΑΤΟΛΙΣΜΟΥ */}
               <CustomDropdown 
                 value={activeOrientation} 
                 onChange={(val) => setSelectedOrientation(val)} 
@@ -283,17 +315,34 @@ const Tachymetry = ({
 
               <div className="border-l border-slate-800 pl-3 ml-1 flex items-center gap-2">
                 {computedResults.length > 0 && <CheckCircle size={14} className="text-emerald-500" title="Έχει Υπολογιστεί" />}
+                
+                {/* ΚΟΥΜΠΙ ΕΠΙΛΥΣΗΣ */}
                 <button 
                   onClick={handleCalculate}
                   disabled={isLoading || measurements.length === 0}
                   className={`group flex items-center gap-2 px-4 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase ${
                     isLoading 
                       ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50'
+                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 cursor-pointer'
                   }`}
                 >
                   {isLoading ? <Cpu size={12} className="animate-spin" /> : <Play size={12} className="group-hover:text-emerald-300" />}
                   Επιλυση
+                </button>
+
+                {/* ΔΙΑΚΡΙΤΙΚΟ ΚΟΥΜΠΙ EXPORT TXT */}
+                <button 
+                  onClick={handleExportAll}
+                  disabled={isExporting || measurements.length === 0}
+                  title="Εξαγωγή όλων των σημείων όλων των στάσεων σε .txt"
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                    isExporting
+                      ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                      : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30 hover:border-cyan-500/50 cursor-pointer'
+                  }`}
+                >
+                  {isExporting ? <Cpu size={12} className="animate-spin" /> : <FileText size={12} className="group-hover:text-cyan-300" />}
+                  Export TXT
                 </button>
               </div>
             </div>
@@ -393,7 +442,7 @@ const Tachymetry = ({
                     <>
                       <TransformComponent 
                         wrapperStyle={{ width: "100%", height: "100%", cursor: "move" }}
-                        contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        contentStyle={{ width: "100%", height: "100%", display: "flex", itemsCenter: "center", justifyContent: "center" }}
                       >
                         {renderLocalSVG(false)}
                       </TransformComponent>
@@ -419,7 +468,7 @@ const Tachymetry = ({
                     <>
                       <TransformComponent 
                         wrapperStyle={{ width: "100%", height: "100%", cursor: "move" }}
-                        contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        contentStyle={{ width: "100%", height: "100%", display: "flex", itemsCenter: "center", justifyContent: "center" }}
                       >
                         <img 
                           src={plotImage} 
