@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { toast } from 'react-hot-toast';
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
-  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown
+  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown
 } from 'lucide-react';
 
 // --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
@@ -221,6 +222,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     }
   };
 
+  // --- ΚΑΤΕΒΑΣΜΑ ΕΙΚΟΝΑΣ ---
   const handleDownload = () => {
     if (!plotImage) return;
     const a = document.createElement('a');
@@ -229,6 +231,42 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  // --- ΚΑΤΕΒΑΣΜΑ DXF ---
+  const handleDownloadDXF = async () => {
+    if (!data || data.length === 0) {
+      toast.error("Δεν υπάρχουν δεδομένα για εξαγωγή.");
+      return;
+    }
+
+    const toastId = toast.loading("Δημιουργία DXF...");
+    try {
+      const response = await fetch('http://localhost:5000/api/traverse/export-dxf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: data })
+      });
+      
+      if (!response.ok) throw new Error("Αποτυχία δημιουργίας DXF");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Traverse_Diagram.dxf';
+      document.body.appendChild(a);
+      a.click();
+      
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Το αρχείο DXF κατέβηκε επιτυχώς!", { id: toastId });
+
+    } catch (error) {
+      toast.error("Σφάλμα κατά τη λήψη του DXF.", { id: toastId });
+      console.error(error);
+    }
   };
 
   return (
@@ -555,9 +593,16 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                    <Maximize2 size={16} />
                  </button>
                  <button
+                   onClick={handleDownloadDXF}
+                   className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg"
+                   title="Λήψη DXF"
+                 >
+                   <FileDown size={16} />
+                 </button>
+                 <button
                    onClick={handleDownload}
                    className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg backdrop-blur-sm transition-all border border-slate-600/50 shadow-lg"
-                   title="Λήψη"
+                   title="Λήψη Εικόνας"
                  >
                    <Download size={16} />
                  </button>
@@ -579,21 +624,32 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       {/* FULLSCREEN OVERLAY MODAL */}
       {isFullscreen && plotImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md">
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="absolute top-6 right-6 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
-            title="Κλείσιμο"
-          >
-            <X size={24} className="group-hover:text-pink-500 transition-colors" />
-          </button>
+          
+          <div className="absolute top-6 right-6 flex items-center gap-4 z-50">
+            <button
+              onClick={handleDownloadDXF}
+              className="p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group shadow-2xl"
+              title="Λήψη DXF"
+            >
+              <FileDown size={24} className="group-hover:text-blue-400 transition-colors" />
+            </button>
 
-          <button
-            onClick={handleDownload}
-            className="absolute top-6 right-24 p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group z-50 shadow-2xl"
-            title="Λήψη"
-          >
-            <Download size={24} className="group-hover:text-emerald-500 transition-colors" />
-          </button>
+            <button
+              onClick={handleDownload}
+              className="p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group shadow-2xl"
+              title="Λήψη Εικόνας"
+            >
+              <Download size={24} className="group-hover:text-emerald-400 transition-colors" />
+            </button>
+
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-full transition-colors border border-slate-600/50 group shadow-2xl"
+              title="Κλείσιμο"
+            >
+              <X size={24} className="group-hover:text-pink-500 transition-colors" />
+            </button>
+          </div>
 
           <div className="w-full h-full flex items-center justify-center cursor-move">
             <TransformWrapper
