@@ -518,7 +518,7 @@ const BasicCalculations = () => {
                 </div>
                 
                 {/* Action Buttons (Minus / Plus) */}
-                <div className="flex gap-1 mb-[2px]">
+                <div className="flex gap-1 mb-[1px]">
                   {prob3Data.b_angles.length > 1 && (
                     <button
                       type="button"
@@ -526,10 +526,10 @@ const BasicCalculations = () => {
                         const newAngles = prob3Data.b_angles.filter((_, i) => i !== index);
                         setProb3Data({...prob3Data, b_angles: newAngles});
                       }}
-                      className="h-[34px] w-[34px] flex items-center justify-center bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all hover:scale-105"
+                      className="h-[32px] w-[32px] flex items-center justify-center text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-full hover:bg-rose-500/20 hover:scale-105 transition-all shadow-sm shadow-rose-500/10"
                       title="Αφαίρεση"
                     >
-                      <Minus size={16} />
+                      <Minus size={18} strokeWidth={2.5} />
                     </button>
                   )}
                   
@@ -537,10 +537,10 @@ const BasicCalculations = () => {
                     <button
                       type="button"
                       onClick={() => setProb3Data({...prob3Data, b_angles: [...prob3Data.b_angles, '']})}
-                      className="h-[34px] w-[34px] flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all hover:scale-105"
+                      className="h-[32px] w-[32px] flex items-center justify-center text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 rounded-full hover:bg-indigo-500/20 hover:scale-105 transition-all shadow-sm shadow-indigo-500/10"
                       title="Προσθήκη"
                     >
-                      <Plus size={16} />
+                      <Plus size={18} strokeWidth={2.5} />
                     </button>
                   )}
                 </div>
