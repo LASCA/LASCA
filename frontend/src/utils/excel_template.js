@@ -56,6 +56,13 @@ const applyProfessionalStyles = (ws) => {
 export const downloadSurveyTemplate = () => {
   try {
     const wb = XLSX.utils.book_new();
+    // γωνιομετρησεις
+    const wsgwn = XLSX.utils.aoa_to_sheet([
+      ["From", "To", "Period", "Face I", "Face II", "Z_Face I", "Z_Face II"]
+    ]);
+    applyProfessionalStyles(wsgwn);
+    XLSX.utils.book_append_sheet(wb, wsgwn, "gwniometriseis");
+
 
     // 1. Συνόρθωση (synorthosi_stathmou)
     const wsAdj = XLSX.utils.aoa_to_sheet([

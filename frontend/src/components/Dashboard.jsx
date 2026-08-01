@@ -1,465 +1,557 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2, PlusCircle, Play, Cpu, ArrowLeft } from 'lucide-react';
+import React, { useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { toast } from 'react-hot-toast';
+import { 
+  Plus, FolderOpen, Upload, 
+  FileSpreadsheet, LayoutGrid,
+  Database, MapPin, Target, CheckCircle2, AlertCircle, Map
+} from 'lucide-react';
+import { 
+  ResponsiveContainer, ScatterChart, Scatter, 
+  XAxis, YAxis, CartesianGrid, Tooltip 
+} from 'recharts';
 
-const Goniometry = ({ rows = [], setRows }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+import { downloadSurveyTemplate } from '../utils/excel_template';
 
-  const formatDecimals = (val, decimals = 4) => {
-    if (val === "" || val === null || val === undefined) return "";
-    const num = parseFloat(String(val).replace(',', '.'));
-    return isNaN(num) ? val : num.toFixed(decimals);
-  };
+// Custom Tooltip για τον Χάρτη
+const MapTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isStation = data.type === 'station';
+    return (
+      <div className="bg-[#0B1221]/95 backdrop-blur-sm border border-slate-700/80 p-3 rounded-xl shadow-2xl">
+        <div className="flex items-center gap-2 mb-2 border-b border-slate-700/50 pb-2">
+          {isStation ? <Target size={14} className="text-blue-400" /> : <MapPin size={14} className="text-emerald-400" />}
+          <p className="text-white font-bold text-[12px] tracking-wide">{data.name}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-slate-400 text-[10px] font-mono flex justify-between gap-4">
+            <span>E (X):</span> <span className="text-slate-200 font-bold">{Number(data.x).toFixed(3)}</span>
+          </p>
+          <p className="text-slate-400 text-[10px] font-mono flex justify-between gap-4">
+            <span>N (Y):</span> <span className="text-slate-200 font-bold">{Number(data.y).toFixed(3)}</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
-  // ---------------------------------------------------------
-  // ΑΥΤΟΜΑΤΗ ΜΟΡΦΟΠΟΙΗΣΗ ΔΕΚΑΔΙΚΩΝ (ΟΡΙΖΟΝΤΙΕΣ & ΖΕΝΙΘΙΕΣ)
-  // ---------------------------------------------------------
-  useEffect(() => {
-    if (!rows || rows.length === 0) return;
-    let hasChanges = false;
-    const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
+const Dashboard = ({ 
+  setObservations, 
+  setTraverseData, 
+  setTachymetryData, 
+  setStakeoutData, 
+  setGoniometryData,
+  setLevelingObservations, 
+  setLevelingStations,     
+  setTrigLevelingData,
+  onOpenProjectManager,
+  
+  projectSettings,
+  traverseData = [],
+  tachymetryData = { measurements: [], stations: [] },
+  stakeoutData = { points: [] },
+  levelingMetrics = null
+}) => {
 
-    const formattedRows = rows.map((row, index) => {
-      let updated = { ...row };
+  const stationCount = tachymetryData?.stations?.length || traverseData?.length || 0;
+  const measurementCount = tachymetryData?.measurements?.length || 0;
+  const stakeoutCount = stakeoutData?.points?.length || 0;
+  const projectName = projectSettings?.name || 'My_Survey_Project.lasca';
+  const hasData = stationCount > 0 || measurementCount > 0 || stakeoutCount > 0;
 
-      // Οριζόντιες
-      const isFaceIFocused = activeId === `input-${index}-faceI`;
-      const isFaceIIFocused = activeId === `input-${index}-faceII`;
-      if (!isFaceIFocused && row.faceI !== "" && row.faceI !== undefined) {
-        const val = formatDecimals(row.faceI, 4);
-        if (val !== String(row.faceI)) { updated.faceI = val; hasChanges = true; }
-      }
-      if (!isFaceIIFocused && row.faceII !== "" && row.faceII !== undefined) {
-        const val = formatDecimals(row.faceII, 4);
-        if (val !== String(row.faceII)) { updated.faceII = val; hasChanges = true; }
-      }
+  // Επεξεργασία δεδομένων για τον χάρτη
+  const mapData = useMemo(() => {
+    const stations = traverseData
+      .filter(pt => pt.x && pt.y && !isNaN(pt.x) && !isNaN(pt.y))
+      .map(pt => ({
+        name: pt.name || 'Στάση',
+        x: Number(pt.x),
+        y: Number(pt.y),
+        type: 'station'
+      }));
 
-      // Ζενίθιες
-      const isZfaceIFocused = activeId === `zenith-input-${index}-ZfaceI`;
-      const isZfaceIIFocused = activeId === `zenith-input-${index}-ZfaceII`;
-      if (!isZfaceIFocused && row.ZfaceI !== "" && row.ZfaceI !== undefined) {
-        const val = formatDecimals(row.ZfaceI, 4);
-        if (val !== String(row.ZfaceI)) { updated.ZfaceI = val; hasChanges = true; }
-      }
-      if (!isZfaceIIFocused && row.ZfaceII !== "" && row.ZfaceII !== undefined) {
-        const val = formatDecimals(row.ZfaceII, 4);
-        if (val !== String(row.ZfaceII)) { updated.ZfaceII = val; hasChanges = true; }
-      }
+    const details = (tachymetryData?.measurements || [])
+      .filter(pt => (pt['E[m]'] || pt.x) && (pt['N[m]'] || pt.y))
+      .map(pt => ({
+        name: pt['Point'] || pt.name || 'Σημείο',
+        x: Number(pt['E[m]'] || pt.x),
+        y: Number(pt['N[m]'] || pt.y),
+        type: 'detail'
+      })).filter(pt => !isNaN(pt.x) && !isNaN(pt.y));
 
-      return updated;
-    });
+    return { stations, details, hasPoints: stations.length > 0 || details.length > 0 };
+  }, [traverseData, tachymetryData]);
 
-    if (hasChanges && setRows) {
-      setRows(formattedRows);
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.match(/\.(xlsx|xls)$/)) {
+      toast.error('Παρακαλώ επιλέξτε αρχείο μορφής .xlsx ή .xls');
+      return;
     }
-  }, [rows, setRows]);
 
-  // Handlers για αλλαγή δεδομένων
-  const handleInputChange = (id, field, value) => {
-    if (setRows) {
-      setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
-    }
-  };
+    const reader = new FileReader();
+    const loadingToast = toast.loading('Ανάγνωση δεδομένων Excel...');
 
-  const handleBlur = (id, field, value) => {
-    if (['faceI', 'faceII', 'ZfaceI', 'ZfaceII'].includes(field)) {
-      handleInputChange(id, field, formatDecimals(value, 4));
-    }
-  };
+    reader.onload = (event) => {
+      try {
+        const bstr = event.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
 
-  // Πλοήγηση με βέλη/Enter στον πίνακα Οριζοντίων
-  const handleKeyDown = (e, index, colName) => {
-    const columns = ['from', 'to', 'period', 'faceI', 'faceII'];
-    const colIndex = columns.indexOf(colName);
-    let nextRow = index;
-    let nextCol = colIndex;
-    let shouldMove = false;
+        const adjSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('synorthosi_stathmou'));
+        if (adjSheetName && setObservations) {
+          const wsAdjustment = wb.Sheets[adjSheetName];
+          const dataAdj = XLSX.utils.sheet_to_json(wsAdjustment);
+          
+          if (dataAdj.length > 0) {
+            const formattedAdj = dataAdj.map((row, index) => ({
+              id: Date.now() + index,
+              station: row['Stations'] || row['Station'] || row['From'] || "",
+              target: row['Target'] || row['To'] || "",
+              Period: row['Period'] || "1",
+              Face_I: row['Hz [grad]'] || row['Face I'] || "0.0000",
+              Face_II: row['Face II'] || "200.0000",
+              adj_hz: "",
+              std_dev: ""
+            }));
+            setObservations(formattedAdj);
+          }
+        }
 
-    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); nextRow = index + 1; shouldMove = true; }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); nextRow = index - 1; shouldMove = true; }
-    else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) { e.preventDefault(); nextCol = colIndex - 1; shouldMove = true; }
-    else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) { e.preventDefault(); nextCol = colIndex + 1; shouldMove = true; }
+        const traverseSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse');
+        if (traverseSheetName) {
+          const wsTraverse = wb.Sheets[traverseSheetName];
+          const dataTraverse = XLSX.utils.sheet_to_json(wsTraverse);
 
-    if (shouldMove && nextRow >= 0 && nextRow < rows.length && nextCol >= 0 && nextCol < columns.length) {
-      const nextInput = document.getElementById(`input-${nextRow}-${columns[nextCol]}`);
-      if (nextInput) { 
-        nextInput.focus(); 
-        const valLength = nextInput.value.length;
-        nextInput.setSelectionRange(valLength, valLength);
+          const formattedTraverse = dataTraverse.map((row, index) => ({
+            id: Date.now() + index,
+            name: row['Stations'] || row['Station'] || "",
+            hz: row['Hz [grad]'] || "",
+            sd: row['D [m]'] || "", 
+            x: row['X [m]'] || "",
+            y: row['Y [m]'] || "",
+            h: row['H [m]'] || ""
+          }));
+          
+          if (setTraverseData) setTraverseData(formattedTraverse);
+
+          if (setLevelingStations) {
+            const extractedStations = [];
+            formattedTraverse.forEach((row, index) => {
+              if (row.name) {
+                const currentH = (row.h !== undefined && row.h !== null) ? row.h : "";
+                extractedStations.push({
+                  id: Date.now() + 1000 + index,
+                  name: String(row.name),
+                  h: String(currentH)
+                });
+              }
+            });
+            setLevelingStations(extractedStations);
+          }
+        }
+
+        const traverseLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase() === 'traverse_leveling');
+        if (traverseLevelingSheetName && setLevelingObservations) {
+          const wsLeveling = wb.Sheets[traverseLevelingSheetName];
+          const dataLeveling = XLSX.utils.sheet_to_json(wsLeveling);
+
+          if (dataLeveling.length > 0) {
+            const formattedLevelingObs = dataLeveling.map((row, index) => ({
+              id: Date.now() + 2000 + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              s: row['Slope_D'] !== undefined ? String(row['Slope_D']) : "",
+              z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
+              hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
+              ht: row['H_target'] !== undefined ? String(row['H_target']) : ""
+            }));
+            setLevelingObservations(formattedLevelingObs);
+          }
+        }
+
+        const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_taxymetria'));
+        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
+
+        if (setTachymetryData) {
+          // 1. Προετοιμάζουμε έναν άδειο πίνακα
+          let cleanMeasurements = [];
+          
+          // 2. Αν βρεθεί το φύλλο μετρήσεων, το διαβάζουμε και το καθαρίζουμε
+          if (measSheetName) {
+            const rawMeas = XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]);
+            
+            cleanMeasurements = rawMeas
+              // Κρατάμε ΑΥΣΤΗΡΑ μόνο τις γραμμές που έχουν τιμή στη στήλη 'From' και 'Point_ID'
+              .filter(row => row['From'] !== undefined && row['Point_ID'] !== undefined)
+              // Φτιάχνουμε νέο καθαρό αντικείμενο, αγνοώντας τις στήλες 'Station', 'Orientation' κτλ (αριστερός πίνακας)
+              .map(row => ({
+                From: String(row['From']).trim(),
+                O: row['O'],
+                Point_ID: row['Point_ID'],
+                Hz: row['Hz'],
+                Z: row['Z'],
+                SD: row['SD'],
+                TargetHeight: row['TargetHeight']
+              }));
+          }
+
+          // 3. Ενημερώνουμε το state με τα καθαρισμένα δεδομένα
+          setTachymetryData({
+            measurements: cleanMeasurements,
+            stations: stationsSheetName ? XLSX.utils.sheet_to_json(wb.Sheets[stationsSheetName]) : [],
+            results: [] 
+          });
+        }
+
+        const charaxiSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('charaxi'));
+        if (charaxiSheetName && setStakeoutData) {
+          const wsCharaxi = wb.Sheets[charaxiSheetName];
+          const dataCharaxi = XLSX.utils.sheet_to_json(wsCharaxi);
+
+          if (dataCharaxi.length > 0) {
+            const formattedCharaxi = dataCharaxi.map((row, index) => ({
+              id: Date.now() + index,
+              name: row['Point'],
+              x: row['E[m]'] ,
+              y: row['N[m]'],
+              hz_stake: "",
+              dist_stake: ""
+            }));
+            setStakeoutData(prev => ({ ...prev, points: formattedCharaxi }));
+          }
+        }
+
+        const goniometrySheetName = wb.SheetNames.find(n => n.toLowerCase().includes('gwniometriseis'));
+        if (goniometrySheetName && setGoniometryData) {
+          const wsGoniometry = wb.Sheets[goniometrySheetName];
+          const dataGoniometry = XLSX.utils.sheet_to_json(wsGoniometry);
+
+          if (dataGoniometry.length > 0) {
+            const formattedGoniometry = dataGoniometry.map((row, index) => ({
+              id: Date.now() + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              period: row['Period'] !== undefined ? String(row['Period']) : "1",
+              faceI: row['Face I'] !== undefined ? String(row['Face I']) : "",
+              faceII: row['Face II'] !== undefined ? String(row['Face II']) : "",
+              ZfaceI: row['Z_Face I'] !== undefined ? String(row['Z_Face I']) : "",
+              ZfaceII: row['Z_Face II'] !== undefined ? String(row['Z_Face II']) : ""
+            }));
+            setGoniometryData(formattedGoniometry);
+          }
+        }
+
+        const trigLevelingSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('trig_leveling'));
+        if (trigLevelingSheetName && setTrigLevelingData) {
+          const wsTrig = wb.Sheets[trigLevelingSheetName];
+          const dataTrig = XLSX.utils.sheet_to_json(wsTrig);
+
+          if (dataTrig.length > 0) {
+            const formattedTrig = dataTrig.map((row, index) => ({
+              id: Date.now() + 3000 + index,
+              from: row['From'] !== undefined ? String(row['From']) : "",
+              to: row['To'] !== undefined ? String(row['To']) : "",
+              s: row['Slope_D'] !== undefined ? String(row['Slope_D']) : "",
+              z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
+              hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
+              ht: row['H_target'] !== undefined ? String(row['H_target']) : "",
+              dh: "",      
+              dh_avg: "" 
+            }));
+            setTrigLevelingData(formattedTrig);
+          }
+        }
+
+        toast.success('Επιτυχής εισαγωγή δεδομένων!', { id: loadingToast });
+      } catch (err) {
+        console.error(err);
+        toast.error('Σφάλμα κατά την επεξεργασία του αρχείου.', { id: loadingToast });
       }
-    }
-  };
-
-  // Πλοήγηση με βέλη/Enter στον πίνακα Ζενιθίων
-  const handleZenithKeyDown = (e, index, colName) => {
-    const columns = ['from', 'to', 'period', 'ZfaceI', 'ZfaceII'];
-    const colIndex = columns.indexOf(colName);
-    let nextRow = index;
-    let nextCol = colIndex;
-    let shouldMove = false;
-
-    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); nextRow = index + 1; shouldMove = true; }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); nextRow = index - 1; shouldMove = true; }
-    else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) { e.preventDefault(); nextCol = colIndex - 1; shouldMove = true; }
-    else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) { e.preventDefault(); nextCol = colIndex + 1; shouldMove = true; }
-
-    if (shouldMove && nextRow >= 0 && nextRow < rows.length && nextCol >= 0 && nextCol < columns.length) {
-      const nextInput = document.getElementById(`zenith-input-${nextRow}-${columns[nextCol]}`);
-      if (nextInput) { 
-        nextInput.focus(); 
-        const valLength = nextInput.value.length;
-        nextInput.setSelectionRange(valLength, valLength);
-      }
-    }
-  };
-
-  const addRowAt = (index) => {
-    if(!setRows) return;
-    const newRow = { 
-      id: Date.now(), 
-      from: "", 
-      to: "", 
-      period: "1", 
-      faceI: "", 
-      faceII: "", 
-      ZfaceI: "", 
-      ZfaceII: "" 
     };
-    const updated = [...rows];
-    updated.splice(index + 1, 0, newRow);
-    setRows(updated);
-  };
 
-  const deleteRow = (id) => {
-    if(setRows) {
-      setRows(rows.filter(r => r.id !== id));
-    }
+    reader.readAsBinaryString(file);
+    e.target.value = null;
   };
-
-  const handleCalculate = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('http://localhost:5000/api/goniometry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rows })
-      });
-      const data = await response.json();
-      
-      if (data.error) {
-        alert(`Σφάλμα Υπολογισμού: ${data.error}`);
-      } else if (data.results && setRows) {
-        const updatedRows = data.results.map((backendRow, index) => ({
-          ...rows[index],
-          mesos_oros: backendRow.mesos_oros,
-          anigmeni_timi: backendRow.anigmeni_timi,
-          genikos_mesos: backendRow.genikos_mesos,
-          v_m: backendRow.v_m,
-          v_prime: backendRow.v_prime,
-          v_ji: backendRow.v_ji,
-          vv: backendRow.vv
-        }));
-        setRows(updatedRows);
-        setShowResults(true); 
-      }
-    } catch (error) {
-      console.error("Σφάλμα σύνδεσης:", error);
-      alert("Αποτυχία σύνδεσης με τον Server. Βεβαιώσου ότι τρέχει το Python Backend.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const totalColumns = showResults ? 14 : 7;
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] p-4 sm:p-6 font-sans flex flex-col gap-8">
+    <div className="min-h-screen bg-transparent text-slate-200 flex flex-col font-sans h-screen overflow-y-auto custom-scrollbar">
       <style>
-        {`.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        {`
+          /* Καθολικό Scrollbar (πιάνει το window/body) */
+          ::-webkit-scrollbar { width: 6px; height: 6px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+          ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+          /* Custom Scrollbar για συγκεκριμένα divs αν χρειαστεί */
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }`}
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        `}
       </style>
 
-      {/* ============================== */}
-      {/* ΠΙΝΑΚΑΣ ΟΡΙΖΟΝΤΙΩΝ ΓΩΝΙΩΝ      */}
-      {/* ============================== */}
-      <div className="flex flex-col gap-3">
-        <h2 className="text-slate-200 text-lg font-bold px-2 tracking-wide">Οριζόντιες Γωνίες</h2>
-        <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl relative w-full overflow-hidden">
-          <div className="overflow-y-auto overflow-x-auto custom-scrollbar max-h-[calc(60vh)] rounded-2xl">
-            <table className="w-full text-left border-collapse relative">
-              <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
-                <tr className="border-b border-slate-800/50">
-                  <th className="px-2 py-3 w-8 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">From</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">To</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">Period</th>
-                  <th className="px-2 py-3 w-24 text-[10px] font-black text-slate-500 tracking-widest">Face I</th>
-                  <th className="px-2 py-3 w-24 text-[10px] font-black text-slate-500 tracking-widest">Face II</th>
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 py-6 px-10 overflow-hidden flex flex-col">
+        <div className="grid grid-cols-[1fr_320px] gap-8 max-w-[1400px] w-full mx-auto h-full overflow-hidden">
+          
+          {/* ----- ΑΡΙΣΤΕΡΗ ΣΤΗΛΗ ----- */}
+          <div className="flex flex-col gap-6 h-full overflow-hidden">
+            
+            {/* Πάνω Μέρος */}
+            <div className="grid grid-cols-2 gap-6 shrink-0">
+              {/* FILE OPERATIONS */}
+              <div className="flex flex-col gap-3">
+                <SectionTitle title="FILE OPERATIONS" />
+                <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
+                  <ActionButton 
+                    icon={<Plus size={18} />} 
+                    title="Create New" 
+                    subtitle="Νέο αρχείο" 
+                    theme="primary" 
+                    onClick={onOpenProjectManager}
+                  />
+                  <ActionButton 
+                    icon={<FolderOpen size={18} />} 
+                    title="Open Project" 
+                    subtitle="Ανάκτηση από δίσκο" 
+                    theme="default"
+                    onClick={onOpenProjectManager}
+                  />
+                </div>
+              </div>
+
+              {/* DATA INGESTION */}
+              <div className="flex flex-col gap-3">
+                <SectionTitle title="DATA INGESTION" />
+                <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
+                  <ActionButton 
+                    icon={<FileSpreadsheet size={18} />} 
+                    title="Excel Template" 
+                    subtitle="Λήψη πρότυπου αρχείου" 
+                    theme="emerald"
+                    onClick={downloadSurveyTemplate}
+                  />
+                  <ImportButton onChange={handleFileUpload} />
+                </div>
+              </div>
+            </div>
+
+            {/* Κάτω Μέρος: Χάρτης (Recharts) */}
+            <div className="flex flex-col gap-3 flex-1 min-h-[200px] overflow-hidden">
+              <SectionTitle title="SPATIAL PREVIEW" />
+              <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-lg h-full relative overflow-hidden group">
+                
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Map size={16} className="text-cyan-500" />
+                    <span className="text-[11px] font-bold text-slate-300 tracking-wider">Τοπογραφικό Δίκτυο & Αποτύπωση</span>
+                  </div>
+                  <div className="text-[9px] text-slate-500 font-mono font-bold">
+                    {mapData.hasPoints ? `${mapData.stations.length + mapData.details.length} ΣΗΜΕΙΑ ΣΤΟΝ ΧΑΡΤΗ` : 'ΑΝΑΜΟΝΗ ΣΥΝΤΕΤΑΓΜΕΝΩΝ'}
+                  </div>
+                </div>
+                
+                {/* ΧΩΡΟΣ ΧΑΡΤΗ */}
+                <div className="flex-1 bg-[#080E1A] rounded-xl border border-slate-800/50 relative flex items-center justify-center overflow-hidden [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px]">
                   
-                  {showResults && (
-                    <>
-                      <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Μέσος Όρος</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Ανηγμένη</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-emerald-400 tracking-widest whitespace-nowrap">Γεν. Μέσος</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_m (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v'_j (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_ji (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">vv</th>
-                    </>
+                  {mapData.hasPoints ? (
+                    <div className="w-full h-full p-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.5} />
+                          <XAxis 
+                            type="number" 
+                            dataKey="x" 
+                            name="Easting" 
+                            domain={['auto', 'auto']} 
+                            tickFormatter={(val) => val.toFixed(0)} 
+                            stroke="#475569"
+                            tick={{ fill: '#64748b', fontSize: 10 }}
+                          />
+                          <YAxis 
+                            type="number" 
+                            dataKey="y" 
+                            name="Northing" 
+                            domain={['auto', 'auto']} 
+                            tickFormatter={(val) => val.toFixed(0)} 
+                            stroke="#475569"
+                            tick={{ fill: '#64748b', fontSize: 10 }}
+                          />
+                          <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#334155' }} content={<MapTooltip />} />
+                          
+                          <Scatter 
+                            name="Αποτύπωση" 
+                            data={mapData.details} 
+                            fill="#10b981" 
+                            shape="circle"
+                          />
+                          
+                          <Scatter 
+                            name="Στάσεις" 
+                            data={mapData.stations} 
+                            fill="#3b82f6" 
+                            shape="triangle"
+                            line={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeOpacity: 0.6 }}
+                          />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 opacity-30">
+                      <Map size={32} className="text-slate-600" />
+                      <span className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">
+                        Αδεια Σκηνη
+                      </span>
+                    </div>
                   )}
 
-                  <th className="px-2 py-3 w-20 text-right sticky right-0 bg-[#0f172a]">
-                    <div className="flex justify-end gap-2 pr-1">
-                      {showResults && (
-                        <button 
-                          onClick={() => setShowResults(false)}
-                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
-                          title="Επιστροφή στην επεξεργασία"
-                        >
-                          <ArrowLeft size={14} />
-                        </button>
-                      )}
-                      <button 
-                        onClick={handleCalculate}
-                        disabled={isLoading || !rows || rows.length === 0}
-                        className={`group inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
-                          isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
-                        }`}
-                        title="Εκτέλεση Υπολογισμού"
-                      >
-                        {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
-                      </button>
+                  <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-slate-700/50 pointer-events-none" />
+                  <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-slate-700/50 pointer-events-none" />
+                  <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-slate-700/50 pointer-events-none" />
+                  <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-slate-700/50 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* ----- ΔΕΞΙΑ ΣΤΗΛΗ ----- */}
+          <div className="flex flex-col gap-3 h-full">
+            <SectionTitle title="ACTIVE PROJECT OVERVIEW" />
+            <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-6 shadow-lg h-full">
+              
+              <div className="flex flex-col gap-4 border-b border-slate-800/50 pb-5 shrink-0">
+                <div className="flex items-start justify-between">
+                  <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-500">
+                    <Database size={20} />
+                  </div>
+                  <div className={`px-2.5 py-1 border rounded-md text-[9px] font-bold tracking-wider flex items-center gap-1.5 ${hasData ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${hasData ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                    {hasData ? 'ΕΝΕΡΓΟ' : 'ΑΝΑΜΟΝΗ'}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-lg tracking-tight break-all">{projectName}</h4>
+                  <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-1">
+                    {hasData ? "Φορτωθηκαν Δεδομενα" : "Κενο Εργο"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Vertical Stats */}
+              <div className="flex flex-col gap-3 flex-1">
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Target size={18} className={`${stationCount > 0 ? 'text-blue-500' : 'text-slate-700'}`} />
+                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Στασεις / Οδευσεις</span>
                     </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/30">
-                {(!rows || rows.length === 0) ? (
-                  <tr>
-                    <td colSpan={totalColumns} className="p-8 text-center text-slate-500 font-mono text-sm">
-                      Δεν βρέθηκαν δεδομένα. Παρακαλώ εισάγετε το Excel από το Project Setup.
-                    </td>
-                  </tr>
-                ) : rows.map((row, index) => (
-                  <React.Fragment key={row.id}>
-                    <tr className="group hover:bg-blue-600/[0.03] transition-all">
-                      <td className="px-2 py-2 text-center text-[10px] text-slate-600 font-mono font-bold">
-                        {index + 1}
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`input-${index}-from`}
-                          className={`w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`}
-                          value={row.from || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'from', e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, index, 'from')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`input-${index}-to`}
-                          className={`w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`}
-                          value={row.to || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'to', e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, index, 'to')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`input-${index}-period`} 
-                          className={`w-full bg-transparent p-1.5 text-left font-mono text-[13px] outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all ${showResults ? 'text-slate-600 font-medium' : 'text-slate-400 font-bold'}`}
-                          value={row.period || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'period', e.target.value)} 
-                          onKeyDown={(e) => handleKeyDown(e, index, 'period')}
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`input-${index}-faceI`} 
-                          className={`w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all ${showResults ? 'text-cyan-600/70 font-medium' : 'text-cyan-400 font-bold'}`}
-                          value={row.faceI || ""} 
-                          onBlur={(e) => handleBlur(row.id, 'faceI', e.target.value)} 
-                          onChange={(e) => {
-                            handleInputChange(row.id, 'faceI', e.target.value);
-                            setShowResults(false);
-                          }} 
-                          onKeyDown={(e) => handleKeyDown(e, index, 'faceI')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`input-${index}-faceII`} 
-                          className={`w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400/80 transition-all ${showResults ? 'text-cyan-600/70 font-medium' : 'text-cyan-400 font-bold'}`}
-                          value={row.faceII || ""} 
-                          onBlur={(e) => handleBlur(row.id, 'faceII', e.target.value)} 
-                          onChange={(e) => {
-                            handleInputChange(row.id, 'faceII', e.target.value);
-                            setShowResults(false);
-                          }} 
-                          onKeyDown={(e) => handleKeyDown(e, index, 'faceII')}
-                          placeholder="-"
-                        />
-                      </td>
-                      
-                      {showResults && (
-                        <>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-blue-400 whitespace-nowrap">{formatDecimals(row.mesos_oros, 4)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-blue-400 whitespace-nowrap">{formatDecimals(row.anigmeni_timi, 4)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-emerald-400 whitespace-nowrap">{formatDecimals(row.genikos_mesos, 4)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_m, 0)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_prime, 1)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.v_ji, 1)}</td>
-                          <td className="px-2 py-2 text-[13px] font-mono font-bold text-purple-400 whitespace-nowrap">{formatDecimals(row.vv, 2)}</td>
-                        </>
-                      )}
-  
-                      <td className="px-2 py-2 text-right sticky right-0 bg-[#0b1120] group-hover:bg-[#101827]">
-                        <button 
-                          onClick={() => deleteRow(row.id)} 
-                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all cursor-pointer flex justify-end w-full"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                    
-                    <tr className="h-0 p-0">
-                      <td colSpan={totalColumns} className="p-0 h-0 relative">
-                        <button 
-                          onClick={() => addRowAt(index)} 
-                          className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"
-                          title="Προσθήκη γραμμής εδώ"
-                        >
-                          <PlusCircle size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+                    <span className={`text-2xl font-mono font-black ${stationCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{stationCount}</span>
+                 </div>
+                 
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <MapPin size={18} className={`${measurementCount > 0 ? 'text-emerald-500' : 'text-slate-700'}`} />
+                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημ. Αποτυπωσης</span>
+                    </div>
+                    <span className={`text-2xl font-mono font-black ${measurementCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{measurementCount}</span>
+                 </div>
+                 
+                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <MapPin size={18} className={`${stakeoutCount > 0 ? 'text-amber-500' : 'text-slate-700'}`} />
+                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημεια Χαραξης</span>
+                    </div>
+                    <span className={`text-2xl font-mono font-black ${stakeoutCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{stakeoutCount}</span>
+                 </div>
+              </div>
 
-      {/* ============================== */}
-      {/* ΠΙΝΑΚΑΣ ΖΕΝΙΘΙΩΝ ΓΩΝΙΩΝ        */}
-      {/* ============================== */}
-      <div className="flex flex-col gap-3">
-        <h2 className="text-slate-200 text-lg font-bold px-2 tracking-wide">Ζενίθιες Γωνίες</h2>
-        <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl relative w-full overflow-hidden">
-          <div className="overflow-y-auto overflow-x-auto custom-scrollbar max-h-[calc(60vh)] rounded-2xl">
-            <table className="w-full text-left border-collapse relative">
-              <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
-                <tr className="border-b border-slate-800/50">
-                  <th className="px-2 py-3 w-8 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">From</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">To</th>
-                  <th className="px-2 py-3 w-16 text-[10px] font-black text-slate-500 tracking-widest">Period</th>
-                  <th className="px-2 py-3 w-24 text-[10px] font-black text-slate-500 tracking-widest">Face I</th>
-                  <th className="px-2 py-3 w-24 text-[10px] font-black text-slate-500 tracking-widest">Face II</th>
-                  <th className="px-2 py-3 w-20 text-right sticky right-0 bg-[#0f172a]"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/30">
-                {(!rows || rows.length === 0) ? (
-                  <tr>
-                    <td colSpan="7" className="p-8 text-center text-slate-500 font-mono text-sm">
-                      Δεν βρέθηκαν δεδομένα.
-                    </td>
-                  </tr>
-                ) : rows.map((row, index) => (
-                  <React.Fragment key={`zenith-${row.id}`}>
-                    <tr className="group hover:bg-orange-600/[0.03] transition-all">
-                      <td className="px-2 py-2 text-center text-[10px] text-slate-600 font-mono font-bold">
-                        {index + 1}
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`zenith-input-${index}-from`}
-                          className="w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all text-slate-200 font-bold"
-                          value={row.from || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'from', e.target.value)}
-                          onKeyDown={(e) => handleZenithKeyDown(e, index, 'from')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`zenith-input-${index}-to`}
-                          className="w-full bg-transparent p-1.5 text-[13px] tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-400/80 transition-all text-slate-200 font-bold"
-                          value={row.to || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'to', e.target.value)}
-                          onKeyDown={(e) => handleZenithKeyDown(e, index, 'to')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`zenith-input-${index}-period`} 
-                          className="w-full bg-transparent p-1.5 text-left font-mono text-[13px] outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-400 font-bold"
-                          value={row.period || ""} 
-                          onChange={(e) => handleInputChange(row.id, 'period', e.target.value)} 
-                          onKeyDown={(e) => handleZenithKeyDown(e, index, 'period')}
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`zenith-input-${index}-ZfaceI`} 
-                          className="w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-orange-400/80 transition-all text-orange-400 font-bold"
-                          value={row.ZfaceI || ""} 
-                          onBlur={(e) => handleBlur(row.id, 'ZfaceI', e.target.value)} 
-                          onChange={(e) => handleInputChange(row.id, 'ZfaceI', e.target.value)} 
-                          onKeyDown={(e) => handleZenithKeyDown(e, index, 'ZfaceI')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-1 py-2">
-                        <input 
-                          id={`zenith-input-${index}-ZfaceII`} 
-                          className="w-full bg-transparent p-1.5 font-mono text-[13px] tracking-wide outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-orange-400/80 transition-all text-orange-400 font-bold"
-                          value={row.ZfaceII || ""} 
-                          onBlur={(e) => handleBlur(row.id, 'ZfaceII', e.target.value)} 
-                          onChange={(e) => handleInputChange(row.id, 'ZfaceII', e.target.value)} 
-                          onKeyDown={(e) => handleZenithKeyDown(e, index, 'ZfaceII')}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-right sticky right-0 bg-[#0b1120] group-hover:bg-[#101827]">
-                        <button 
-                          onClick={() => deleteRow(row.id)} 
-                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all cursor-pointer flex justify-end w-full"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                    
-                    <tr className="h-0 p-0">
-                      <td colSpan="7" className="p-0 h-0 relative">
-                        <button 
-                          onClick={() => addRowAt(index)} 
-                          className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-orange-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"
-                          title="Προσθήκη γραμμής εδώ"
-                        >
-                          <PlusCircle size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+              {/* Status Indicators at the bottom */}
+              <div className="flex flex-col gap-2 shrink-0 pt-2 border-t border-slate-800/50">
+                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
+                     {hasData ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                     <span className="text-[11px] font-bold tracking-wide">
+                       {hasData ? 'Συγχρονισμός Δίσκου: OK' : 'Απαιτείται Εισαγωγή'}
+                     </span>
+                  </div>
+                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
+                     {levelingMetrics?.error_dh !== undefined ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                     <span className="text-[11px] font-bold tracking-wide">
+                       {levelingMetrics?.error_dh !== undefined ? 'Υψόμετρα: Εντός Ανοχής' : 'Χωροστάθμιση: Εκκρεμεί'}
+                     </span>
+                  </div>
+              </div>
 
+            </div>
+          </div>
+
+        </div>
+      </main>
     </div>
   );
 };
 
-export default Goniometry;
+const SectionTitle = ({ title }) => (
+  <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] ml-2">
+    {title}
+  </h3>
+);
+
+const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => {
+  const isPrimary = theme === 'primary';
+
+  const getContainerClasses = () => {
+    if (isPrimary) return 'bg-blue-600 border-blue-500 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.2)]';
+    if (theme === 'emerald') return 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-emerald-500/50';
+    return 'bg-transparent border-slate-800/50 hover:bg-slate-800 hover:border-slate-700';
+  };
+
+  const getIconBoxClasses = () => {
+    if (isPrimary) return 'text-white flex items-center justify-center shrink-0 w-8 h-8';
+    if (theme === 'emerald') return 'w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-all text-emerald-500';
+    return 'text-slate-400 flex items-center justify-center shrink-0 w-8 h-8';
+  };
+
+  return (
+    <button 
+      onClick={onClick} 
+      className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all duration-200 border text-left group ${getContainerClasses()}`}
+    >
+      <div className={getIconBoxClasses()}>
+        {icon}
+      </div>
+      <div className="overflow-hidden">
+        {/* Αφαιρέθηκε η κλάση uppercase ώστε να διατηρείται το πεζό/κεφαλαίο στυλ */}
+        <h4 className={`text-[12px] font-bold tracking-wide truncate transition-colors group-hover:text-white ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
+          {title}
+        </h4>
+        <p className={`text-[10px] mt-0.5 truncate ${isPrimary ? 'text-blue-100' : 'text-slate-500'}`}>
+          {subtitle}
+        </p>
+      </div>
+    </button>
+  );
+};
+
+const ImportButton = ({ onChange }) => (
+  <label className="relative cursor-pointer w-full p-3 rounded-xl flex items-center gap-3 transition-all duration-200 border border-slate-800/50 hover:bg-slate-800 hover:border-blue-500/50 group text-left bg-transparent">
+    <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 transition-all text-blue-500">
+      <Upload size={16} />
+    </div>
+    <div className="overflow-hidden">
+      <h4 className="text-[12px] font-bold tracking-wide truncate group-hover:text-white transition-colors text-slate-200">
+        Import Data
+      </h4>
+      <p className="text-[10px] mt-0.5 truncate text-slate-500">
+        Εισαγωγή δεδομένων μορφής .xlsx
+      </p>
+    </div>
+    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={onChange} />
+  </label>
+);
+
+export default Dashboard;
