@@ -73,7 +73,7 @@ export const downloadSurveyTemplate = () => {
 
     // 2. Όδευση (traverse)
     const wsTrav = XLSX.utils.aoa_to_sheet([
-      ["Stations", "Hz [grad]", "Slope_D [m]", "X [m]", "Y [m]", "H [m]"]]);
+      ["Stations", "Hz [grad]", "D [m]", "X [m]", "Y [m]", "H [m]"]]);
     applyProfessionalStyles(wsTrav);
     XLSX.utils.book_append_sheet(wb, wsTrav, "traverse");
 
