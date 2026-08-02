@@ -51,12 +51,16 @@ const Dashboard = ({
   
   projectSettings,
   traverseData = [],
+  traverseMetrics, // <--- Προστέθηκε εδώ!
   tachymetryData = { measurements: [], stations: [] },
   stakeoutData = { points: [] },
   levelingMetrics = null
 }) => {
 
-  const stationCount = tachymetryData?.stations?.length || traverseData?.length || 0;
+  // --- Η ΑΛΛΑΓΗ ΠΟΥ ΘΕΛΑΜΕ ΕΙΝΑΙ ΕΔΩ ---
+  // Τραβάει το n από την όδευση, αν δεν υπάρχει (π.χ. δεν έχει τρέξει υπολογισμός), μετράει γραμμές
+  const stationCount = traverseMetrics?.n || traverseData?.length || 0;
+  
   const measurementCount = tachymetryData?.measurements?.length || 0;
   const stakeoutCount = stakeoutData?.points?.length || 0;
   const projectName = projectSettings?.name || 'My_Survey_Project.lasca';
@@ -178,17 +182,13 @@ const Dashboard = ({
         const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
 
         if (setTachymetryData) {
-          // 1. Προετοιμάζουμε έναν άδειο πίνακα
           let cleanMeasurements = [];
           
-          // 2. Αν βρεθεί το φύλλο μετρήσεων, το διαβάζουμε και το καθαρίζουμε
           if (measSheetName) {
             const rawMeas = XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]);
             
             cleanMeasurements = rawMeas
-              // Κρατάμε ΑΥΣΤΗΡΑ μόνο τις γραμμές που έχουν τιμή στη στήλη 'From' και 'Point_ID'
               .filter(row => row['From'] !== undefined && row['Point_ID'] !== undefined)
-              // Φτιάχνουμε νέο καθαρό αντικείμενο, αγνοώντας τις στήλες 'Station', 'Orientation' κτλ (αριστερός πίνακας)
               .map(row => ({
                 From: String(row['From']).trim(),
                 O: row['O'],
@@ -200,7 +200,6 @@ const Dashboard = ({
               }));
           }
 
-          // 3. Ενημερώνουμε το state με τα καθαρισμένα δεδομένα
           setTachymetryData({
             measurements: cleanMeasurements,
             stations: stationsSheetName ? XLSX.utils.sheet_to_json(wb.Sheets[stationsSheetName]) : [],
@@ -525,7 +524,6 @@ const ActionButton = ({ icon, title, subtitle, theme = 'default', onClick }) => 
         {icon}
       </div>
       <div className="overflow-hidden">
-        {/* Αφαιρέθηκε η κλάση uppercase ώστε να διατηρείται το πεζό/κεφαλαίο στυλ */}
         <h4 className={`text-[12px] font-bold tracking-wide truncate transition-colors group-hover:text-white ${isPrimary ? 'text-white' : 'text-slate-200'}`}>
           {title}
         </h4>

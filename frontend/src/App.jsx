@@ -320,6 +320,7 @@ function App() {
                 // Πέρασμα Δεδομένων για τον Χάρτη και τα Στατιστικά
                 projectSettings={{ name: currentProject }}
                 traverseData={traverseData}
+                traverseMetrics={traverseMetrics}
                 tachymetryData={tachymetryData}
                 stakeoutData={stakeoutData}
                 levelingMetrics={levelingMetrics}
