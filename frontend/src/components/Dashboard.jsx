@@ -340,10 +340,8 @@ const Dashboard = ({
                 </div>
               </div>
             </div>
-
-            {/* Κάτω Μέρος: Χάρτης (Recharts) */}
-            <div className="flex flex-col gap-3 flex-1 min-h-[200px] overflow-hidden">
-              <SectionTitle title="SPATIAL PREVIEW" />
+{/* Κάτω Μέρος: Χάρτης (Recharts) - Compact Version */}
+            <div className="flex flex-col flex-none h-[340px] overflow-hidden">
               <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-lg h-full relative overflow-hidden group">
                 
                 <div className="flex items-center justify-between border-b border-slate-800/50 pb-2 shrink-0">
