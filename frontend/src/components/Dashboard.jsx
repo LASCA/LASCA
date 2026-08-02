@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { 
   Plus, FolderOpen, Upload, 
   FileSpreadsheet, LayoutGrid,
-  Database, MapPin, Target, CheckCircle2, AlertCircle, Map
+  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User // Προστέθηκε το User
 } from 'lucide-react';
 import { 
   ResponsiveContainer, ScatterChart, Scatter, 
@@ -51,19 +51,20 @@ const Dashboard = ({
   
   projectSettings,
   traverseData = [],
-  traverseMetrics, // <--- Προστέθηκε εδώ!
+  traverseMetrics,
   tachymetryData = { measurements: [], stations: [] },
   stakeoutData = { points: [] },
   levelingMetrics = null
 }) => {
 
-  // --- Η ΑΛΛΑΓΗ ΠΟΥ ΘΕΛΑΜΕ ΕΙΝΑΙ ΕΔΩ ---
-  // Τραβάει το n από την όδευση, αν δεν υπάρχει (π.χ. δεν έχει τρέξει υπολογισμός), μετράει γραμμές
   const stationCount = traverseMetrics?.n || traverseData?.length || 0;
-  
   const measurementCount = tachymetryData?.measurements?.length || 0;
   const stakeoutCount = stakeoutData?.points?.length || 0;
+  
   const projectName = projectSettings?.name || 'My_Survey_Project.lasca';
+  // Λήψη του ονόματος μηχανικού (ανάλογα με το πώς το έχεις ονομάσει στο state σου, π.χ. engineer ή engineerName)
+  const engineerName = projectSettings?.designer || projectSettings?.settings?.designer || 'ΜΗ ΟΡΙΣΜΕΝΟΣ ΜΗΧΑΝΙΚΟΣ';
+  
   const hasData = stationCount > 0 || measurementCount > 0 || stakeoutCount > 0;
 
   // Επεξεργασία δεδομένων για τον χάρτη
@@ -419,67 +420,115 @@ const Dashboard = ({
 
           </div>
 
-          {/* ----- ΔΕΞΙΑ ΣΤΗΛΗ ----- */}
-          <div className="flex flex-col gap-3 h-full">
+          {/* ----- ΔΕΞΙΑ ΣΤΗΛΗ (Compact Version) ----- */}
+          <div className="flex flex-col gap-3">
             <SectionTitle title="ACTIVE PROJECT OVERVIEW" />
-            <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-6 shadow-lg h-full">
+            
+            <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-4 shadow-lg h-fit">
               
-              <div className="flex flex-col gap-4 border-b border-slate-800/50 pb-5 shrink-0">
-                <div className="flex items-start justify-between">
-                  <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-500">
-                    <Database size={20} />
+              {/* Header Project Name, Engineer & Status */}
+              <div className="flex items-center justify-between border-b border-slate-800/50 pb-4 mb-2 shrink-0">
+                <div className="flex items-center gap-3.5 overflow-hidden">
+                  {/* Icon Box με glow effect */}
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute inset-0 bg-blue-500/20 blur-md rounded-xl" />
+                    <div className="relative p-2.5 bg-gradient-to-br from-[#0B1221] to-[#111A2E] border border-blue-500/30 rounded-xl text-blue-400 shadow-sm">
+                      <Database size={18} />
+                    </div>
                   </div>
-                  <div className={`px-2.5 py-1 border rounded-md text-[9px] font-bold tracking-wider flex items-center gap-1.5 ${hasData ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${hasData ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-                    {hasData ? 'ΕΝΕΡΓΟ' : 'ΑΝΑΜΟΝΗ'}
+                  
+                  {/* Τίτλος & Όνομα Μηχανικού */}
+                  <div className="flex flex-col overflow-hidden pr-2">
+                    <h4 
+                      className="font-extrabold text-[16px] text-white truncate leading-tight tracking-wide" 
+                      title={projectName}
+                    >
+                      {projectName || "Νέο Έργο"}
+                    </h4>
+                    <div className="flex items-center gap-1.5 mt-1 text-slate-400" title={engineerName}>
+                      <User size={10} className="text-slate-500" />
+                      <p className="text-[11px] font-bold tracking-widest truncate">
+                        {engineerName}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-white font-bold text-lg tracking-tight break-all">{projectName}</h4>
-                  <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-1">
-                    {hasData ? "Φορτωθηκαν Δεδομενα" : "Κενο Εργο"}
-                  </p>
+
+                {/* Status Badge */}
+                <div className={`flex-shrink-0 ml-1 px-2.5 py-1.5 border rounded-lg text-[9px] font-bold tracking-wider flex items-center gap-1.5 shadow-sm ${
+                  hasData 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                    : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    hasData 
+                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' 
+                      : 'bg-slate-500'
+                  }`} />
+                  {hasData ? 'ΕΝΕΡΓΟ' : 'ΑΝΑΜΟΝΗ'}
                 </div>
               </div>
 
               {/* Vertical Stats */}
-              <div className="flex flex-col gap-3 flex-1">
-                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Target size={18} className={`${stationCount > 0 ? 'text-blue-500' : 'text-slate-700'}`} />
-                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Στασεις / Οδευσεις</span>
+              <div className="flex flex-col gap-2">
+                 
+                 {/* Στασεις / Οδευσεις (Blue) */}
+                 <div className="group bg-[#080E1A]/60 border border-slate-800/80 hover:border-blue-500/30 hover:bg-[#0a1222] transition-all duration-300 rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm hover:shadow-[0_0_15px_rgba(59,130,246,0.05)]">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg transition-colors ${stationCount > 0 ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-800/50 text-slate-600 group-hover:text-blue-400/50'}`}>
+                        <Target size={15} />
+                      </div>
+                      <span className="text-slate-300 text-[12px] font-bold tracking-wider group-hover:text-white transition-colors">
+                        Στάσεις Όδευσης
+                      </span>
                     </div>
-                    <span className={`text-2xl font-mono font-black ${stationCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{stationCount}</span>
+                    <span className={`text-xl font-mono font-black transition-all ${stationCount > 0 ? 'text-blue-100 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'text-slate-700 group-hover:text-slate-500'}`}>
+                      {stationCount}
+                    </span>
                  </div>
                  
-                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MapPin size={18} className={`${measurementCount > 0 ? 'text-emerald-500' : 'text-slate-700'}`} />
-                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημ. Αποτυπωσης</span>
+                 {/* Σημ. Αποτυπωσης (Emerald) */}
+                 <div className="group bg-[#080E1A]/60 border border-slate-800/80 hover:border-emerald-500/30 hover:bg-[#0a1222] transition-all duration-300 rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.05)]">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg transition-colors ${measurementCount > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-800/50 text-slate-600 group-hover:text-emerald-400/50'}`}>
+                        <MapPin size={15} />
+                      </div>
+                      <span className="text-slate-300 text-[12px] font-bold tracking-wider group-hover:text-white transition-colors">
+                        Σημεία Αποτύπωσης
+                      </span>
                     </div>
-                    <span className={`text-2xl font-mono font-black ${measurementCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{measurementCount}</span>
+                    <span className={`text-xl font-mono font-black transition-all ${measurementCount > 0 ? 'text-emerald-100 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-slate-700 group-hover:text-slate-500'}`}>
+                      {measurementCount}
+                    </span>
                  </div>
                  
-                 <div className="bg-[#080E1A]/50 border border-slate-800/50 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MapPin size={18} className={`${stakeoutCount > 0 ? 'text-amber-500' : 'text-slate-700'}`} />
-                      <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Σημεια Χαραξης</span>
+                 {/* Σημεια Χαραξης (Amber) */}
+                 <div className="group bg-[#080E1A]/60 border border-slate-800/80 hover:border-amber-500/30 hover:bg-[#0a1222] transition-all duration-300 rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm hover:shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg transition-colors ${stakeoutCount > 0 ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-800/50 text-slate-600 group-hover:text-amber-400/50'}`}>
+                        <MapPin size={15} />
+                      </div>
+                      <span className="text-slate-300 text-[12px] font-bold tracking-wider group-hover:text-white transition-colors">
+                        Σημεία Χάραξης
+                      </span>
                     </div>
-                    <span className={`text-2xl font-mono font-black ${stakeoutCount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>{stakeoutCount}</span>
+                    <span className={`text-xl font-mono font-black transition-all ${stakeoutCount > 0 ? 'text-amber-100 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'text-slate-700 group-hover:text-slate-500'}`}>
+                      {stakeoutCount}
+                    </span>
                  </div>
               </div>
 
               {/* Status Indicators at the bottom */}
-              <div className="flex flex-col gap-2 shrink-0 pt-2 border-t border-slate-800/50">
-                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
-                     {hasData ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                     <span className="text-[11px] font-bold tracking-wide">
+              <div className="flex flex-col gap-1.5 shrink-0 pt-2 border-t border-slate-800/50">
+                  <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
+                     {hasData ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                     <span className="text-[10px] font-bold tracking-wide">
                        {hasData ? 'Συγχρονισμός Δίσκου: OK' : 'Απαιτείται Εισαγωγή'}
                      </span>
                   </div>
-                  <div className={`flex items-center gap-2 border px-3 py-2.5 rounded-xl ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#080E1A] border-slate-800/80 text-slate-500'}`}>
-                     {levelingMetrics?.error_dh !== undefined ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                     <span className="text-[11px] font-bold tracking-wide">
+                  <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
+                     {levelingMetrics?.error_dh !== undefined ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                     <span className="text-[10px] font-bold tracking-wide">
                        {levelingMetrics?.error_dh !== undefined ? 'Υψόμετρα: Εντός Ανοχής' : 'Χωροστάθμιση: Εκκρεμεί'}
                      </span>
                   </div>

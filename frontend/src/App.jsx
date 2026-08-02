@@ -318,7 +318,9 @@ function App() {
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
                 
                 // Πέρασμα Δεδομένων για τον Χάρτη και τα Στατιστικά
-                projectSettings={{ name: currentProject }}
+                projectSettings={{ name: currentProject,
+                                   settings: globalSettings
+                 }}
                 traverseData={traverseData}
                 traverseMetrics={traverseMetrics}
                 tachymetryData={tachymetryData}
