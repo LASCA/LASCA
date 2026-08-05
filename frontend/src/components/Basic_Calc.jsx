@@ -204,22 +204,41 @@ const BasicCalculations = () => {
     finally { setLoadings(prev => ({ ...prev, intersect: false })); }
   };
 
-  const [resectData, setResectData] = useState({ xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', a: '', b: '', c: '', A: '', B: '', C: '' });
+// Αφαίρεση των A, B, C από το initial state
+  const [resectData, setResectData] = useState({ xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', a: '', b: '', c: '' });
+  
   const handleResectCalculation = async () => {
-    const { xa, ya, xb, yb, xc, yc, a, b, c, A, B, C } = resectData;
-    if (!xa || !ya || !xb || !yb || !xc || !yc || !a || !b || !c || !A || !B || !C) { toast.error('Παρακαλώ συμπληρώστε όλα τα 12 πεδία!'); return; }
+    const { xa, ya, xb, yb, xc, yc, a, b, c } = resectData;
+    
+    // Έλεγχος πλέον για 9 πεδία
+    if (!xa || !ya || !xb || !yb || !xc || !yc || !a || !b || !c) { 
+      toast.error('Παρακαλώ συμπληρώστε όλα τα 9 πεδία!'); 
+      return; 
+    }
+    
     setLoadings(prev => ({ ...prev, resect: true }));
     try {
       const response = await fetch('http://127.0.0.1:5000/api/basic_calc/resect', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xa: parseFloat(xa), ya: parseFloat(ya), xb: parseFloat(xb), yb: parseFloat(yb), xc: parseFloat(xc), yc: parseFloat(yc), a: parseFloat(a), b: parseFloat(b), c: parseFloat(c), A: parseFloat(A), B: parseFloat(B), C: parseFloat(C) }),
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        // Αποστολή μόνο των 9 συντεταγμένων/γωνιών
+        body: JSON.stringify({ 
+          xa: parseFloat(xa), ya: parseFloat(ya), 
+          xb: parseFloat(xb), yb: parseFloat(yb), 
+          xc: parseFloat(xc), yc: parseFloat(yc), 
+          a: parseFloat(a), b: parseFloat(b), c: parseFloat(c) 
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
+      
       setResults(prev => ({ ...prev, resect: [data.xm.toFixed(3), data.ym.toFixed(3)] }));
       toast.success('Επιτυχής υπολογισμός!');
-    } catch (err) { toast.error(err.message || 'Αποτυχία επικοινωνίας.'); }
-    finally { setLoadings(prev => ({ ...prev, resect: false })); }
+    } catch (err) { 
+      toast.error(err.message || 'Αποτυχία επικοινωνίας.'); 
+    } finally { 
+      setLoadings(prev => ({ ...prev, resect: false })); 
+    }
   };
 
   // 4 ΟΡΙΣΜΕΝΕΣ ΚΑΤΗΓΟΡΙΕΣ (SLIDES)
@@ -383,6 +402,7 @@ const BasicCalculations = () => {
               </CalcWidget>
 
               {/* Οπισθοτομία */}
+              {/* Οπισθοτομία */}
               <CalcWidget 
                 title="Οπισθοτομία" 
                 badge="Υπολογισμός Σημείου O"
@@ -397,16 +417,16 @@ const BasicCalculations = () => {
                   <InputField label={<span>X<sub>A</sub></span>} value={resectData.xa} onChange={(e) => setResectData({...resectData, xa: e.target.value})} />
                   <InputField label={<span>X<sub>B</sub></span>} value={resectData.xb} onChange={(e) => setResectData({...resectData, xb: e.target.value})} />
                   <InputField label={<span>X<sub>C</sub></span>} value={resectData.xc} onChange={(e) => setResectData({...resectData, xc: e.target.value})} />
+                  
                   <InputField label={<span>Y<sub>A</sub></span>} value={resectData.ya} onChange={(e) => setResectData({...resectData, ya: e.target.value})} />
                   <InputField label={<span>Y<sub>B</sub></span>} value={resectData.yb} onChange={(e) => setResectData({...resectData, yb: e.target.value})} />
                   <InputField label={<span>Y<sub>C</sub></span>} value={resectData.yc} onChange={(e) => setResectData({...resectData, yc: e.target.value})} />
+                  
                   <div className="col-span-3 border-t border-slate-800/60 my-1"></div>
+                  
                   <InputField label={<span>a&#770;</span>} value={resectData.a} onChange={(e) => setResectData({...resectData, a: e.target.value})} />
                   <InputField label={<span>b&#770;</span>} value={resectData.b} onChange={(e) => setResectData({...resectData, b: e.target.value})} />
                   <InputField label={<span>c&#770;</span>} value={resectData.c} onChange={(e) => setResectData({...resectData, c: e.target.value})} />
-                  <InputField label={<span>A&#770;</span>} value={resectData.A} onChange={(e) => setResectData({...resectData, A: e.target.value})} />
-                  <InputField label={<span>B&#770;</span>} value={resectData.B} onChange={(e) => setResectData({...resectData, B: e.target.value})} />
-                  <InputField label={<span>C&#770;</span>} value={resectData.C} onChange={(e) => setResectData({...resectData, C: e.target.value})} />
                 </div>
               </CalcWidget>
 

@@ -108,22 +108,71 @@ def empros(xa, ya, xb, yb, a, b):
     ym = nom2 / denom
     return xm, ym
 
-def tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C):
-    gwna, gwnb, gwnc = g2r(a), g2r(b), g2r(c)
-    gwnA, gwnB, gwnC = g2r(A), g2r(B), g2r(C)
-    denom1_val = (ctg(gwnA) - ctg(gwna))
-    denom2_val = (ctg(gwnB) - ctg(gwnb))
-    denom3_val = (ctg(gwnC) - ctg(gwnc))
-    if abs(denom1_val) < 1e-15 or abs(denom2_val) < 1e-15 or abs(denom3_val) < 1e-15:
-        raise ZeroDivisionError("Απροσδιοριστία (π.χ. A=a ή B=b ή C=c)")
-    k1 = 1 / denom1_val
-    k2 = 1 / denom2_val
-    k3 = 1 / denom3_val
+
+def tienstra(xa, ya, xb, yb, xc, yc, a, b, c):
+    """
+    Υπολογισμός Οπισθοτομίας Tienstra.
+    xa, ya, xb, yb, xc, yc : Συντεταγμένες A, B, C (σε m)
+    a, b, c                : Σκοπευθείσες γωνίες a=BMC, b=CMA, c=AMB (σε grads/gons)
+    """
+    # 1. Υπολογισμός ctg(A), ctg(B), ctg(C) των εσωτερικών γωνιών του τριγώνου ABC
+    # Κορυφή A (Διανύσματα AB, AC)
+    uAx, uAy = xb - xa, yb - ya
+    vAx, vAy = xc - xa, yc - ya
+    dot_A = uAx * vAx + uAy * vAy
+    cross_A = abs(uAx * vAy - uAy * vAx)
+    if cross_A < 1e-15:
+        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
+    cot_A = dot_A / cross_A
+
+    # Κορυφή B (Διανύσματα BC, BA)
+    uBx, uBy = xc - xb, yc - yb
+    vBx, vBy = xa - xb, ya - yb
+    dot_B = uBx * vBx + uBy * vBy
+    cross_B = abs(uBx * vBy - uBy * vBx)
+    if cross_B < 1e-15:
+        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
+    cot_B = dot_B / cross_B
+
+    # Κορυφή C (Διανύσματα CA, CB)
+    uCx, uCy = xa - xc, ya - yc
+    vCx, vCy = xb - xc, yb - yc
+    dot_C = uCx * vCx + uCy * vCy
+    cross_C = abs(uCx * vCy - uCy * vCx)
+    if cross_C < 1e-15:
+        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
+    cot_C = dot_C / cross_C
+
+    # 2. Μετατροπή σκοπευθεισών γωνιών α, β, γ από grads σε radians
+    rad_a = a * math.pi / 200.0
+    rad_b = b * math.pi / 200.0
+    rad_c = c * math.pi / 200.0
+
+    # Υπολογισμός ctg = cos / sin (διατηρεί τα πρόσημα σε όλους τους τομείς)
+    cot_a = math.cos(rad_a) / math.sin(rad_a)
+    cot_b = math.cos(rad_b) / math.sin(rad_b)
+    cot_c = math.cos(rad_c) / math.sin(rad_c)
+
+    # 3. Συντελεστές βαρύτητας Tienstra k1, k2, k3
+    d1 = cot_A - cot_a
+    d2 = cot_B - cot_b
+    d3 = cot_C - cot_c
+
+    if abs(d1) < 1e-15 or abs(d2) < 1e-15 or abs(d3) < 1e-15:
+        raise ZeroDivisionError("Απροσδιοριστία (cot_vertex = cot_angle).")
+
+    k1 = 1.0 / d1
+    k2 = 1.0 / d2
+    k3 = 1.0 / d3
+
     sk = k1 + k2 + k3
     if abs(sk) < 1e-15:
-        raise ZeroDivisionError("Απροσδιοριστία (k1 + k2 + k3 = 0)")
+        raise ZeroDivisionError("Απροσδιοριστία: Το σημείο βρίσκεται στον επικίνδυνο κύκλο.")
+
+    # 4. Υπολογισμός τελικών συντεταγμένων
     xm = (k1 * xa + k2 * xb + k3 * xc) / sk
     ym = (k1 * ya + k2 * yb + k3 * yc) / sk
+
     return xm, ym
 
 def tachymetry(data_meas, data_st=None, target_station=None, target_orientation=None, apply_scale=False, scale_factor=1.0):

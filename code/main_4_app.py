@@ -1093,16 +1093,16 @@ def calc_resect():
     try:
         data = request.json
         
-        # Λήψη και των 12 δεδομένων από το React
+        # Λήψη των 9 δεδομένων από το React (χωρίς τις εσωτερικές γωνίες A, B, C)
         xa, ya = float(data.get('xa', 0)), float(data.get('ya', 0))
         xb, yb = float(data.get('xb', 0)), float(data.get('yb', 0))
         xc, yc = float(data.get('xc', 0)), float(data.get('yc', 0))
         
+        # Οι σκοπευθείσες γωνίες από το άγνωστο σημείο
         a, b, c = float(data.get('a', 0)), float(data.get('b', 0)), float(data.get('c', 0))
-        A, B, C = float(data.get('A', 0)), float(data.get('B', 0)), float(data.get('C', 0))
 
-        # Κλήση της συνάρτησης tienstra
-        xm, ym = dpr.tienstra(xa, ya, xb, yb, xc, yc, a, b, c, A, B, C)
+        # Κλήση της ενημερωμένης συνάρτησης tienstra (με 9 παραμέτρους)
+        xm, ym = dpr.tienstra(xa, ya, xb, yb, xc, yc, a, b, c)
 
         return jsonify({"xm": xm, "ym": ym})
         
