@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Database, PlusCircle, Trash2, Play, Cpu, Table } from 'lucide-react';
+import { Calculator, Database, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const TrigonometricHeight = ({ 
@@ -9,6 +9,7 @@ const TrigonometricHeight = ({
 }) => {
   const [localData, setLocalData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false); // Προσθήκη state για εμφάνιση/απόκρυψη αποτελεσμάτων
 
   // --- HELPERS ΣΤΡΟΓΓΥΛΟΠΟΙΗΣΗΣ ---
   const to3 = (val) => {
@@ -56,6 +57,7 @@ const TrigonometricHeight = ({
   // --- HANDLERS ΕΙΣΑΓΩΓΗΣ ---
   const handleInputChange = (id, field, value) => {
     updateData(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row));
+    setShowResults(false); // Επιστροφή σε λειτουργία εισαγωγής αν ο χρήστης πληκτρολογήσει κάτι νέο
   };
 
   const handleBlur = (id, field, value) => {
@@ -115,7 +117,6 @@ const TrigonometricHeight = ({
   };
 
   // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API) ---
-// --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API) ---
   const handleCalculate = async () => {
     setIsLoading(true);
     try {
@@ -123,7 +124,6 @@ const TrigonometricHeight = ({
         ? projectSettings 
         : (projectSettings?.name || '');
 
-      // 1. Μετατροπή των δεδομένων του React στη μορφή που περιμένει το Python DataFrame
       const formattedForBackend = localData.map(row => ({
         "From": row.from,
         "To": row.to,
@@ -133,26 +133,24 @@ const TrigonometricHeight = ({
         "H_target": row.ht
       }));
 
-      // Στέλνουμε το κλειδί 'rows' που περιμένει το backend
       const payload = {
         rows: formattedForBackend, 
         project_name: projectNamePayload
       };
 
-      // Βεβαιώσου ότι το URL ταιριάζει με το όνομα του endpoint στο Flask (π.χ. /api/trig_leveling)
       const response = await axios.post('http://127.0.0.1:5000/api/trig_leveling', payload);
 
       if (response.data && response.data.results) {
-        // 2. Μετατροπή των αποτελεσμάτων της Python πίσω στη μορφή του React
         const calculatedData = response.data.results.map((row, index) => ({
-          ...localData[index], // Διατηρούμε το id και τα αρχικά δεδομένα
+          ...localData[index], 
           from: row["From"] || localData[index].from,
           to: row["To"] || localData[index].to,
           dh: row["dh"] !== undefined ? row["dh"] : "",
-          dh_avg: row["dh_mean"] !== undefined ? row["dh_mean"] : "" // Προσοχή: Η Python το ονομάζει dh_mean
+          dh_avg: row["dh_mean"] !== undefined ? row["dh_mean"] : "" 
         }));
         
         updateData(calculatedData);
+        setShowResults(true); // Εμφάνιση αποτελεσμάτων μετά από επιτυχή υπολογισμό
       } else {
         alert(response.data?.error || "Προέκυψε σφάλμα κατά τον υπολογισμό.");
       }
@@ -163,6 +161,33 @@ const TrigonometricHeight = ({
       setIsLoading(false);
     }
   };
+
+  // --- ΠΡΟΕΤΟΙΜΑΣΙΑ ΔΕΔΟΜΕΝΩΝ ΓΙΑ MERGING (ROWSPAN) ---
+  const processedData = [];
+  let currentGroupStart = 0;
+
+  for (let i = 0; i < localData.length; i++) {
+    const row = localData[i];
+    if (i === 0) {
+      processedData.push({ ...row, isFirst: true, span: 1, groupDhAvg: row.dh_avg });
+    } else {
+      const prev = localData[i - 1];
+      if (row.from === prev.from && row.to === prev.to && row.from !== "" && row.to !== "") {
+        processedData[currentGroupStart].span += 1;
+        if (row.dh_avg && String(row.dh_avg).trim() !== '-' && String(row.dh_avg).trim() !== '' && !processedData[currentGroupStart].groupDhAvg) {
+          processedData[currentGroupStart].groupDhAvg = row.dh_avg;
+        }
+        processedData.push({ ...row, isFirst: false });
+      } else {
+        currentGroupStart = i;
+        processedData.push({ ...row, isFirst: true, span: 1, groupDhAvg: row.dh_avg });
+      }
+    }
+  }
+
+  // Δυναμικός υπολογισμός στηλών για το κουμπί Προσθήκης (+)
+  const inputColumnsCount = 7; // #, From, To, Slope, Z, Hi, Ht
+  const resultColumnsSpan = showResults ? 8 : 7; // Αν δείχνουμε results, φτάνει μέχρι τη στήλη του ΔH (8).
 
   return (
     <div className="flex flex-col h-full relative font-sans">
@@ -195,15 +220,30 @@ const TrigonometricHeight = ({
                   <th className="p-3.5 text-[10px] font-black text-slate-400 tracking-widest text-center">Z [grad]</th>
                   <th className="p-3.5 text-[10px] font-black text-slate-400 tracking-widest text-center">H station [m]</th>
                   <th className="p-3.5 text-[10px] font-black text-slate-400 tracking-widest text-center">H target [m]</th>
-                  <th className="p-3.5 text-[10px] font-black text-cyan-400/90 tracking-widest text-center bg-cyan-950/20">ΔH [m]</th>
-                  <th className="p-3.5 text-[10px] font-black text-emerald-400/90 tracking-widest text-center bg-emerald-950/20">ΔH Μ.Ο. [m]</th>
                   
-                  {/* Κουμπί Play ενσωματωμένο στο Thead */}
-                  <th className="p-3 w-16">
+                  {/* Εμφάνιση των στηλών αποτελεσμάτων μόνο όταν showResults === true */}
+                  {showResults && (
+                    <>
+                      <th className="p-3.5 text-[10px] font-black text-cyan-400/90 tracking-widest text-center bg-cyan-950/20 whitespace-nowrap">ΔH [m]</th>
+                      <th className="p-3.5 text-[10px] font-black text-emerald-400/90 tracking-widest text-center bg-emerald-950/20 whitespace-nowrap">ΔH Μ.Ο. [m]</th>
+                    </>
+                  )}
+                  
+                  {/* Κουμπιά ελέγχου (Back / Play) */}
+                  <th className="p-3 w-20">
                     <div className="flex justify-end pr-2 gap-2">
+                      {showResults && (
+                        <button 
+                          onClick={() => setShowResults(false)}
+                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+                          title="Επιστροφή στην επεξεργασία"
+                        >
+                          <ArrowLeft size={14} />
+                        </button>
+                      )}
                       <button 
                         onClick={handleCalculate}
-                        disabled={isLoading}
+                        disabled={isLoading || localData.length === 0}
                         className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
                           isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
                         }`}
@@ -216,8 +256,8 @@ const TrigonometricHeight = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40">
-                {localData.length > 0 ? (
-                  localData.map((row, index) => (
+                {processedData.length > 0 ? (
+                  processedData.map((row, index) => (
                     <React.Fragment key={row.id || index}>
                       <tr className="group hover:bg-slate-800/30 transition-colors">
                         <td className="p-3 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
@@ -226,7 +266,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-from`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500 transition-all text-slate-200" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200'}`} 
                             value={row.from || ""} 
                             onChange={(e) => handleInputChange(row.id, 'from', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'from')}
@@ -238,7 +278,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-to`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500 transition-all text-slate-200" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500 transition-all ${showResults ? 'text-slate-500 font-medium' : 'text-slate-200'}`} 
                             value={row.to || ""} 
                             onChange={(e) => handleInputChange(row.id, 'to', e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, index, 'to')}
@@ -250,7 +290,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-s`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all text-cyan-300" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all ${showResults ? 'text-cyan-600/70' : 'text-cyan-300'}`} 
                             value={row.s || ""} 
                             onBlur={(e) => handleBlur(row.id, 's', e.target.value)}
                             onChange={(e) => handleInputChange(row.id, 's', e.target.value)}
@@ -263,7 +303,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-z`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all text-cyan-300" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all ${showResults ? 'text-cyan-600/70' : 'text-cyan-300'}`} 
                             value={row.z || ""} 
                             onBlur={(e) => handleBlur(row.id, 'z', e.target.value)}
                             onChange={(e) => handleInputChange(row.id, 'z', e.target.value)}
@@ -276,7 +316,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-hi`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all text-cyan-300" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all ${showResults ? 'text-cyan-600/70' : 'text-cyan-300'}`} 
                             value={row.hi || ""} 
                             onBlur={(e) => handleBlur(row.id, 'hi', e.target.value)}
                             onChange={(e) => handleInputChange(row.id, 'hi', e.target.value)}
@@ -289,7 +329,7 @@ const TrigonometricHeight = ({
                         <td className="p-1.5">
                           <input 
                             id={`input-trig-${index}-ht`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all text-cyan-300" 
+                            className={`w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500 transition-all ${showResults ? 'text-cyan-600/70' : 'text-cyan-300'}`} 
                             value={row.ht || ""} 
                             onBlur={(e) => handleBlur(row.id, 'ht', e.target.value)}
                             onChange={(e) => handleInputChange(row.id, 'ht', e.target.value)}
@@ -298,47 +338,57 @@ const TrigonometricHeight = ({
                           />
                         </td>
 
-                        {/* ΔH */}
-                        <td className="p-1.5 bg-cyan-950/10">
-                          <input 
-                            id={`input-trig-${index}-dh`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400 transition-all text-cyan-400" 
-                            value={row.dh || ""} 
-                            onBlur={(e) => handleBlur(row.id, 'dh', e.target.value)}
-                            onChange={(e) => handleInputChange(row.id, 'dh', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, index, 'dh')}
-                            placeholder="-"
-                          />
-                        </td>
+                        {/* ΔH (Εμφάνιση μόνο στο showResults) */}
+                        {showResults && (
+                          <td className="p-1.5 bg-cyan-950/10">
+                            <input 
+                              id={`input-trig-${index}-dh`}
+                              className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-400 transition-all text-cyan-400" 
+                              value={row.dh || ""} 
+                              onBlur={(e) => handleBlur(row.id, 'dh', e.target.value)}
+                              onChange={(e) => handleInputChange(row.id, 'dh', e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, index, 'dh')}
+                              placeholder="-"
+                            />
+                          </td>
+                        )}
 
-                        {/* ΔH Avg */}
-                        <td className="p-1.5 bg-emerald-950/10">
-                          <input 
-                            id={`input-trig-${index}-dh_avg`}
-                            className="w-full bg-transparent p-2 text-xs text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400 transition-all text-emerald-400" 
-                            value={row.dh_avg || ""} 
-                            onBlur={(e) => handleBlur(row.id, 'dh_avg', e.target.value)}
-                            onChange={(e) => handleInputChange(row.id, 'dh_avg', e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, index, 'dh_avg')}
-                            placeholder="-"
-                          />
-                        </td>
+                        {/* ΔH Avg - MERGED CELL (Εμφάνιση μόνο στο showResults) */}
+                        {showResults && row.isFirst && (
+                          <td 
+                            rowSpan={row.span * 2} 
+                            className="p-1.5 bg-emerald-950/20 align-middle border-l border-emerald-900/30 shadow-inner"
+                          >
+                            <input 
+                              id={`input-trig-${index}-dh_avg`}
+                              className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-emerald-400 transition-all text-emerald-400" 
+                              value={row.groupDhAvg || ""} 
+                              onBlur={(e) => handleBlur(row.id, 'dh_avg', e.target.value)}
+                              onChange={(e) => handleInputChange(row.id, 'dh_avg', e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, index, 'dh_avg')}
+                              placeholder="-"
+                            />
+                          </td>
+                        )}
 
                         {/* ACTIONS */}
-                        <td className="p-2 text-center">
-                          <button 
-                            onClick={() => removeRow(row.id)} 
-                            className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all cursor-pointer p-1"
-                            title="Διαγραφή Γραμμής"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        <td className="p-2 text-right">
+                          <div className="flex justify-end w-full">
+                            <button 
+                              onClick={() => removeRow(row.id)} 
+                              className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all cursor-pointer p-1"
+                              title="Διαγραφή Γραμμής"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
 
                       {/* INLINE ADD BUTTON */}
                       <tr className="h-0 p-0">
-                        <td colSpan={10} className="p-0 h-0 relative">
+                        {/* Προσαρμογή colSpan βάσει εμφάνισης αποτελεσμάτων (showResults) */}
+                        <td colSpan={resultColumnsSpan} className="p-0 h-0 relative">
                           <button 
                             onClick={() => addRowAt(index)} 
                             className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-cyan-400 hover:text-white rounded-full p-1 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"
@@ -347,12 +397,15 @@ const TrigonometricHeight = ({
                             <PlusCircle size={15} />
                           </button>
                         </td>
+                        {/* Η στήλη για τα Actions. */}
+                        <td colSpan={1} className="p-0 h-0"></td>
                       </tr>
                     </React.Fragment>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="px-4 py-20 text-center text-slate-500">
+                    {/* +3 για columns αν εμφανίζονται τα results */}
+                    <td colSpan={showResults ? 10 : 8} className="px-4 py-20 text-center text-slate-500">
                       <div className="flex flex-col items-center gap-3">
                         <Table size={32} className="opacity-40 text-slate-600" />
                         <span className="text-xs font-semibold">Δεν υπάρχουν εγγραφές στον πίνακα</span>

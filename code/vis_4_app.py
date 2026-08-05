@@ -316,13 +316,6 @@ def plot_traverse_base64(results: list, measurements: list = None, scale: str = 
     
     return f"data:image/png;base64,{plot_url}"
 
-import base64
-import io
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-from matplotlib.patches import Arc
-
 def plot_traverse_base64_2(results: list, measurements: list = None, scale: str = '1:1000') -> str:
     def get_val(obj, *keys):
         for k in keys:
@@ -571,8 +564,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     legend_y = bar_y - tick_h * 1.5
     line_spacing = y_range * 0.025
     ax.text(bar_x, legend_y, f"ΚΛΙΜΑΚΑ: 1:{scale_num}", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
-    ax.text(bar_x, legend_y - line_spacing, "Σ.Α.: ΕΓΣΑ '87", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
-
+    
     plt.tight_layout(pad=3.0)
     
     img = io.BytesIO()

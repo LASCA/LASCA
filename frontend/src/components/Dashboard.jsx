@@ -4,7 +4,8 @@ import { toast } from 'react-hot-toast';
 import { 
   Plus, FolderOpen, Upload, 
   FileSpreadsheet, LayoutGrid,
-  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User // Προστέθηκε το User
+  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User,
+  RefreshCw
 } from 'lucide-react';
 import { 
   ResponsiveContainer, ScatterChart, Scatter, 
@@ -62,7 +63,7 @@ const Dashboard = ({
   const stakeoutCount = stakeoutData?.points?.length || 0;
   
   const projectName = projectSettings?.name || 'My_Survey_Project.lasca';
-  // Λήψη του ονόματος μηχανικού (ανάλογα με το πώς το έχεις ονομάσει στο state σου, π.χ. engineer ή engineerName)
+  // Λήψη του ονόματος μηχανικού
   const engineerName = projectSettings?.designer || projectSettings?.settings?.designer || 'ΜΗ ΟΡΙΣΜΕΝΟΣ ΜΗΧΑΝΙΚΟΣ';
   
   const hasData = stationCount > 0 || measurementCount > 0 || stakeoutCount > 0;
@@ -340,7 +341,8 @@ const Dashboard = ({
                 </div>
               </div>
             </div>
-{/* Κάτω Μέρος: Χάρτης (Recharts) - Compact Version */}
+
+            {/* Κάτω Μέρος: Χάρτης (Recharts) - Compact Version */}
             <div className="flex flex-col flex-none h-[340px] overflow-hidden">
               <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-lg h-full relative overflow-hidden group">
                 
@@ -519,9 +521,9 @@ const Dashboard = ({
               {/* Status Indicators at the bottom */}
               <div className="flex flex-col gap-1.5 shrink-0 pt-2 border-t border-slate-800/50">
                   <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
-                     {hasData ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                     <RefreshCw size={13} />
                      <span className="text-[10px] font-bold tracking-wide">
-                       {hasData ? 'Συγχρονισμός Δίσκου: OK' : 'Απαιτείται Εισαγωγή'}
+                       {hasData ? 'Sync: OK' : 'Απαιτείται Εισαγωγή'}
                      </span>
                   </div>
                   <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>

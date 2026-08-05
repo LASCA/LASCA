@@ -172,7 +172,7 @@ const Goniometry = ({ rows = [], setRows }) => {
   };
 
   // ---------------------------------------------------------
-  // ΥΠΟΛΟΓΙΣΜΟΣ ΖΕΝΙΘΙΩΝ
+  // ΥΠΟΛΟΓΙΣΜΟΣ ΖΕΝΙΘΙΩΝ (ΜΕ ΑΘΟΡΥΒΗ ΚΑΤΑΝΟΜΗ ΣΦΑΛΜΑΤΟΣ)
   // ---------------------------------------------------------
   const handleZenithCalculate = () => {
     if (!setRows) return;
@@ -182,8 +182,16 @@ const Goniometry = ({ rows = [], setRows }) => {
       
       if (!isNaN(z1) && !isNaN(z2)) {
         const sum = z1 + z2;
-        const diffCc = (sum - 400) * 10000;
-        const anigmeni = (z1 + (400 - z2)) / 2;
+        const errorGrad = sum - 400; // Σφάλμα κλεισίματος σε grad
+        const diffCc = errorGrad * 10000; // Σφάλμα σε cc για εμφάνιση
+        
+        // Αθόρυβη κατανομή του σφάλματος στο Face I και Face II
+        const correctedZ1 = z1 - (errorGrad / 2);
+        const correctedZ2 = z2 - (errorGrad / 2);
+
+        // Υπολογισμός ανηγμένης με τις διορθωμένες τιμές
+        const anigmeni = (correctedZ1 + (400 - correctedZ2)) / 2;
+
         return { ...row, Z_anigmeni: anigmeni, Z_diff_cc: diffCc };
       }
       return { ...row, Z_anigmeni: "", Z_diff_cc: "" };
@@ -390,7 +398,7 @@ const Goniometry = ({ rows = [], setRows }) => {
                   {showZenithResults && (
                     <>
                       <th className="px-4 py-3 w-[14%] text-[10px] font-black text-emerald-400 tracking-widest whitespace-nowrap">Ανηγμένη</th>
-                      <th className="px-4 py-3 w-[14%] text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">Δ (cc)</th>
+                      <th className="px-4 py-3 w-[14%] text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">Residuals (cc)</th>
                     </>
                   )}
 

@@ -409,6 +409,10 @@ def export_traverse_dxf():
         if 'DASHED' not in doc.linetypes:
             doc.linetypes.new('DASHED', dxfattribs={'description': 'Dashed', 'pattern': [1.5, 1.0, -0.5]})
             
+        # --- ΠΡΟΣΘΗΚΗ TRUE TYPE FONT (ARIAL) ---
+        if 'ARIAL' not in doc.styles:
+            doc.styles.new('ARIAL', dxfattribs={'font': 'arial.ttf'})
+            
         msp = doc.modelspace()
         
         # --- ΔΗΜΙΟΥΡΓΙΑ LAYERS ---
@@ -440,9 +444,9 @@ def export_traverse_dxf():
         curr_x = start_x
         while curr_x <= end_x + 0.1:
             curr_y = start_y
-            # Κείμενο Άξονα X (κάτω)
-            txt = msp.add_text(f"{curr_x:.0f}", dxfattribs={'height': 1.2, 'layer': 'GRID_TEXT'})
-            txt.set_placement((curr_x, start_y - 2), align=TextEntityAlignment.MIDDLE_RIGHT)
+            # Κείμενο Άξονα X (κάτω) - Αυξημένο Μέγεθος και Arial
+            txt = msp.add_text(f"{curr_x:.0f}", dxfattribs={'height': 2.5, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
+            txt.set_placement((curr_x, start_y - 3), align=TextEntityAlignment.MIDDLE_RIGHT)
             txt.dxf.rotation = 45 # Πλάγια γραφή όπως στο plot
             
             while curr_y <= end_y + 0.1:
@@ -450,10 +454,10 @@ def export_traverse_dxf():
                 msp.add_line((curr_x - cross_size, curr_y), (curr_x + cross_size, curr_y), dxfattribs={'layer': 'GRID'})
                 msp.add_line((curr_x, curr_y - cross_size), (curr_x, curr_y + cross_size), dxfattribs={'layer': 'GRID'})
                 
-                # Κείμενο Άξονα Y (αριστερά) - σχεδιάζεται μόνο στην πρώτη στήλη
+                # Κείμενο Άξονα Y (αριστερά) - Αυξημένο Μέγεθος και Arial
                 if abs(curr_x - start_x) < 0.1:
-                    txt = msp.add_text(f"{curr_y:.0f}", dxfattribs={'height': 1.2, 'layer': 'GRID_TEXT'})
-                    txt.set_placement((start_x - 2, curr_y), align=TextEntityAlignment.MIDDLE_RIGHT)
+                    txt = msp.add_text(f"{curr_y:.0f}", dxfattribs={'height': 2.5, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
+                    txt.set_placement((start_x - 3, curr_y), align=TextEntityAlignment.MIDDLE_RIGHT)
                 
                 curr_y += grid_step
             curr_x += grid_step
@@ -487,19 +491,19 @@ def export_traverse_dxf():
                 msp.add_line((x_float - r, y_float), (x_float + r, y_float), dxfattribs={'layer': 'POINTS'})
                 msp.add_line((x_float, y_float - r), (x_float, y_float + r), dxfattribs={'layer': 'POINTS'})
             
-            # --- Ονόματα & Γωνίες ---
-            msp.add_text(name, dxfattribs={'height': 1.5, 'layer': 'POINT_NAMES'}).set_placement((x_float + r*1.2, y_float + r*1.2))
+            # --- Ονόματα & Γωνίες (Αυξημένα Μεγέθη + Arial) ---
+            msp.add_text(name, dxfattribs={'height': 3.0, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((x_float + r*1.5, y_float + r*1.5))
             
             hz = pt['hz']
             if hz and str(hz).strip() != '---':
-                msp.add_text(f"{hz}g", dxfattribs={'height': 0.8, 'layer': 'ANGLES'}).set_placement((x_float - r*2.5, y_float - r*1.5))
+                msp.add_text(f"{hz}g", dxfattribs={'height': 1.8, 'layer': 'ANGLES', 'style': 'ARIAL'}).set_placement((x_float - r*2.5, y_float - r*2.0))
             
             # --- Γραμμές & Αποστάσεις ---
             if prev_coord:
                 prev_x, prev_y = prev_coord
                 
-                # Αν ένα από τα δύο (προηγούμενο ή τωρινό) είναι 'Σ', κάνε τη γραμμή γκρι διακεκομμένη
-                if is_control or prev_is_control:
+                # ΔΙΟΡΘΩΣΗ: Πρέπει ΚΑΙ ΤΑ ΔΥΟ σημεία να είναι 'Σ' για να γίνει η γραμμή γκρι (όδευση vs εξαρτήσεις)
+                if is_control and prev_is_control:
                     line_layer = 'CONTROL_LINES'
                 else:
                     line_layer = 'TRAVERSE_LINES'
@@ -521,14 +525,15 @@ def export_traverse_dxf():
                 elif -180 <= angle_deg < -90:
                     angle_deg += 180
                     
-                offset = 0.8
+                offset = 1.2 # Αυξήσαμε λίγο το offset για να μην πέφτει το μεγαλύτερο κείμενο πάνω στη γραμμή
                 text_x = mid_x - offset * math.sin(math.radians(angle_deg))
                 text_y = mid_y + offset * math.cos(math.radians(angle_deg))
                 
                 sd = pt['sd']
                 dist_str = str(sd) if (sd and str(sd).strip() != '---') else f"{dist:.3f}"
                 
-                txt = msp.add_text(dist_str, dxfattribs={'height': 0.9, 'layer': 'DISTANCES'})
+                # Απόσταση με αυξημένο μέγεθος και Arial
+                txt = msp.add_text(dist_str, dxfattribs={'height': 2.0, 'layer': 'DISTANCES', 'style': 'ARIAL'})
                 txt.set_placement((text_x, text_y), align=TextEntityAlignment.MIDDLE_CENTER)
                 txt.dxf.rotation = angle_deg
                 
@@ -542,9 +547,8 @@ def export_traverse_dxf():
         # --- ΒΕΛΟΣ ΒΟΡΡΑ (Πάνω Δεξιά) ---
         nx = end_x - 10
         ny = end_y - 10
-        # Βελάκι (Ματζέντα)
         msp.add_lwpolyline([(nx, ny), (nx, ny+6), (nx-1.5, ny+4), (nx, ny+8), (nx+1.5, ny+4), (nx, ny+6)], dxfattribs={'layer': 'TRAVERSE_LINES'})
-        txt_n = msp.add_text("N", dxfattribs={'height': 2.5, 'layer': 'POINT_NAMES'})
+        txt_n = msp.add_text("N", dxfattribs={'height': 4.0, 'layer': 'POINT_NAMES', 'style': 'ARIAL'})
         txt_n.set_placement((nx, ny-1), align=TextEntityAlignment.TOP_CENTER)
         
         # --- ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ (Κάτω Αριστερά) ---
@@ -557,14 +561,13 @@ def export_traverse_dxf():
         msp.add_line((sx + 5, sy), (sx + 5, sy+1), dxfattribs={'layer': 'POINT_NAMES'})
         msp.add_line((sx + 10, sy), (sx + 10, sy+1), dxfattribs={'layer': 'POINT_NAMES'})
         
-        # Κείμενα κλίμακας
-        msp.add_text("0", dxfattribs={'height': 0.8, 'layer': 'POINT_NAMES'}).set_placement((sx, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
-        msp.add_text("10m", dxfattribs={'height': 0.8, 'layer': 'POINT_NAMES'}).set_placement((sx+10, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
+        # Κείμενα κλίμακας (Arial)
+        msp.add_text("0", dxfattribs={'height': 1.5, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((sx, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
+        msp.add_text("10m", dxfattribs={'height': 1.5, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((sx+10, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
         
-        # Κείμενο Υπομνήματος (Κυανό)
-        msp.add_text("ΚΛΙΜΑΚΑ: 1:200", dxfattribs={'height': 1.2, 'layer': 'DECORATIONS'}).set_placement((sx, sy-2))
-        msp.add_text("Σ.Α.: ΕΓΣΑ '87", dxfattribs={'height': 1.2, 'layer': 'DECORATIONS'}).set_placement((sx, sy-3.5))
-
+        # Κείμενο Υπομνήματος (Arial)
+        msp.add_text("ΚΛΙΜΑΚΑ: 1:500", dxfattribs={'height': 2.2, 'layer': 'DECORATIONS', 'style': 'ARIAL'}).set_placement((sx, sy-3))
+        
         # ==========================================
         # 4. ΕΞΑΓΩΓΗ
         # ==========================================
@@ -582,6 +585,7 @@ def export_traverse_dxf():
         import traceback
         print(f"Σφάλμα κατά την εξαγωγή DXF:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+    
 # ==========================================
 #  ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ (TRAVERSE HEIGHT)
 # ==========================================

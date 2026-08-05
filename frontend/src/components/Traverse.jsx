@@ -70,6 +70,9 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // REF ΓΙΑ ΑΥΤΟΜΑΤΟ SCROLL ΣΤΑ ΣΤΑΤΙΣΤΙΚΑ
+  const statsRef = useRef(null);
+
   const [klass, setKlass] = useState(metrics.klass || "Πρωτεύουσα");
   const [terrain, setTerrain] = useState(metrics.terrain || "Ομαλό");
   const [scale, setScale] = useState(metrics.scale || "1:1000");
@@ -213,6 +216,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
             scaleFactor: scaleFactor
           });
         }
+
+        // ΑΥΤΟΜΑΤΟ SMOOTH SCROLL ΣΤΟ ΠΙΝΑΚΑ ΣΤΑΤΙΣΤΙΚΩΝ
+        setTimeout(() => {
+          statsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
       }
     } catch (error) {
       console.error("Σφάλμα κατά την Όδευση:", error);
@@ -504,8 +512,8 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
             </div>
           </div>
 
-          {/* ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
-          <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
+          {/* ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ (Προστέθηκε το statsRef) */}
+          <div ref={statsRef} className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
               <Activity size={16} className="text-cyan-500" />
               <span className="text-[10px] font-black text-slate-400 tracking-[0.2em]">Γεωδαιτικοί Έλεγχοι & Σφάλματα</span>
