@@ -917,24 +917,24 @@ def export_tachymetry_txt():
             except Exception as err:
                 print(f"⚠️ Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
 
-    # 4. Δημιουργία δομημένου περιεχομένου .txt
+# 4. Δημιουργία δομημένου περιεχομένου .txt
     lines = []
-    # lines.append("==============================================================================")
-    # lines.append(f"ΑΠΟΤΕΛΕΣΜΑΤΑ ΤΑΧΥΜΕΤΡΙΑΣ - ΣΥΝΟΛΟ ΣΤΑΜΕΝΩΝ ΣΗΜΕΙΩΝ")
-    # lines.append(f"Έργο: {project_name if project_name else 'Default'}")
-    # lines.append("==============================================================================")
-    lines.append(f"{'Στάση':<12} {'Σημείο':<12} {'X (m)':>14} {'Y (m)':>14} {'Z (m)':>12}")
-    # lines.append("-" * 78)
+    
+    # Αλλαγή της κεφαλίδας για να έχει μόνο Point ID, X, Y, Z
+    lines.append(f"{'Point ID':<15} {'X (m)':>14} {'Y (m)':>14} {'Z (m)':>12}")
 
     for p in all_calculated_points:
-        st_str = f"{p['station']:<12}"
-        pt_str = f"{p['point']:<12}"
+        # Αφαίρεση του st_str (Στάση)
+        pt_str = f"{p['point']:<15}"
         x_str = f"{p['x']:>14.3f}"
         y_str = f"{p['y']:>14.3f}"
         z_str = f"{p['z']:>12.3f}"
-        lines.append(f"{st_str} {pt_str} {x_str} {y_str} {z_str}")
+        
+        # Προσθήκη μόνο των επιθυμητών στηλών στη γραμμή
+        lines.append(f"{pt_str} {x_str} {y_str} {z_str}")
 
-    lines.append("-" * 78)
+    # Μείωση του μήκους της διαχωριστικής γραμμής ώστε να ταιριάζει με τις 4 στήλες
+    lines.append("-" * 58)
     lines.append(f"Σύνολο Υπολογισμένων Σημείων: {len(all_calculated_points)}")
 
     txt_content = "\n".join(lines)

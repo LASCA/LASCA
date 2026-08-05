@@ -226,8 +226,8 @@ const BasicCalculations = () => {
   const slidesMeta = [
     { id: 0, title: 'Μετατροπές', sub: 'rad / grad / deg', icon: <Repeat size={16} /> },
     { id: 1, title: 'Θεμελιώδη', sub: '1ο, 2ο & 3ο Προβλήματα', icon: <Compass size={16} /> },
-    { id: 2, title: 'Τομές', sub: 'Εμπροσθοτομία & Οπισθοτομία', icon: <Crosshair size={16} /> },
-    { id: 3, title: 'Κλίμακα', sub: 'Συντελεστής m_ij', icon: <SlidersHorizontal size={16} /> },
+    { id: 2, title: 'Αλληλοτομίες', sub: 'Εμπροσθοτομία & Οπισθοτομία', icon: <Crosshair size={16} /> },
+    { id: 3, title: 'Συντελεστής Κλίμακας', sub: 'Συντελεστής m_ij', icon: <SlidersHorizontal size={16} /> },
   ];
 
   return (
