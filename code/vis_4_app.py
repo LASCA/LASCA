@@ -516,7 +516,6 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     gx = np.arange(start_x, end_x, grid_interval)
     gy = np.arange(start_y, end_y, grid_interval)
     
-    # ΠΡΟΣΘΗΚΗ: Πιο αχνοί σταυροί (μικρότερο markersize, alpha=0.4, markeredgewidth=0.8)
     for x_val in gx:
         for y_val in gy:
             ax.plot(x_val, y_val, marker='+', color='#555555', markersize=6, markeredgewidth=0.8, alpha=0.4, zorder=1)
@@ -524,11 +523,40 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ ---
-    ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
-                xycoords='axes fraction', textcoords='axes fraction',
-                arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
-                ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
+    # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ (ΜΕ ΧΡΗΣΗ ΕΙΚΟΝΙΔΙΟΥ) ---
+    import os
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    from PIL import Image
+
+    # Τοποθέτησε εδώ το σχετικό (ή απόλυτο) μονοπάτι για το εικονίδιο σου
+    icon_path = r'C:\Users\akara\OneDrive\Desktop\survey_project\north.png' 
+
+    if os.path.exists(icon_path):
+        try:
+            icon_img = Image.open(icon_path)
+            # Το 'zoom' ελέγχει πόσο μεγάλο/μικρό θα φαίνεται το εικονίδιο στο διάγραμμα
+            imagebox = OffsetImage(icon_img, zoom=0.10)
+            
+            # Στοιχείο τοποθέτησης: (0.95, 0.95) είναι το πάνω δεξιά μέρος του γραφήματος
+            ab = AnnotationBbox(imagebox, (0.95, 0.95),
+                                xycoords='axes fraction',
+                                frameon=False, 
+                                box_alignment=(0.5, 0.5),
+                                zorder=10)
+            ax.add_artist(ab)
+        except Exception as e:
+            print(f"Σφάλμα κατά τη φόρτωση του εικονιδίου: {e}")
+            # Fallback 1: Αν υπάρξει σφάλμα στο άνοιγμα, βάζουμε το σχεδιασμένο
+            ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
+                        xycoords='axes fraction', textcoords='axes fraction',
+                        arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
+                        ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
+    else:
+        # Fallback 2: Αν δεν βρεθεί το αρχείο, βάζουμε το κλασικό σχεδιασμένο βέλος
+        ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
+                    xycoords='axes fraction', textcoords='axes fraction',
+                    arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
+                    ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
 
     # --- 6. ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ (ΚΑΤΩ ΑΡΙΣΤΕΡΑ) ---
     if scale_num <= 200:
