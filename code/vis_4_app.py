@@ -9,6 +9,10 @@ import matplotlib.ticker as ticker
 from adjustText import adjust_text
 from matplotlib.lines import Line2D 
 from matplotlib.patches import Arc
+import os
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from PIL import Image
+
 matplotlib.use('Agg') # ΚΡΙΣΙΜΟ: Λέει στη matplotlib να μην προσπαθήσει να ανοίξει GUI
 
 try:
@@ -316,6 +320,16 @@ def plot_traverse_base64(results: list, measurements: list = None, scale: str = 
     
     return f"data:image/png;base64,{plot_url}"
 
+import io
+import os
+import base64
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
+from matplotlib.ticker import MultipleLocator
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from PIL import Image
+
 def plot_traverse_base64_2(results: list, measurements: list = None, scale: str = '1:1000') -> str:
     def get_val(obj, *keys):
         for k in keys:
@@ -358,22 +372,36 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     station_indices = [i for i in range(n) if i not in orient_indices]
 
     # --- 1. ΑΝΑΓΡΑΦΗ ΑΠΟΣΤΑΣΕΩΝ ΠΑΝΩ ΣΤΙΣ ΠΛΕΥΡΕΣ ---
+    annotated_segments = set()
+
     for i in range(n - 1):
         p1_name = names[i]
         p2_name = names[i+1]
+        
+        # Αποφυγή διπλοεγγραφής στην ίδια πλευρά
+        segment_key = tuple(sorted([p1_name, p2_name]))
+        if segment_key in annotated_segments:
+            continue
+        annotated_segments.add(segment_key)
+
         dist_str = None
         
+        # 1. Αναζήτηση μέτρησης με βάση το σημείο αφετηρίας της πλευράς (p1_name)
         if measurements:
-            if i + 1 < len(measurements) and measurements[i+1].get('sd'):
-                dist_str = str(measurements[i+1].get('sd')).strip()
-            elif i < len(measurements) and measurements[i].get('sd'):
-                dist_str = str(measurements[i].get('sd')).strip()
-            else:
+            if i < len(measurements) and str(measurements[i].get('name', '')).strip() == p1_name:
+                val = measurements[i].get('sd')
+                if val and str(val).strip() != "-":
+                    dist_str = str(val).strip()
+            
+            if not dist_str:
                 for row in measurements:
-                    if str(row.get('name', '')).strip() == p2_name and row.get('sd'):
-                        dist_str = str(row.get('sd')).strip()
-                        break
+                    if str(row.get('name', '')).strip() == p1_name:
+                        val = row.get('sd')
+                        if val and str(val).strip() != "-":
+                            dist_str = str(val).strip()
+                            break
 
+        # 2. Αν δεν υπάρχει μέτρηση (π.χ. πλευρά εξάρτησης Σ7-Σ6), υπολογίζουμε τη γεωμετρική απόσταση
         if not dist_str or dist_str == "" or dist_str == "-":
             geom_dist = np.sqrt((X[i+1]-X[i])**2 + (Y[i+1]-Y[i])**2)
             dist_str = f"{geom_dist:.3f}"
@@ -388,6 +416,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
         if angle > 90: angle -= 180
         if angle < -90: angle += 180
         
+        # Γκρι χρώμα για τις πλευρές εξάρτησης (πρώτη & τελευταία), Λευκό για τις μετρημένες
         txt_color = 'gray' if (i == 0 or i == n-2) else "#FFFFFF"
         
         ax.annotate(dist_str, (mid_x, mid_y), 
@@ -454,7 +483,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
                     fontweight='normal', ha='center', va='center',
                     bbox=dict(facecolor='#121212', edgecolor='none', pad=0.2, alpha=0.5))
 
-    # --- 3. Σχεδίαση Σημείων (Κόμβοι) ---
+    # --- 3. ΣΧΕΔΙΑΣΗ ΣΗΜΕΙΩΝ (ΚΟΜΒΟΙ) ---
     if orient_indices:
         ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
                    marker='^', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
@@ -469,7 +498,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
         ax.annotate(str(txt), (X[i], Y[i]), xytext=(6, 6), textcoords='offset points',
                     fontsize=9.5, fontweight='bold', color="#FFFEFE")
 
-    # --- 4. Σχεδίαση γραμμών ---
+    # --- 4. ΣΧΕΔΙΑΣΗ ΓΡΑΜΜΩΝ ---
     if n >= 4:
         ax.plot(X[0:2], Y[0:2], color='gray', linestyle='--', linewidth=1.2)
         ax.plot(X[1:n-1], Y[1:n-1], color="#FF00BB", linestyle='-', linewidth=1.5)
@@ -481,7 +510,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.set_title("ΔΙΑΓΡΑΜΜΑ ΟΔΕΥΣΗΣ", loc='left', fontsize=14, fontweight='bold', pad=20, color="white")
     ax.set_aspect('equal', adjustable='datalim')
 
-    # --- Υπολογισμός Κλίμακας ---
+    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΛΙΜΑΚΑΣ ---
     try:
         scale_num = int(scale.split(':')[-1])
     except (ValueError, AttributeError):
@@ -500,10 +529,9 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.yaxis.set_major_locator(MultipleLocator(grid_interval))
     ax.grid(False) 
 
-    # --- Περιστροφή αριθμών άξονα Χ ---
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-    # --- ΔΗΜΙΟΥΡΓΙΑ ΣΤΑΥΡΩΝ ΚΑΝΝΑΒΟΥ ΑΝΤΙ ΓΙΑ ΣΥΝΕΧΕΙΣ ΓΡΑΜΜΕΣ ---
+    # --- ΔΗΜΙΟΥΡΓΙΑ ΣΤΑΥΡΩΝ ΚΑΝΝΑΒΟΥ ---
     plt.draw() 
     xmin, xmax = ax.get_xlim()
     ymin, ymax = ax.get_ylim()
@@ -523,21 +551,13 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ (ΜΕ ΧΡΗΣΗ ΕΙΚΟΝΙΔΙΟΥ) ---
-    import os
-    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-    from PIL import Image
-
-    # Τοποθέτησε εδώ το σχετικό (ή απόλυτο) μονοπάτι για το εικονίδιο σου
+    # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ ---
     icon_path = r'C:\Users\akara\OneDrive\Desktop\survey_project\north.png' 
 
     if os.path.exists(icon_path):
         try:
             icon_img = Image.open(icon_path)
-            # Το 'zoom' ελέγχει πόσο μεγάλο/μικρό θα φαίνεται το εικονίδιο στο διάγραμμα
             imagebox = OffsetImage(icon_img, zoom=0.10)
-            
-            # Στοιχείο τοποθέτησης: (0.95, 0.95) είναι το πάνω δεξιά μέρος του γραφήματος
             ab = AnnotationBbox(imagebox, (0.95, 0.95),
                                 xycoords='axes fraction',
                                 frameon=False, 
@@ -546,19 +566,17 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
             ax.add_artist(ab)
         except Exception as e:
             print(f"Σφάλμα κατά τη φόρτωση του εικονιδίου: {e}")
-            # Fallback 1: Αν υπάρξει σφάλμα στο άνοιγμα, βάζουμε το σχεδιασμένο
             ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
                         xycoords='axes fraction', textcoords='axes fraction',
                         arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
                         ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
     else:
-        # Fallback 2: Αν δεν βρεθεί το αρχείο, βάζουμε το κλασικό σχεδιασμένο βέλος
         ax.annotate('N', xy=(0.95, 0.95), xytext=(0.95, 0.86),
                     xycoords='axes fraction', textcoords='axes fraction',
                     arrowprops=dict(facecolor='#FF00BB', edgecolor='#FF00BB', width=3, headwidth=10, headlength=12),
                     ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
 
-    # --- 6. ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ (ΚΑΤΩ ΑΡΙΣΤΕΡΑ) ---
+    # --- 6. ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ ---
     if scale_num <= 200:
         bar_len = 10
     elif scale_num <= 500:
@@ -576,7 +594,6 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     tick_h = y_range * 0.012  
 
     ax.plot([bar_x, bar_x + bar_len], [bar_y, bar_y], color='white', linewidth=2, zorder=10)
-    
     ax.plot([bar_x, bar_x], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
     ax.plot([bar_x + bar_len/2, bar_x + bar_len/2], [bar_y, bar_y + tick_h], color='white', linewidth=1, zorder=10)
     ax.plot([bar_x + bar_len, bar_x + bar_len], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
@@ -590,7 +607,6 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.text(bar_x + bar_len, txt_y, f"{bar_len}m", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
 
     legend_y = bar_y - tick_h * 1.5
-    line_spacing = y_range * 0.025
     ax.text(bar_x, legend_y, f"ΚΛΙΜΑΚΑ: 1:{scale_num}", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
     
     plt.tight_layout(pad=3.0)
