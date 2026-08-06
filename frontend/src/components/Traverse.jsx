@@ -7,7 +7,7 @@ import {
   Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown
 } from 'lucide-react';
 
-// --- CUSTOM DROPDOWN COMPONENT ΓΙΑ ΤΕΛΕΙΟ UI ---
+// --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ label, value, onChange, options }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -70,15 +70,14 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // REF ΓΙΑ ΑΥΤΟΜΑΤΟ SCROLL ΣΤΑ ΣΤΑΤΙΣΤΙΚΑ
   const statsRef = useRef(null);
 
   const [klass, setKlass] = useState(metrics.klass || "Πρωτεύουσα");
   const [terrain, setTerrain] = useState(metrics.terrain || "Ομαλό");
   const [scale, setScale] = useState(metrics.scale || "1:1000");
   
-  // STATE ΓΙΑ ΤΗΝ ΕΠΙΛΟΓΗ ΥΠΟΛΟΓΙΣΜΟΥ m_ij
-  const [scaleMode, setScaleMode] = useState("Χωρίς");
+  // STATE ΓΙΑ ΤΗΝ ΕΠΙΛΟΓΗ m_ij: "Χωρίς" | "Υπολογισμός" | "Χειροκίνητα"
+  const [scaleMode, setScaleMode] = useState(metrics.scaleMode || "Χωρίς");
   const [scaleFactor, setScaleFactor] = useState(metrics.scaleFactor || "1.000000");
 
   useEffect(() => {
@@ -86,11 +85,12 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     if (metrics.terrain) setTerrain(metrics.terrain);
     if (metrics.scale) setScale(metrics.scale);
     if (metrics.scaleFactor) setScaleFactor(metrics.scaleFactor);
+    if (metrics.scaleMode) setScaleMode(metrics.scaleMode);
   }, [metrics]);
 
   const plotImage = metrics.plotImage || null;
 
-  // ΣΥΝΑΡΤΗΣΗ ΥΠΟΛΟΓΙΣΜΟΥ ΤΟΠΙΚΟΥ ΣΥΝΤΕΛΕΣΤΗ m_ij
+  // ΥΠΟΛΟΓΙΣΜΟΣ m_ij ΑΠΟ ΣΥΝΤΕΤΑΓΜΕΝΕΣ ΕΓΣΑ87
   const calculateScaleFactor = (xValue) => {
     const E = parseFloat(xValue);
     if (isNaN(E)) return "1.000000";
@@ -103,9 +103,9 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     return mij.toFixed(6);
   };
 
-  // EFFECT ΓΙΑ ΑΥΤΟΜΑΤΟ ΥΠΟΛΟΓΙΣΜΟ ΟΤΑΝ ΑΛΛΑΖΟΥΝ ΤΑ ΔΕΔΟΜΕΝΑ 'Η ΤΟ MODE
+  // ΕΛΕΓΧΟΣ ΚΑΙ ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ Η' ΕΠΑΝΑΦΟΡΑ ΤΟΥ m_ij
   useEffect(() => {
-    if (scaleMode === "Με") {
+    if (scaleMode === "Υπολογισμός") {
       const firstRowWithX = data.find(row => row.x !== undefined && row.x !== "" && !isNaN(parseFloat(row.x)));
       if (firstRowWithX) {
         setScaleFactor(calculateScaleFactor(firstRowWithX.x));
@@ -113,9 +113,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         setScaleFactor("1.000000");
       }
     } else if (scaleMode === "Χωρίς") {
-      if (scaleFactor !== "1.000000" && !document.activeElement?.id?.includes('scale-input')) {
-        setScaleFactor("1.000000");
-      }
+      setScaleFactor("1.000000");
     }
   }, [data, scaleMode]);
 
@@ -180,8 +178,9 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       
       const currentScaleFactor = parseFloat(scaleFactor) || 1.0;
       
+      // ΕΦΑΡΜΟΓΗ ΣΥΝΤΕΛΕΣΤΗ ΣΤΙΣ ΑΠΟΣΤΑΣΕΙΣ ΑΝ ΔΕΝ ΕΙΝΑΙ "ΧΩΡΙΣ"
       const processedMeasurements = data.map(row => {
-        if (scaleMode === "Με" && row.sd && !isNaN(parseFloat(row.sd))) {
+        if (scaleMode !== "Χωρίς" && row.sd && !isNaN(parseFloat(row.sd))) {
           const originalSd = parseFloat(row.sd);
           const reducedSd = originalSd / currentScaleFactor;
           return { ...row, sd: reducedSd.toFixed(4) };
@@ -213,11 +212,11 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
             klass: klass,
             terrain: terrain,
             scale: scale,
-            scaleFactor: scaleFactor
+            scaleFactor: scaleFactor,
+            scaleMode: scaleMode
           });
         }
 
-        // ΑΥΤΟΜΑΤΟ SMOOTH SCROLL ΣΤΟ ΠΙΝΑΚΑ ΣΤΑΤΙΣΤΙΚΩΝ
         setTimeout(() => {
           statsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -230,7 +229,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     }
   };
 
-  // --- ΚΑΤΕΒΑΣΜΑ ΕΙΚΟΝΑΣ ---
   const handleDownload = () => {
     if (!plotImage) return;
     const a = document.createElement('a');
@@ -241,7 +239,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     document.body.removeChild(a);
   };
 
-  // --- ΚΑΤΕΒΑΣΜΑ DXF ---
   const handleDownloadDXF = async () => {
     if (!data || data.length === 0) {
       toast.error("Δεν υπάρχουν δεδομένα για εξαγωγή.");
@@ -309,7 +306,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                 </div>
 
                 {/* ΓΡΑΜΜΗ ΧΕΙΡΙΣΤΗΡΙΩΝ (2x2 Grid) */}
-                <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-l border-slate-800/60 pl-5 py-1 w-full max-w-[440px]">
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-l border-slate-800/60 pl-5 py-1 w-full max-w-[460px]">
                   
                   <CustomDropdown 
                     label="Τάξη" 
@@ -344,28 +341,47 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                     ]} 
                   />
 
-                  {/* WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij */}
+                  {/* ΝΕΟ WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij (3 ΕΠΙΛΟΓΕΣ) */}
                   <div className="flex flex-col gap-1.5 w-full group">
                     <div className="flex justify-between items-center h-[14px]">
                       <label className="text-[10px] font-bold text-slate-400 tracking-wide group-hover:text-amber-500/70 transition-colors whitespace-nowrap overflow-hidden text-ellipsis">
                         Συντελεστής m<sub className="lowercase tracking-normal">ij</sub>
                       </label>
                       
-                      {/* Toggles */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Segmented Toggles 3 Επιλογών */}
+                      <div className="flex items-center gap-0.5 bg-slate-950 p-0.5 rounded-md border border-slate-800 flex-shrink-0">
                         <button 
                           type="button" 
                           onClick={() => setScaleMode("Χωρίς")}
-                          className={`text-[8px] font-black px-1 py-0.5 rounded transition-colors ${scaleMode === "Χωρίς" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                          className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                            scaleMode === "Χωρίς" 
+                              ? "bg-slate-700 text-white shadow" 
+                              : "text-slate-500 hover:text-slate-300"
+                          }`}
                         >
                           ΧΩΡΙΣ
                         </button>
                         <button 
                           type="button" 
-                          onClick={() => setScaleMode("Με")}
-                          className={`text-[8px] font-black px-1 py-0.5 rounded transition-colors ${scaleMode === "Με" ? "bg-emerald-500/20 text-emerald-400" : "text-slate-500 hover:text-slate-300"}`}
+                          onClick={() => setScaleMode("Υπολογισμός")}
+                          className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                            scaleMode === "Υπολογισμός" 
+                              ? "bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 shadow" 
+                              : "text-slate-500 hover:text-slate-300"
+                          }`}
                         >
-                          ΜΕ
+                          ΥΠΟΛ.
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setScaleMode("Χειροκίνητα")}
+                          className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                            scaleMode === "Χειροκίνητα" 
+                              ? "bg-amber-500/30 text-amber-400 border border-amber-500/40 shadow" 
+                              : "text-slate-500 hover:text-slate-300"
+                          }`}
+                        >
+                          ΧΕΙΡ.
                         </button>
                       </div>
                     </div>
@@ -373,15 +389,19 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                     <input
                       id="scale-input"
                       type="text"
+                      readOnly={scaleMode !== "Χειροκίνητα"}
                       value={scaleFactor}
                       onChange={(e) => {
-                        setScaleFactor(e.target.value);
-                        if (scaleMode === "Με") setScaleMode("Χωρίς"); 
+                        if (scaleMode === "Χειροκίνητα") {
+                          setScaleFactor(e.target.value);
+                        }
                       }}
                       className={`bg-slate-950/40 border text-[10px] rounded-md px-3 h-[32px] outline-none transition-all font-mono w-full shadow-inner ${
-                        scaleMode === "Με" 
-                          ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5" 
-                          : "border-slate-800 text-slate-300 focus:border-amber-500/50 hover:border-slate-700"
+                        scaleMode === "Χειροκίνητα"
+                          ? "border-amber-500/50 text-amber-300 bg-amber-500/5 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30"
+                          : scaleMode === "Υπολογισμός"
+                          ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5 cursor-not-allowed"
+                          : "border-slate-800 text-slate-400 cursor-not-allowed opacity-70"
                       }`}
                       placeholder="1.000000"
                     />
@@ -462,7 +482,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                           value={
                           document.activeElement?.id === `input-${idx}-sd`
                             ? (row.sd ?? "") 
-                            : (scaleMode === "Με" && row.sd && !isNaN(parseFloat(row.sd))
+                            : (scaleMode !== "Χωρίς" && row.sd && !isNaN(parseFloat(row.sd))
                                 ? (parseFloat(row.sd) / (parseFloat(scaleFactor) || 1.0)).toFixed(3)
                                 : formatVal(row.sd, 3))
                           }
@@ -512,7 +532,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
             </div>
           </div>
 
-          {/* ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ (Προστέθηκε το statsRef) */}
+          {/* ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
           <div ref={statsRef} className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
               <Activity size={16} className="text-cyan-500" />

@@ -23,24 +23,24 @@ const CustomDropdown = ({ value, onChange, options, disabled, icon: Icon }) => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-1 group relative" ref={dropdownRef}>
+    <div className="flex flex-col gap-1 group relative w-full" ref={dropdownRef}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`bg-[#0f172a] border ${isOpen ? 'border-emerald-500' : 'border-slate-800'} text-[11px] text-slate-300 rounded-lg px-3 py-1.5 outline-none focus:border-emerald-500/50 transition-all font-mono hover:border-emerald-500/50 flex items-center justify-between gap-3 min-w-[130px] w-full ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+        className={`bg-[#0f172a] border ${isOpen ? 'border-emerald-500' : 'border-slate-800'} text-[11px] text-slate-300 rounded-lg px-3 py-1.5 outline-none focus:border-emerald-500/50 transition-all font-mono hover:border-emerald-500/50 flex items-center justify-between gap-2 w-full ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <div className="flex items-center gap-2">
-          <span>{options.find(opt => opt.value === value)?.label || value || "Επιλογή..."}</span>
+        <div className="flex items-center gap-2 truncate">
+          <span className="truncate">{options.find(opt => opt.value === value)?.label || value || "Επιλογή..."}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {Icon && <Icon size={12} className="text-slate-500 group-hover:text-emerald-500/70 transition-colors" />}
           <ChevronDown size={14} className={`text-emerald-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute top-full left-0 mt-1.5 w-full bg-[#0f172a] border border-slate-800 rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[11px] animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute top-full left-0 mt-1.5 w-full min-w-[200px] bg-[#0f172a] border border-slate-800 rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[11px] animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col py-1">
             {options.map((opt) => {
               const isActive = value === opt.value;
@@ -82,6 +82,10 @@ const Tachymetry = ({
   const [viewMode, setViewMode] = useState('local'); 
   const [isFullscreen, setIsFullscreen] = useState(false); 
 
+  // STATE ΓΙΑ ΤΟΝ ΣΥΝΤΕΛΕΣΤΗ ΚΛΙΜΑΚΑΣ m_ij
+  const [scaleMode, setScaleMode] = useState("Χωρίς");
+  const [scaleFactor, setScaleFactor] = useState("1.000000");
+
   const measurements = tachymetryData.measurements || [];
   const stationsData = tachymetryData.stations || [];
   const computedResults = tachymetryData.results || [];
@@ -119,6 +123,42 @@ const Tachymetry = ({
 
   const activeOrientation = selectedOrientation || (orientations.length > 0 ? orientations[0] : "");
 
+  // ΥΠΟΛΟΓΙΣΜΟΣ m_ij ΑΠΟ ΣΥΝΤΕΤΑΓΜΕΝΕΣ ΕΓΣΑ87 (X/E)
+  const calculateScaleFactor = (xValue) => {
+    const E = parseFloat(xValue);
+    if (isNaN(E)) return "1.000000";
+    
+    const m_0 = 0.9996;
+    const R_0 = 6371000.0;
+    const Em_tonos = E - 500000.0;
+    
+    const mij = m_0 * (1.0 + Math.pow(Em_tonos, 2) / (2.0 * Math.pow(R_0, 2) * Math.pow(m_0, 2)));
+    return mij.toFixed(6);
+  };
+
+  // ΕΛΕΓΧΟΣ ΚΑΙ ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ Η' ΕΠΑΝΑΦΟΡΑ ΤΟΥ m_ij
+  useEffect(() => {
+    if (scaleMode === "Υπολογισμός") {
+      const stObj = stationsData.find(s => String(s.name || s.Station || s.station || s.Point_ID || s.id || '').toUpperCase() === activeStation.toUpperCase())
+        || traverseData.find(s => String(s.name || s.Station || '').toUpperCase() === activeStation.toUpperCase());
+      
+      const xVal = stObj?.x || stObj?.X || stObj?.E;
+      
+      if (xVal && !isNaN(parseFloat(xVal))) {
+        setScaleFactor(calculateScaleFactor(xVal));
+      } else {
+        const firstWithX = traverseData.find(r => r.x && !isNaN(parseFloat(r.x))) || stationsData.find(r => (r.x || r.X) && !isNaN(parseFloat(r.x || r.X)));
+        if (firstWithX) {
+          setScaleFactor(calculateScaleFactor(firstWithX.x || firstWithX.X));
+        } else {
+          setScaleFactor("1.000000");
+        }
+      }
+    } else if (scaleMode === "Χωρίς") {
+      setScaleFactor("1.000000");
+    }
+  }, [scaleMode, activeStation, stationsData, traverseData]);
+
   const stationOpts = stations.length === 0 
     ? [{ value: "", label: "Χωρίς Στάσεις" }] 
     : stations.map(s => ({ value: s, label: `Στάση: ${s}` }));
@@ -141,7 +181,25 @@ const Tachymetry = ({
     return tachymetryData.plots?.[key] || tachymetryData.plot || null;
   }, [tachymetryData.plots, tachymetryData.plot, activeStation, activeOrientation]);
 
-  // 2. ΕΠΙΛΥΣΗ ΜΙΑΣ ΣΤΑΣΗΣ (UI DISPLAY)
+  // ΕΦΑΡΜΟΓΗ ΑΝΑΓΩΓΗΣ ΑΠΟΣΤΑΣΕΩΝ ΜΕ ΒΑΣΗ ΤΟ m_ij
+  const getProcessedMeasurements = () => {
+    const currentScaleFactor = parseFloat(scaleFactor) || 1.0;
+    return filledMeasurements.map(row => {
+      const sdRaw = row.SD || row.sd || row.Sd;
+      if (scaleMode !== "Χωρίς" && sdRaw && !isNaN(parseFloat(sdRaw))) {
+        const reducedSd = parseFloat(sdRaw) / currentScaleFactor;
+        return { 
+          ...row, 
+          SD: reducedSd.toFixed(4), 
+          sd: reducedSd.toFixed(4),
+          Sd: reducedSd.toFixed(4)
+        };
+      }
+      return row;
+    });
+  };
+
+  // 2. ΕΠΙΛΥΣΗ ΜΙΑΣ ΣΤΑΣΗΣ
   const handleCalculate = async () => {
     if (!measurements.length) {
       toast.error("Λείπουν δεδομένα μετρήσεων.");
@@ -150,9 +208,11 @@ const Tachymetry = ({
     
     setIsLoading(true);
     try {
+      const processedMeasurements = getProcessedMeasurements();
+
       const response = await axios.post('http://127.0.0.1:5000/api/tachymetry', {
         project_name: projectSettings, 
-        measurements: filledMeasurements,    
+        measurements: processedMeasurements,    
         stations: stationsData,
         station_name: activeStation,        
         orientation_name: activeOrientation   
@@ -201,9 +261,11 @@ const Tachymetry = ({
 
     setIsExporting(true);
     try {
+      const processedMeasurements = getProcessedMeasurements();
+
       const response = await axios.post('http://127.0.0.1:5000/api/tachymetry/export', {
         project_name: projectSettings,
-        measurements: filledMeasurements,
+        measurements: processedMeasurements,
         stations: stationsData
       });
 
@@ -254,7 +316,10 @@ const Tachymetry = ({
       
       {filteredPoints.map((p, i) => {
         const hzVal = Number(p.Hz || p.HZ || 0);
-        const sdVal = Number(p.SD || p.sd || 0);
+        const rawSd = Number(p.SD || p.sd || 0);
+        const currentScaleFactor = parseFloat(scaleFactor) || 1.0;
+        const sdVal = scaleMode !== "Χωρίς" && rawSd ? (rawSd / currentScaleFactor) : rawSd;
+
         const angleRad = (hzVal * Math.PI) / 200;
         const maxDistance = Math.max(...filteredPoints.map(pt => Number(pt.SD || 1)));
         const scaledRadius = (sdVal / maxDistance) * 130;
@@ -288,39 +353,119 @@ const Tachymetry = ({
       <div className="flex flex-1 gap-6 min-h-0 pt-2">
         {/* ΑΡΙΣΤΕΡΟ ΠΑΝΕΛ */}
         <div className="flex-[1.6] bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col">
-          <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between flex-wrap gap-4">
+          
+          {/* ΚΕΦΑΛΙΔΑ (2 ΥΠΟ-ΓΡΑΜΜΕΣ) */}
+          <div className="p-3.5 border-b border-slate-800 bg-[#0f172a]/50 flex flex-col gap-3">
             
-            <div className="flex items-center gap-3 min-w-max">
-              <LayoutGrid size={16} className="text-emerald-500" />
-              <span className="text-[10px] font-black text-slate-300 tracking-[0.2em]">Ταχυμετρία</span>
+            {/* 1η Γραμμή: Τίτλος & Επιλογές Στάσης / Προσανατολισμού */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-emerald-500/10 rounded-lg flex-shrink-0">
+                  <LayoutGrid size={16} className="text-emerald-500" />
+                </div>
+                <span className="text-[11px] font-black text-slate-200 tracking-[0.2em] uppercase">
+                  Ταχυμετρία
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Αυξημένα πλάτη containers για να μη κόβεται το κείμενο */}
+                <div className="w-[150px]">
+                  <CustomDropdown 
+                    value={activeStation} 
+                    onChange={(val) => { setSelectedStation(val); setSelectedOrientation(""); }} 
+                    options={stationOpts} 
+                    icon={Crosshair} 
+                  />
+                </div>
+
+                <ChevronRight size={12} className="text-slate-700 flex-shrink-0" />
+
+                <div className="w-[210px]">
+                  <CustomDropdown 
+                    value={activeOrientation} 
+                    onChange={(val) => setSelectedOrientation(val)} 
+                    options={orientationOpts} 
+                    disabled={!activeStation}
+                    icon={Compass} 
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <CustomDropdown 
-                value={activeStation} 
-                onChange={(val) => { setSelectedStation(val); setSelectedOrientation(""); }} 
-                options={stationOpts} 
-                icon={Crosshair} 
-              />
+            {/* 2η Γραμμή: Τριπλός Διακόπτης m_ij & Κουμπιά Ενεργειών */}
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-2.5 gap-3 flex-wrap">
+              
+              {/* WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij */}
+              <div className="flex items-center gap-2.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1 rounded-xl group">
+                <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap group-hover:text-amber-500/80 transition-colors">
+                  Συντελεστής m<sub className="lowercase">ij</sub>:
+                </span>
 
-              <ChevronRight size={12} className="text-slate-700" />
+                <div className="flex items-center gap-0.5 bg-slate-900 p-0.5 rounded-md border border-slate-800">
+                  <button 
+                    type="button" 
+                    onClick={() => setScaleMode("Χωρίς")}
+                    className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                      scaleMode === "Χωρίς" 
+                        ? "bg-slate-700 text-white shadow" 
+                        : "text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    ΧΩΡΙΣ
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setScaleMode("Υπολογισμός")}
+                    className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                      scaleMode === "Υπολογισμός" 
+                        ? "bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 shadow" 
+                        : "text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    ΥΠΟΛ.
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setScaleMode("Χειροκίνητα")}
+                    className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                      scaleMode === "Χειροκίνητα" 
+                        ? "bg-amber-500/30 text-amber-400 border border-amber-500/40 shadow" 
+                        : "text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    ΧΕΙΡ.
+                  </button>
+                </div>
 
-              <CustomDropdown 
-                value={activeOrientation} 
-                onChange={(val) => setSelectedOrientation(val)} 
-                options={orientationOpts} 
-                disabled={!activeStation}
-                icon={Compass} 
-              />
+                <input
+                  type="text"
+                  readOnly={scaleMode !== "Χειροκίνητα"}
+                  value={scaleFactor}
+                  onChange={(e) => {
+                    if (scaleMode === "Χειροκίνητα") {
+                      setScaleFactor(e.target.value);
+                    }
+                  }}
+                  className={`w-[82px] text-center border text-[10px] rounded-md px-2 py-0.5 outline-none transition-all font-mono shadow-inner ${
+                    scaleMode === "Χειροκίνητα"
+                      ? "border-amber-500/50 text-amber-300 bg-amber-500/5 focus:border-amber-400"
+                      : scaleMode === "Υπολογισμός"
+                      ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5 cursor-not-allowed"
+                      : "border-slate-800 text-slate-400 cursor-not-allowed opacity-70"
+                  }`}
+                  placeholder="1.000000"
+                />
+              </div>
 
-              <div className="border-l border-slate-800 pl-3 ml-1 flex items-center gap-2">
+              {/* Κουμπιά Επιμέρους Ενεργειών */}
+              <div className="flex items-center gap-2">
                 {computedResults.length > 0 && <CheckCircle size={14} className="text-emerald-500" title="Έχει Υπολογιστεί" />}
                 
-                {/* ΚΟΥΜΠΙ ΕΠΙΛΥΣΗΣ */}
                 <button 
                   onClick={handleCalculate}
                   disabled={isLoading || measurements.length === 0}
-                  className={`group flex items-center gap-2 px-4 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase ${
+                  className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase ${
                     isLoading 
                       ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 cursor-pointer'
@@ -330,7 +475,6 @@ const Tachymetry = ({
                   Επιλυση
                 </button>
 
-                {/* ΔΙΑΚΡΙΤΙΚΟ ΚΟΥΜΠΙ EXPORT TXT */}
                 <button 
                   onClick={handleExportAll}
                   disabled={isExporting || measurements.length === 0}
@@ -345,9 +489,12 @@ const Tachymetry = ({
                   Export TXT
                 </button>
               </div>
+
             </div>
+
           </div>
           
+          {/* ΠΙΝΑΚΑΣ ΜΕΤΡΗΣΕΩΝ & ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
           <div className="flex-1 overflow-y-auto custom-scrollbar relative">
             <table className="w-full text-left border-collapse table-fixed">
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
@@ -355,7 +502,9 @@ const Tachymetry = ({
                   <th className="w-[10%] p-3 text-[9px] font-black text-slate-500 tracking-widest">P.ID</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [gon]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [gon]</th>
-                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">SD [m]</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">
+                    SD [m] {scaleMode !== "Χωρίς" && <span className="text-[8px] text-amber-400/80 font-normal">(αναγ.)</span>}
+                  </th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">X [m]</th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Y [m]</th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Z [m]</th>
@@ -367,7 +516,12 @@ const Tachymetry = ({
                     const ptId = p.Point_ID || p.pointId || p.PointID || (i + 1);
                     const hzVal = p.Hz || p.HZ || p.hz || 0;
                     const zVal = p.Z || p.z || p.V || 0;
-                    const sdVal = p.SD || p.sd || p.Sd || 0;
+                    
+                    const rawSd = p.SD || p.sd || p.Sd || 0;
+                    const currentScaleFactor = parseFloat(scaleFactor) || 1.0;
+                    const sdVal = scaleMode !== "Χωρίς" && rawSd && !isNaN(parseFloat(rawSd))
+                      ? (parseFloat(rawSd) / currentScaleFactor).toFixed(3)
+                      : Number(rawSd).toFixed(3);
 
                     const resPoint = computedResults.find(r => String(r['Σημείο']) === String(ptId) && String(r['Στάση']).toUpperCase() === String(p._filledStation).toUpperCase());
 
@@ -376,7 +530,7 @@ const Tachymetry = ({
                         <td className="p-2 pl-4"><span className="text-[11px] font-bold text-slate-400">#{ptId}</span></td>
                         <td className="p-2 font-mono text-[12px] text-slate-400 text-center">{Number(hzVal).toFixed(4)}</td>
                         <td className="p-2 font-mono text-[12px] text-slate-400 text-center">{Number(zVal).toFixed(4)}</td>
-                        <td className="p-2 font-mono text-[12px] text-cyan-500/70 text-center">{Number(sdVal).toFixed(3)}</td>
+                        <td className="p-2 font-mono text-[12px] text-cyan-500/70 text-center">{sdVal}</td>
                         <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide">{resPoint ? Number(resPoint.X).toFixed(3) : "-"}</td>
                         <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide">{resPoint ? Number(resPoint.Y).toFixed(3) : "-"}</td>
                         <td className="p-2 font-mono text-[12px] text-emerald-400 font-bold text-right tracking-wide pr-4">{resPoint ? Number(resPoint.Z).toFixed(3) : "-"}</td>
