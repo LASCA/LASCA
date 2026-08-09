@@ -577,34 +577,55 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
                     ha='center', va='center', fontsize=16, fontweight='bold', color='white', zorder=10)
 
     # --- 6. ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ ---
-    if scale_num <= 200:
-        bar_len = 10
-    elif scale_num <= 500:
-        bar_len = 25
-    elif scale_num <= 1000:
-        bar_len = 50
-    else:
-        bar_len = 100
-
     x_range = xmax - xmin
     y_range = ymax - ymin
 
+    # Δυναμικός υπολογισμός μήκους μπάρας (~20% του συνολικού πλάτους του plot)
+    # ώστε να μην επικαλύπτονται τα κείμενα ποτέ, ανεξαρτήτως μεγέθους οδεύσεως.
+    target_len = x_range * 0.20
+    
+    if target_len <= 15:
+        bar_len, step = 10, 2.5
+    elif target_len <= 35:
+        bar_len, step = 20, 5
+    elif target_len <= 75:
+        bar_len, step = 50, 10
+    elif target_len <= 150:
+        bar_len, step = 100, 25
+    elif target_len <= 350:
+        bar_len, step = 200, 50
+    elif target_len <= 750:
+        bar_len, step = 500, 100
+    else:
+        # Αν το σχέδιο είναι τεράστιο, στρογγυλοποιούμε σε εκατοντάδες
+        bar_len = round(target_len / 100) * 100
+        step = bar_len / 4
+
     bar_x = xmin + (x_range * 0.05)
     bar_y = ymin + (y_range * 0.09)
-    tick_h = y_range * 0.012  
+    tick_h = y_range * 0.012
 
+    # Σχεδίαση της κύριας οριζόντιας γραμμής
     ax.plot([bar_x, bar_x + bar_len], [bar_y, bar_y], color='white', linewidth=2, zorder=10)
-    ax.plot([bar_x, bar_x], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
-    ax.plot([bar_x + bar_len/2, bar_x + bar_len/2], [bar_y, bar_y + tick_h], color='white', linewidth=1, zorder=10)
-    ax.plot([bar_x + bar_len, bar_x + bar_len], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
 
     txt_y = bar_y + tick_h * 1.5
-    ax.text(bar_x, txt_y, "0", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
-    
-    if bar_len >= 20:
-        ax.text(bar_x + bar_len/2, txt_y, f"{bar_len/2:g}", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+    current_x = bar_x
+    val = 0
+
+    # Προσθέτουμε ένα ελάχιστο tolerance (step * 0.1) στο όριο για να αποφύγουμε 
+    # προβλήματα ακρίβειας (float precision) της Python στο while loop
+    while val <= bar_len + (step * 0.1): 
+        # Σχεδίαση κάθετης υποδιαίρεσης
+        ax.plot([current_x, current_x], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
         
-    ax.text(bar_x + bar_len, txt_y, f"{bar_len}m", color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+        # Καθαρισμός δεκαδικών (πχ το 5.0 γίνεται 5) για πιο καθαρό σχέδιο
+        label_val = int(val) if float(val).is_integer() else val
+        label = f"{label_val}" if val < bar_len else f"{label_val}m"
+        
+        ax.text(current_x, txt_y, label, color='white', fontsize=7, ha='center', va='bottom', zorder=10)
+        
+        current_x += step
+        val += step
 
     legend_y = bar_y - tick_h * 1.5
     ax.text(bar_x, legend_y, f"ΚΛΙΜΑΚΑ: 1:{scale_num}", color='#00FFFF', fontsize=8, ha='left', va='top', fontweight='bold', zorder=10)
