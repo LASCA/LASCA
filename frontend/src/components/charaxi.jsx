@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play, ArrowLeft } from 'lucide-react';
+import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play, ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
@@ -257,8 +257,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                     </>
                   )}
                   
-                  <th className="p-2 w-16">
-                    <div className="flex justify-end gap-2">
+                  <th className="p-2 w-28">
+                    <div className="flex justify-end gap-1.5">
                       {isCalculated && (
                         <button 
                           onClick={handleBackToEdit}
@@ -278,6 +278,16 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                       >
                         {loading ? <Cpu size={12} className="animate-spin text-emerald-500" /> : <Play size={12} fill="currentColor" className="text-emerald-500 ml-0.5" />}
                       </button>
+                      {isCalculated && (
+                        <button
+                          type="button"
+                          onClick={() => alert("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                          title="Εξαγωγή Report"
+                          className="group flex items-center justify-center w-7 h-7 rounded transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
+                        >
+                          <FileText size={12} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                        </button>
+                      )}
                     </div>
                   </th>
                 </tr>
