@@ -8,6 +8,12 @@ ENV/
 *.py[cod]
 *$py.class
 
+# PyInstaller / Build Outputs
+dist/
+build/
+*.spec
+*.exe
+
 # IDE settings (Ρυθμίσεις του VS Code που αφορούν μόνο εσένα)
 .vscode/
 # ότι έχει κατάληξει .csv Να μην ανεβει

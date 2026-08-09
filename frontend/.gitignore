@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# PyInstaller / Build Outputs
+dist/
+build/
+*.spec
+*.exe
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
