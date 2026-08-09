@@ -108,7 +108,6 @@ def empros(xa, ya, xb, yb, a, b):
     ym = nom2 / denom
     return xm, ym
 
-
 def tienstra(xa, ya, xb, yb, xc, yc, a, b, c):
     """
     Υπολογισμός Οπισθοτομίας Tienstra.
@@ -666,8 +665,6 @@ def gwn(dataframe):
     return df
 
 # SYNORTHOSI STATHMOY
-import pandas as pd
-import numpy as np
 
 # 1. Η ΔΙΟΡΘΩΜΕΝΗ solve_lsa_detailed
 # Πρόσθεσα το st_name="Unknown" ως δεύτερη παράμετρο!
@@ -939,6 +936,175 @@ def traverse_level_calc(measurements_json):
             # Αν η στάση έχει υπολογισμένο υψόμετρο και στο UI είναι κενό, το συμπληρώνουμε
             if st_name in known_heights and (pd.isna(h_val) or h_val == "" or h_val is None):
                 row['h'] = known_heights[st_name]
+
+    return measurements_json
+
+def traverse_level_calc2(measurements_json):
+    """
+    Δέχεται τα δεδομένα (JSON) από το UI, εκτελεί τον υπολογισμό τριγωνομετρικής 
+    υψομετρίας με δυναμικό εντοπισμό όδευσης. 
+    Αν βρει εξαρτημένη όδευση (2 γνωστά υψόμετρα), εφαρμόζει επιμερισμό σφάλματος (Wh).
+    Επιστρέφει την ίδια λίστα, συμπληρωμένη με τα νέα 'h'.
+    """
+    if not measurements_json:
+        return []
+        
+    df_raw = pd.DataFrame(measurements_json)
+    
+    # 1. Εξαγωγή Σταθμών & Γνωστών Υψομέτρων
+    df_stations = pd.DataFrame({
+        'Stations': df_raw.get('name', pd.Series(dtype=str)),
+        'H_m': df_raw.get('h', pd.Series(dtype=float))
+    })
+    df_stations['Stations'] = df_stations['Stations'].astype(str).str.strip()
+    df_stations['H_m'] = pd.to_numeric(df_stations['H_m'], errors='coerce')
+    
+    # Αρχικό λεξικό με τα σταθερά (γνωστά) σημεία
+    known_heights_initial = df_stations.dropna(subset=['H_m']).set_index('Stations')['H_m'].to_dict()
+
+    # 2. Απομόνωση πεδίων μετρήσεων
+    z_col = 'Z[grad]' if 'Z[grad]' in df_raw.columns else ('Z_grad' if 'Z_grad' in df_raw.columns else None)
+    slope_col = 'Slope_D [m]' if 'Slope_D [m]' in df_raw.columns else ('Slope_D' if 'Slope_D' in df_raw.columns else None)
+    
+    if not z_col or not slope_col or 'From' not in df_raw.columns:
+        return measurements_json 
+
+    df_measurements = df_raw[['From', 'To', slope_col, z_col, 'H_station', 'H_target']].copy()
+    df_measurements.rename(columns={slope_col: 'Slope_D', z_col: 'Z_grad'}, inplace=True)
+    df_measurements['From'] = df_measurements['From'].astype(str).str.strip().replace('nan', '')
+    df_measurements['To'] = df_measurements['To'].astype(str).str.strip().replace('nan', '')
+
+    mask = (df_measurements['From'] != '') & (df_measurements['To'] != '')
+    df_meas_clean = df_measurements[mask].copy()
+
+    if df_meas_clean.empty:
+        return measurements_json
+
+    for col in ['Slope_D', 'Z_grad', 'H_station', 'H_target']:
+        df_meas_clean[col] = pd.to_numeric(df_meas_clean[col], errors='coerce').fillna(0.0)
+
+    # 3. Υπολογισμός dh και Οριζόντιου Μήκους (L) ανά γραμμή
+    z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
+    
+    # dh = S_slope * cos(Z) + Υ.Ο. - Υ.Σ.
+    df_meas_clean['dh'] = (df_meas_clean['Slope_D'] * np.cos(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
+    # Το οριζόντιο μήκος (S_horiz = S_slope * sin(Z)) χρειάζεται για τα βάρη του σφάλματος
+    df_meas_clean['L_horiz'] = df_meas_clean['Slope_D'] * np.sin(z_rad) 
+
+    # 4. Ενοποίηση μετρήσεων (Forward & Backward) με χρήση Λεξικού
+    pair_dict = {}
+    for _, row in df_meas_clean.iterrows():
+        start, end = row['From'], row['To']
+        dh, l_horiz = row['dh'], row['L_horiz']
+        
+        pair = (start, end)
+        rev_pair = (end, start)
+        
+        if pair in pair_dict:
+            pair_dict[pair]['dh'].append(dh)
+            pair_dict[pair]['L'].append(l_horiz)
+        elif rev_pair in pair_dict:
+            pair_dict[rev_pair]['dh'].append(-dh) # Αντίθετο πρόσημο στο dh για την επιστροφή
+            pair_dict[rev_pair]['L'].append(l_horiz)
+        else:
+            pair_dict[pair] = {'dh': [dh], 'L': [l_horiz]}
+            
+    # Δημιουργία τελικών segments με τους μέσους όρους
+    segments = []
+    for (start, end), data in pair_dict.items():
+        dh_mean = sum(data['dh']) / len(data['dh'])
+        l_mean = sum(data['L']) / len(data['L'])
+        segments.append({'From': start, 'To': end, 'dh_mean': dh_mean, 'L_mean': l_mean})
+        
+    # 5. Εύρεση της όδευσης (Graph Path Search)
+    known_heights = known_heights_initial.copy()
+    graph = {}
+    
+    for seg in segments:
+        u, v = seg['From'], seg['To']
+        if u not in graph: graph[u] = []
+        if v not in graph: graph[v] = []
+        graph[u].append({'to': v, 'dh': seg['dh_mean'], 'L': seg['L_mean']})
+        graph[v].append({'to': u, 'dh': -seg['dh_mean'], 'L': seg['L_mean']})
+        
+    known_nodes = list(known_heights_initial.keys())
+    
+    def find_path(start_node, end_node, graph, path=[]):
+        path = path + [start_node]
+        if start_node == end_node: return path
+        if start_node not in graph: return None
+        for edge in graph[start_node]:
+            if edge['to'] not in path:
+                newpath = find_path(edge['to'], end_node, graph, path)
+                if newpath: return newpath
+        return None
+
+    path_nodes = None
+    start_known = None
+    end_known = None
+    
+    # Αναζήτηση μονοπατιού μεταξύ 2 οποιωνδήποτε γνωστών σημείων
+    if len(known_nodes) >= 2:
+        for i in range(len(known_nodes)):
+            for j in range(i+1, len(known_nodes)):
+                p = find_path(known_nodes[i], known_nodes[j], graph)
+                if p:
+                    path_nodes = p
+                    start_known, end_known = known_nodes[i], known_nodes[j]
+                    break
+            if path_nodes: break
+            
+    # 6A. Αν βρέθηκε εξαρτημένη όδευση (επιμερισμός Wh)
+    if path_nodes:
+        total_length = 0
+        sum_dh = 0
+        path_edges = []
+        
+        for i in range(len(path_nodes)-1):
+            u = path_nodes[i]
+            v = path_nodes[i+1]
+            for edge in graph[u]:
+                if edge['to'] == v:
+                    path_edges.append((u, v, edge['dh'], edge['L']))
+                    total_length += edge['L']
+                    sum_dh += edge['dh']
+                    break
+                    
+        # Σφάλμα Κλεισίματος
+        known_dh = known_heights[end_known] - known_heights[start_known]
+        wh = sum_dh - known_dh
+        
+        # Εφαρμογή διόρθωσης στα σημεία της όδευσης
+        current_h = known_heights[start_known]
+        for u, v, dh, L in path_edges:
+            corr = -wh * (L / total_length) if total_length > 0 else 0
+            current_h += (dh + corr)
+            if v != end_known: 
+                known_heights[v] = round(current_h, 3)
+
+    # 6B. Αλυσιδωτός υπολογισμός για τα υπόλοιπα σημεία (ή για ανοικτή όδευση)
+    added_new = True
+    while added_new:
+        added_new = False
+        for seg in segments:
+            start_node, end_node, dh = seg['From'], seg['To'], seg['dh_mean']
+            
+            if start_node in known_heights and end_node not in known_heights:
+                if end_node.startswith('S') or end_node.isdigit():
+                    known_heights[end_node] = round(known_heights[start_node] + dh, 3)
+                    added_new = True
+                    
+            elif end_node in known_heights and start_node not in known_heights:
+                if start_node.startswith('S') or start_node.isdigit():
+                    known_heights[start_node] = round(known_heights[end_node] - dh, 3)
+                    added_new = True
+
+    # 7. Ενημέρωση του αρχικού JSON
+    for row in measurements_json:
+        st_name = str(row.get('name', '')).strip()
+        h_val = row.get('h')
+        if st_name in known_heights and (pd.isna(h_val) or h_val == "" or h_val is None):
+            row['h'] = known_heights[st_name]
 
     return measurements_json
 

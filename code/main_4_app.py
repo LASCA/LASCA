@@ -376,7 +376,23 @@ def export_traverse_dxf():
     try:
         data = request.json
         points = data.get('points', [])
+        scale = data.get('scale', '1:1000')  # Λήψη της κλίμακας από το frontend
         
+        # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΛΙΜΑΚΑΣ (Νέα Λογική) ---
+        try:
+            scale_num = int(scale.split(':')[-1])
+        except (ValueError, AttributeError):
+            scale_num = 1000
+
+        if scale_num <= 200:
+            grid_step = 20.0
+        elif scale_num <= 500:
+            grid_step = 50.0
+        elif scale_num <= 1000:
+            grid_step = 100.0
+        else:
+            grid_step = max(100.0, float(scale_num // 10))
+
         # Φιλτράρισμα και μετατροπή έγκυρων σημείων
         valid_points = []
         for pt in points:
@@ -401,6 +417,8 @@ def export_traverse_dxf():
         y_coords = [p['y'] for p in valid_points]
         min_x, max_x = min(x_coords), max(x_coords)
         min_y, max_y = min(y_coords), max(y_coords)
+        x_range = max_x - min_x
+        y_range = max_y - min_y
 
         # Δημιουργία νέου εγγράφου DXF
         doc = ezdxf.new('R2010')
@@ -429,7 +447,6 @@ def export_traverse_dxf():
         # ==========================================
         # 1. ΣΧΕΔΙΑΣΗ ΚΑΝΑΒΟΥ (GRID)
         # ==========================================
-        grid_step = 20.0
         margin = grid_step * 1.5  # Περιθώριο γύρω από τα σημεία
         
         # Στρογγυλοποίηση στα πλησιέστερα πολλαπλάσια του grid_step
@@ -438,26 +455,27 @@ def export_traverse_dxf():
         start_y = math.floor((min_y - margin) / grid_step) * grid_step
         end_y = math.ceil((max_y + margin) / grid_step) * grid_step
         
-        cross_size = 0.5
+        cross_size = grid_step * 0.025  # Δυναμικό μέγεθος σταυρού βάσει κλίμακας
+        text_height = grid_step * 0.12  # Δυναμικό ύψος κειμένου αξόνων
         
-        # Σχεδίαση σταυρών και συντεταγμένων
         curr_x = start_x
         while curr_x <= end_x + 0.1:
             curr_y = start_y
-            # Κείμενο Άξονα X (κάτω) - Αυξημένο Μέγεθος και Arial
-            txt = msp.add_text(f"{curr_x:.0f}", dxfattribs={'height': 2.5, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
-            txt.set_placement((curr_x, start_y - 3), align=TextEntityAlignment.MIDDLE_RIGHT)
-            txt.dxf.rotation = 45 # Πλάγια γραφή όπως στο plot
+            
+            # Κείμενο Άξονα X (κάτω)
+            txt = msp.add_text(f"{curr_x:.0f}", dxfattribs={'height': text_height, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
+            txt.set_placement((curr_x, start_y - text_height*1.5), align=TextEntityAlignment.MIDDLE_RIGHT)
+            txt.dxf.rotation = 45
             
             while curr_y <= end_y + 0.1:
                 # Σταυρουδάκι
                 msp.add_line((curr_x - cross_size, curr_y), (curr_x + cross_size, curr_y), dxfattribs={'layer': 'GRID'})
                 msp.add_line((curr_x, curr_y - cross_size), (curr_x, curr_y + cross_size), dxfattribs={'layer': 'GRID'})
                 
-                # Κείμενο Άξονα Y (αριστερά) - Αυξημένο Μέγεθος και Arial
+                # Κείμενο Άξονα Y (αριστερά)
                 if abs(curr_x - start_x) < 0.1:
-                    txt = msp.add_text(f"{curr_y:.0f}", dxfattribs={'height': 2.5, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
-                    txt.set_placement((start_x - 3, curr_y), align=TextEntityAlignment.MIDDLE_RIGHT)
+                    txt = msp.add_text(f"{curr_y:.0f}", dxfattribs={'height': text_height, 'layer': 'GRID_TEXT', 'style': 'ARIAL'})
+                    txt.set_placement((start_x - text_height*1.5, curr_y), align=TextEntityAlignment.MIDDLE_RIGHT)
                 
                 curr_y += grid_step
             curr_x += grid_step
@@ -467,6 +485,7 @@ def export_traverse_dxf():
         # ==========================================
         prev_coord = None
         prev_is_control = False
+        r = grid_step * 0.05 # Δυναμικό μέγεθος συμβόλου
         
         for pt in valid_points:
             name = str(pt['name'])
@@ -474,35 +493,30 @@ def export_traverse_dxf():
             y_float = pt['y']
             current_coord = (x_float, y_float)
             
-            # Έλεγχος αν είναι στάση ελέγχου (ξεκινάει από 'Σ')
             is_control = name.startswith('Σ')
-            r = 1.0 # Μέγεθος συμβόλου
             
             # --- Σύμβολο Σημείου ---
             if is_control:
-                # Τρίγωνο
                 p1 = (x_float, y_float + r)
                 p2 = (x_float - r*0.866, y_float - r*0.5)
                 p3 = (x_float + r*0.866, y_float - r*0.5)
                 msp.add_lwpolyline([p1, p2, p3, p1], dxfattribs={'layer': 'POINTS'})
             else:
-                # Κύκλος με σταυρό
                 msp.add_circle(current_coord, radius=r, dxfattribs={'layer': 'POINTS'})
                 msp.add_line((x_float - r, y_float), (x_float + r, y_float), dxfattribs={'layer': 'POINTS'})
                 msp.add_line((x_float, y_float - r), (x_float, y_float + r), dxfattribs={'layer': 'POINTS'})
             
-            # --- Ονόματα & Γωνίες (Αυξημένα Μεγέθη + Arial) ---
-            msp.add_text(name, dxfattribs={'height': 3.0, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((x_float + r*1.5, y_float + r*1.5))
+            # --- Ονόματα & Γωνίες ---
+            msp.add_text(name, dxfattribs={'height': r*3.0, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((x_float + r*1.5, y_float + r*1.5))
             
             hz = pt['hz']
             if hz and str(hz).strip() != '---':
-                msp.add_text(f"{hz}g", dxfattribs={'height': 1.8, 'layer': 'ANGLES', 'style': 'ARIAL'}).set_placement((x_float - r*2.5, y_float - r*2.0))
+                msp.add_text(f"{hz}g", dxfattribs={'height': r*1.8, 'layer': 'ANGLES', 'style': 'ARIAL'}).set_placement((x_float - r*2.5, y_float - r*2.0))
             
             # --- Γραμμές & Αποστάσεις ---
             if prev_coord:
                 prev_x, prev_y = prev_coord
                 
-                # ΔΙΟΡΘΩΣΗ: Πρέπει ΚΑΙ ΤΑ ΔΥΟ σημεία να είναι 'Σ' για να γίνει η γραμμή γκρι (όδευση vs εξαρτήσεις)
                 if is_control and prev_is_control:
                     line_layer = 'CONTROL_LINES'
                 else:
@@ -510,7 +524,6 @@ def export_traverse_dxf():
                     
                 msp.add_line(prev_coord, current_coord, dxfattribs={'layer': line_layer})
                 
-                # Υπολογισμός απόστασης και τοποθέτηση κειμένου
                 dx = x_float - prev_x
                 dy = y_float - prev_y
                 dist = math.hypot(dx, dy)
@@ -525,15 +538,14 @@ def export_traverse_dxf():
                 elif -180 <= angle_deg < -90:
                     angle_deg += 180
                     
-                offset = 1.2 # Αυξήσαμε λίγο το offset για να μην πέφτει το μεγαλύτερο κείμενο πάνω στη γραμμή
+                offset = r * 1.5 
                 text_x = mid_x - offset * math.sin(math.radians(angle_deg))
                 text_y = mid_y + offset * math.cos(math.radians(angle_deg))
                 
                 sd = pt['sd']
                 dist_str = str(sd) if (sd and str(sd).strip() != '---') else f"{dist:.3f}"
                 
-                # Απόσταση με αυξημένο μέγεθος και Arial
-                txt = msp.add_text(dist_str, dxfattribs={'height': 2.0, 'layer': 'DISTANCES', 'style': 'ARIAL'})
+                txt = msp.add_text(dist_str, dxfattribs={'height': r*2.0, 'layer': 'DISTANCES', 'style': 'ARIAL'})
                 txt.set_placement((text_x, text_y), align=TextEntityAlignment.MIDDLE_CENTER)
                 txt.dxf.rotation = angle_deg
                 
@@ -543,31 +555,58 @@ def export_traverse_dxf():
         # ==========================================
         # 3. ΔΙΑΚΟΣΜΗΤΙΚΑ (ΒΟΡΡΑΣ & ΚΛΙΜΑΚΑ)
         # ==========================================
+        # --- ΒΕΛΟΣ ΒΟΡΡΑ ---
+        nx = end_x - (grid_step * 0.5)
+        ny = end_y - (grid_step * 0.5)
+        s_n = grid_step * 0.2  # Συντελεστής μεγέθους βέλους
+        msp.add_lwpolyline([(nx, ny), (nx, ny + s_n), (nx - s_n*0.25, ny + s_n*0.66), (nx, ny + s_n*1.33), (nx + s_n*0.25, ny + s_n*0.66), (nx, ny + s_n)], dxfattribs={'layer': 'TRAVERSE_LINES'})
+        txt_n = msp.add_text("N", dxfattribs={'height': s_n * 0.6, 'layer': 'POINT_NAMES', 'style': 'ARIAL'})
+        txt_n.set_placement((nx, ny - s_n*0.2), align=TextEntityAlignment.TOP_CENTER)
         
-        # --- ΒΕΛΟΣ ΒΟΡΡΑ (Πάνω Δεξιά) ---
-        nx = end_x - 10
-        ny = end_y - 10
-        msp.add_lwpolyline([(nx, ny), (nx, ny+6), (nx-1.5, ny+4), (nx, ny+8), (nx+1.5, ny+4), (nx, ny+6)], dxfattribs={'layer': 'TRAVERSE_LINES'})
-        txt_n = msp.add_text("N", dxfattribs={'height': 4.0, 'layer': 'POINT_NAMES', 'style': 'ARIAL'})
-        txt_n.set_placement((nx, ny-1), align=TextEntityAlignment.TOP_CENTER)
+        # --- ΔΥΝΑΜΙΚΗ ΓΡΑΦΙΚΗ ΚΛΙΜΑΚΑ (Όπως στο Plot) ---
+        target_len = x_range * 0.20
         
-        # --- ΚΛΙΜΑΚΑ & ΥΠΟΜΝΗΜΑ (Κάτω Αριστερά) ---
-        sx = start_x + 10
-        sy = start_y + 10
-        
-        # Γραφική κλίμακα (Γραμμές)
-        msp.add_line((sx, sy), (sx + 10, sy), dxfattribs={'layer': 'POINT_NAMES'})
-        msp.add_line((sx, sy), (sx, sy+1), dxfattribs={'layer': 'POINT_NAMES'})
-        msp.add_line((sx + 5, sy), (sx + 5, sy+1), dxfattribs={'layer': 'POINT_NAMES'})
-        msp.add_line((sx + 10, sy), (sx + 10, sy+1), dxfattribs={'layer': 'POINT_NAMES'})
-        
-        # Κείμενα κλίμακας (Arial)
-        msp.add_text("0", dxfattribs={'height': 1.5, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((sx, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
-        msp.add_text("10m", dxfattribs={'height': 1.5, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((sx+10, sy+1.5), align=TextEntityAlignment.BOTTOM_CENTER)
-        
-        # Κείμενο Υπομνήματος (Arial)
-        msp.add_text("ΚΛΙΜΑΚΑ: 1:500", dxfattribs={'height': 2.2, 'layer': 'DECORATIONS', 'style': 'ARIAL'}).set_placement((sx, sy-3))
-        
+        if target_len <= 15:
+            bar_len, step = 10, 2.5
+        elif target_len <= 35:
+            bar_len, step = 20, 5
+        elif target_len <= 75:
+            bar_len, step = 50, 10
+        elif target_len <= 150:
+            bar_len, step = 100, 25
+        elif target_len <= 350:
+            bar_len, step = 200, 50
+        elif target_len <= 750:
+            bar_len, step = 500, 100
+        else:
+            bar_len = round(target_len / 100) * 100
+            step = bar_len / 4
+
+        sx = start_x + (grid_step * 0.5)
+        sy = start_y + (grid_step * 0.5)
+        tick_h = grid_step * 0.1
+
+        # Κύρια γραμμή
+        msp.add_line((sx, sy), (sx + bar_len, sy), dxfattribs={'layer': 'POINT_NAMES'})
+
+        val = 0
+        current_x = sx
+        while val <= bar_len + (step * 0.1):
+            # Υποδιαιρέσεις
+            msp.add_line((current_x, sy), (current_x, sy + tick_h), dxfattribs={'layer': 'POINT_NAMES'})
+            
+            label_val = int(val) if float(val).is_integer() else val
+            label = f"{label_val}" if val < bar_len else f"{label_val}m"
+            
+            # Νούμερα κλίμακας
+            msp.add_text(label, dxfattribs={'height': tick_h*1.2, 'layer': 'POINT_NAMES', 'style': 'ARIAL'}).set_placement((current_x, sy + tick_h*1.5), align=TextEntityAlignment.BOTTOM_CENTER)
+            
+            current_x += step
+            val += step
+            
+        # Υπόμνημα κλίμακας
+        msp.add_text(f"ΚΛΙΜΑΚΑ: 1:{scale_num}", dxfattribs={'height': tick_h*1.5, 'layer': 'DECORATIONS', 'style': 'ARIAL'}).set_placement((sx, sy - tick_h*1.5), align=TextEntityAlignment.TOP_LEFT)
+
         # ==========================================
         # 4. ΕΞΑΓΩΓΗ
         # ==========================================
@@ -623,7 +662,7 @@ def run_traverse_height():
             })
 
         # 3. Κλήση της συνάρτησης υπολογισμού από το dpr
-        calculated_data = dpr.traverse_level_calc(measurements_json)
+        calculated_data = dpr.traverse_level_calc2(measurements_json)
 
         # 4. Εξαγωγή ΜΟΝΟ των στάσεων με τα νέα υψόμετρα για το UI
         updated_stations = []
