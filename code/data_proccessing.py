@@ -938,18 +938,23 @@ def traverse_level_calc(measurements_json):
                 row['h'] = known_heights[st_name]
 
     return measurements_json
+import numpy as np
+import pandas as pd
 
-def traverse_level_calc2(measurements_json):
+def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     """
-    Δέχεται τα δεδομένα (JSON) από το UI, εκτελεί τον υπολογισμό τριγωνομετρικής 
-    υψομετρίας με δυναμικό εντοπισμό όδευσης. 
-    Αν βρει εξαρτημένη όδευση (2 γνωστά υψόμετρα), εφαρμόζει επιμερισμό σφάλματος (Wh).
-    Επιστρέφει την ίδια λίστα, συμπληρωμένη με τα νέα 'h'.
+    Εκτελεί τον υπολογισμό τριγωνομετρικής υψομετρίας ταυτιζόμενος 100% 
+    με τη λογική της συνάρτησης tyo(self) και του Web UI σου.
     """
     if not measurements_json:
-        return []
+        return measurements_json
         
     df_raw = pd.DataFrame(measurements_json)
+    
+    # --- DEBUGGING ΣΤΗΝ ΚΟΝΣΟΛΑ ΣΟΥ ---
+    # Δες αυτά τα print στο terminal/console του server σου για να βεβαιωθείς ότι τρέχει
+    print("\n--- ΕΝΑΡΞΗ traverse_level_calc2 ---")
+    print(f"Στήλες που έλαβε το Backend: {df_raw.columns.tolist()}")
     
     # 1. Εξαγωγή Σταθμών & Γνωστών Υψομέτρων
     df_stations = pd.DataFrame({
@@ -959,18 +964,27 @@ def traverse_level_calc2(measurements_json):
     df_stations['Stations'] = df_stations['Stations'].astype(str).str.strip()
     df_stations['H_m'] = pd.to_numeric(df_stations['H_m'], errors='coerce')
     
-    # Αρχικό λεξικό με τα σταθερά (γνωστά) σημεία
     known_heights_initial = df_stations.dropna(subset=['H_m']).set_index('Stations')['H_m'].to_dict()
 
-    # 2. Απομόνωση πεδίων μετρήσεων
-    z_col = 'Z[grad]' if 'Z[grad]' in df_raw.columns else ('Z_grad' if 'Z_grad' in df_raw.columns else None)
-    slope_col = 'Slope_D [m]' if 'Slope_D [m]' in df_raw.columns else ('Slope_D' if 'Slope_D' in df_raw.columns else None)
+    # 2. "Έξυπνη" Εύρεση Στηλών (για να μην κάνει ποτέ σιωπηλό return)
+    z_col = next((c for c in df_raw.columns if 'z' in c.lower() or 'grad' in c.lower()), None)
+    dist_col = next((c for c in df_raw.columns if any(x in c.lower() for x in ['slope', 's_', 'dist', 'horiz'])), None)
     
-    if not z_col or not slope_col or 'From' not in df_raw.columns:
+    # Βρίσκουμε τις στήλες From / To
+    from_col = next((c for c in df_raw.columns if 'from' in c.lower()), None)
+    to_col = next((c for c in df_raw.columns if 'to' in c.lower() and c.lower() != 'total'), None)
+
+    if not z_col or not dist_col or not from_col or not to_col:
+        print("ΣΦΑΛΜΑ: Λείπουν βασικές στήλες! Ακύρωση υπολογισμού.")
+        print(f"Βρέθηκαν -> Z: {z_col}, Dist: {dist_col}, From: {from_col}, To: {to_col}")
         return measurements_json 
 
-    df_measurements = df_raw[['From', 'To', slope_col, z_col, 'H_station', 'H_target']].copy()
-    df_measurements.rename(columns={slope_col: 'Slope_D', z_col: 'Z_grad'}, inplace=True)
+    for col in ['H_station', 'H_target']:
+        if col not in df_raw.columns:
+            df_raw[col] = 0.0
+
+    df_measurements = df_raw[[from_col, to_col, dist_col, z_col, 'H_station', 'H_target']].copy()
+    df_measurements.rename(columns={dist_col: 'Dist', z_col: 'Z_grad', from_col: 'From', to_col: 'To'}, inplace=True)
     df_measurements['From'] = df_measurements['From'].astype(str).str.strip().replace('nan', '')
     df_measurements['To'] = df_measurements['To'].astype(str).str.strip().replace('nan', '')
 
@@ -980,18 +994,22 @@ def traverse_level_calc2(measurements_json):
     if df_meas_clean.empty:
         return measurements_json
 
-    for col in ['Slope_D', 'Z_grad', 'H_station', 'H_target']:
+    for col in ['Dist', 'Z_grad', 'H_station', 'H_target']:
         df_meas_clean[col] = pd.to_numeric(df_meas_clean[col], errors='coerce').fillna(0.0)
 
-    # 3. Υπολογισμός dh και Οριζόντιου Μήκους (L) ανά γραμμή
+    # =====================================================================
+    # 3. Ο ΜΑΓΙΚΟΣ ΤΥΠΟΣ THΣ TYO (Εδώ διορθώνονται τα 7mm)
+    # tyo logic: dh = S * cot(Z) + YO - YS -> dh = (S / tan(Z)) + YO - YS
+    # =====================================================================
     z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
     
-    # dh = S_slope * cos(Z) + Υ.Ο. - Υ.Σ.
-    df_meas_clean['dh'] = (df_meas_clean['Slope_D'] * np.cos(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
-    # Το οριζόντιο μήκος (S_horiz = S_slope * sin(Z)) χρειάζεται για τα βάρη του σφάλματος
-    df_meas_clean['L_horiz'] = df_meas_clean['Slope_D'] * np.sin(z_rad) 
+    # Χρησιμοποιούμε 1.0 / np.tan() για να είναι 100% ταυτόσημο με την cotangent της tyo
+    df_meas_clean['dh'] = (df_meas_clean['Dist'] / np.tan(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
+    
+    # Η απόσταση της tyo για την κατανομή (L_mean) είναι το ίδιο το S (Dist)
+    df_meas_clean['L_horiz'] = df_meas_clean['Dist']
 
-    # 4. Ενοποίηση μετρήσεων (Forward & Backward) με χρήση Λεξικού
+    # 4. Ενοποίηση Μετάβασης / Επιστροφής (Forward / Backward)
     pair_dict = {}
     for _, row in df_meas_clean.iterrows():
         start, end = row['From'], row['To']
@@ -1001,22 +1019,34 @@ def traverse_level_calc2(measurements_json):
         rev_pair = (end, start)
         
         if pair in pair_dict:
-            pair_dict[pair]['dh'].append(dh)
-            pair_dict[pair]['L'].append(l_horiz)
+            pair_dict[pair]['dh_fw'].append(dh)
+            pair_dict[pair]['L_fw'].append(l_horiz)
         elif rev_pair in pair_dict:
-            pair_dict[rev_pair]['dh'].append(-dh) # Αντίθετο πρόσημο στο dh για την επιστροφή
-            pair_dict[rev_pair]['L'].append(l_horiz)
+            pair_dict[rev_pair]['dh_bw'].append(dh)
+            pair_dict[rev_pair]['L_bw'].append(l_horiz)
         else:
-            pair_dict[pair] = {'dh': [dh], 'L': [l_horiz]}
-            
-    # Δημιουργία τελικών segments με τους μέσους όρους
+            pair_dict[pair] = {'dh_fw': [dh], 'L_fw': [l_horiz], 'dh_bw': [], 'L_bw': []}
+
     segments = []
+    
     for (start, end), data in pair_dict.items():
-        dh_mean = sum(data['dh']) / len(data['dh'])
-        l_mean = sum(data['L']) / len(data['L'])
-        segments.append({'From': start, 'To': end, 'dh_mean': dh_mean, 'L_mean': l_mean})
+        dh_fw = np.mean(data['dh_fw']) if data['dh_fw'] else None
+        dh_bw = np.mean(data['dh_bw']) if data['dh_bw'] else None
         
-    # 5. Εύρεση της όδευσης (Graph Path Search)
+        l_fw = np.mean(data['L_fw']) if data['L_fw'] else 0.0
+        l_bw = np.mean(data['L_bw']) if data['L_bw'] else 0.0
+
+        if dh_fw is not None and dh_bw is not None:
+            # Τύπος tyo: dh_mo = (dh_fw - dh_bw) / 2.0
+            dh_mo = (dh_fw - dh_bw) / 2.0
+            l_mean = (l_fw + l_bw) / 2.0
+        else:
+            dh_mo = dh_fw if dh_fw is not None else -dh_bw
+            l_mean = l_fw if l_fw > 0 else l_bw
+
+        segments.append({'From': start, 'To': end, 'dh_mean': dh_mo, 'L_mean': l_mean})
+        
+    # 5. Εύρεση της όδευσης (Graph Search)
     known_heights = known_heights_initial.copy()
     graph = {}
     
@@ -1029,7 +1059,8 @@ def traverse_level_calc2(measurements_json):
         
     known_nodes = list(known_heights_initial.keys())
     
-    def find_path(start_node, end_node, graph, path=[]):
+    def find_path(start_node, end_node, graph, path=None):
+        if path is None: path = []
         path = path + [start_node]
         if start_node == end_node: return path
         if start_node not in graph: return None
@@ -1043,7 +1074,6 @@ def traverse_level_calc2(measurements_json):
     start_known = None
     end_known = None
     
-    # Αναζήτηση μονοπατιού μεταξύ 2 οποιωνδήποτε γνωστών σημείων
     if len(known_nodes) >= 2:
         for i in range(len(known_nodes)):
             for j in range(i+1, len(known_nodes)):
@@ -1054,10 +1084,10 @@ def traverse_level_calc2(measurements_json):
                     break
             if path_nodes: break
             
-    # 6A. Αν βρέθηκε εξαρτημένη όδευση (επιμερισμός Wh)
+    # 6. Υπολογισμός Wh & Επιμερισμός Διορθώσεων
     if path_nodes:
-        total_length = 0
-        sum_dh = 0
+        total_length = 0.0
+        sum_dh = 0.0
         path_edges = []
         
         for i in range(len(path_nodes)-1):
@@ -1070,42 +1100,27 @@ def traverse_level_calc2(measurements_json):
                     sum_dh += edge['dh']
                     break
                     
-        # Σφάλμα Κλεισίματος
         known_dh = known_heights[end_known] - known_heights[start_known]
         wh = sum_dh - known_dh
         
-        # Εφαρμογή διόρθωσης στα σημεία της όδευσης
         current_h = known_heights[start_known]
         for u, v, dh, L in path_edges:
-            corr = -wh * (L / total_length) if total_length > 0 else 0
-            current_h += (dh + corr)
+            corr = -wh * (L / total_length) if total_length > 0 else 0.0
+            dh_final = dh + corr
+            current_h += dh_final
+            
+            # Αποθήκευση του υψομέτρου
             if v != end_known: 
                 known_heights[v] = round(current_h, 3)
 
-    # 6B. Αλυσιδωτός υπολογισμός για τα υπόλοιπα σημεία (ή για ανοικτή όδευση)
-    added_new = True
-    while added_new:
-        added_new = False
-        for seg in segments:
-            start_node, end_node, dh = seg['From'], seg['To'], seg['dh_mean']
-            
-            if start_node in known_heights and end_node not in known_heights:
-                if end_node.startswith('S') or end_node.isdigit():
-                    known_heights[end_node] = round(known_heights[start_node] + dh, 3)
-                    added_new = True
-                    
-            elif end_node in known_heights and start_node not in known_heights:
-                if start_node.startswith('S') or start_node.isdigit():
-                    known_heights[start_node] = round(known_heights[end_node] - dh, 3)
-                    added_new = True
-
-    # 7. Ενημέρωση του αρχικού JSON
+    # 7. Ενημέρωση του JSON
+    # Εδώ κάνουμε FORCE OVERWRITE τις τιμές για να διαγράψουμε τυχόν λάθος υπολογισμούς
     for row in measurements_json:
         st_name = str(row.get('name', '')).strip()
-        h_val = row.get('h')
-        if st_name in known_heights and (pd.isna(h_val) or h_val == "" or h_val is None):
+        if st_name in known_heights:
             row['h'] = known_heights[st_name]
 
+    print("--- ΟΛΟΚΛΗΡΩΣΗ traverse_level_calc2 με επιτυχία ---\n")
     return measurements_json
 
 # Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
