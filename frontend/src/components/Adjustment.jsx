@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft } from 'lucide-react';
+import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
 
 const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics }) => {
@@ -205,30 +205,32 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       </style>
 
       <div className="flex flex-1 gap-6 min-h-0">
-        <div className="flex-[1.6] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
+        {/* Αυξήσαμε το flex από 1.6 σε 2 για να πάρει περισσότερο χώρο το πινακάκι */}
+        <div className="flex-[2] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col min-h-0">
             <div className="overflow-y-auto custom-scrollbar flex-1">
-              <table className="w-full text-left border-collapse table-auto relative">
+              {/* Αλλαγή σε table-fixed */}
+              <table className="w-full text-left border-collapse table-fixed relative">
                 <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
                   <tr className="border-b border-slate-800/50">
-                    <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest">From</th>
-                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest">To</th>
+                    <th className="p-4 w-10 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
+                    <th className="p-4 w-20 text-[10px] font-black text-slate-500 tracking-widest">From</th>
+                    <th className="p-4 w-20 text-[10px] font-black text-slate-500 tracking-widest">To</th>
                     
                     {!isAdjusted ? (
                       <>
-                        <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest">Period</th>
+                        <th className="p-4 w-16 text-[10px] font-black text-slate-500 tracking-widest">Period</th>
                         <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest">Face I</th>
                         <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest">Face II</th>
                       </>
                     ) : (
                       <>
-                        <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">Adj. Hz (grad)</th>
-                        <th className="p-4 text-[10px] font-black text-emerald-500 tracking-widest">σ (cc)</th>
+                        <th className="p-4 w-44 text-[10px] font-black text-emerald-500 tracking-widest text-center">Adj. Hz (grad)</th>
+                        <th className="p-4 w-32 text-[10px] font-black text-emerald-500 tracking-widest text-center">σ (cc)</th>
                       </>
                     )}
 
-                    <th className="p-3 w-16">
+                    <th className="p-3 w-28">
                       <div className="flex justify-end pr-2 gap-2">
                         {isAdjusted && (
                           <button 
@@ -248,6 +250,17 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                         >
                           {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
                         </button>
+
+                        {isAdjusted && (
+                          <button
+                            type="button"
+                            onClick={() => alert("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                            title="Εξαγωγή Report"
+                            className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
+                          >
+                            <FileText size={14} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                          </button>
+                        )}
                       </div>
                     </th>
                   </tr>
@@ -318,12 +331,12 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                         ) : (
                           <>
                             <td className="p-2 animate-in fade-in slide-in-from-left-2 duration-500">
-                              <div className="w-full p-2 text-sm font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
+                              <div className="w-full py-2 px-1 text-sm font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center tracking-tight">
                                 {obs.adj_hz || "-"}
                               </div>
                             </td>
                             <td className="p-2 animate-in fade-in slide-in-from-left-4 duration-700">
-                              <div className="w-full p-2 text-[11px] font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
+                              <div className="w-full py-2 px-1 text-[11px] font-black font-mono text-emerald-400 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center tracking-tight">
                                 {obs.std_dev || "-"}
                               </div>
                             </td>
