@@ -951,11 +951,6 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
         
     df_raw = pd.DataFrame(measurements_json)
     
-    # --- DEBUGGING ΣΤΗΝ ΚΟΝΣΟΛΑ ΣΟΥ ---
-    # Δες αυτά τα print στο terminal/console του server σου για να βεβαιωθείς ότι τρέχει
-    print("\n--- ΕΝΑΡΞΗ traverse_level_calc2 ---")
-    print(f"Στήλες που έλαβε το Backend: {df_raw.columns.tolist()}")
-    
     # 1. Εξαγωγή Σταθμών & Γνωστών Υψομέτρων
     df_stations = pd.DataFrame({
         'Stations': df_raw.get('name', pd.Series(dtype=str)),
@@ -1120,7 +1115,6 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
         if st_name in known_heights:
             row['h'] = known_heights[st_name]
 
-    print("--- ΟΛΟΚΛΗΡΩΣΗ traverse_level_calc2 με επιτυχία ---\n")
     return measurements_json
 
 # Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
