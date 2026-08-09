@@ -4,7 +4,7 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from 'react-hot-toast';
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
-  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown
+  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText
 } from 'lucide-react';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
@@ -410,24 +410,36 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                 </div>
               </div>
 
-              {/* ΚΟΥΜΠΙ ΥΠΟΛΟΓΙΣΜΟΥ */}
-              <button 
-                type="button"
-                onClick={handleRunTraverse}
-                disabled={isLoading}
-                title="Εκτέλεση Όδευσης"
-                className={`group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] ml-4 ${
-                  isLoading 
-                    ? 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer'
-                }`}
-              >
-                {isLoading ? (
-                   <Cpu size={16} className="animate-spin text-emerald-500" />
-                ) : (
-                   <Play size={16} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
-                )}
-              </button>
+              {/* ACTION BUTTONS (PLAY & REPORT) */}
+              <div className="flex items-center gap-2 ml-4">
+                <button 
+                  type="button"
+                  onClick={handleRunTraverse}
+                  disabled={isLoading}
+                  title="Εκτέλεση Όδευσης"
+                  className={`group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)] ${
+                    isLoading 
+                      ? 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 hover:from-emerald-500/20 hover:to-cyan-500/20 border border-emerald-500/30 hover:border-cyan-400/50 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer'
+                  }`}
+                >
+                  {isLoading ? (
+                     <Cpu size={16} className="animate-spin text-emerald-500" />
+                  ) : (
+                     <Play size={16} fill="currentColor" className="text-emerald-500 group-hover:text-cyan-400 transition-colors ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => toast.success("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                  title="Εξαγωγή Report"
+                  className="group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
+                >
+                  <FileText size={16} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                </button>
+              </div>
+              
             </div>
 
             <div className="flex-1">
