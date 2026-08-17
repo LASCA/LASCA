@@ -180,7 +180,7 @@ function App() {
     trigHeightData // Παρακολούθηση για την Τριγωνομετρική
   ]);
 
-  // --- 2. GLOBAL TOOLTIP LOGIC ---
+
 // --- 2. GLOBAL TOOLTIP LOGIC (ΑΠΟΛΥΤΟ ΠΡΩΤΟ ΠΛΑΝΟ) ---
   useEffect(() => {
     // Δημιουργία ενός μοναδικού στοιχείου απευθείας στο body (εκτός των scrollbars)
@@ -220,19 +220,28 @@ function App() {
       }
     };
 
+    // ΝΕΑ ΠΡΟΣΘΗΚΗ: Εξαφάνιση του tooltip σε ΚΑΘΕ κλικ
+    const handleClick = () => {
+      tooltipEl.style.opacity = '0';
+      tooltipEl.style.visibility = 'hidden';
+    };
+
     document.addEventListener('mouseover', handleMouseOver);
     document.addEventListener('mouseout', handleMouseOut);
+    document.addEventListener('click', handleClick); // <-- Προσθήκη event listener
 
     return () => {
       document.removeEventListener('mouseover', handleMouseOver);
       document.removeEventListener('mouseout', handleMouseOut);
+      document.removeEventListener('click', handleClick); // <-- Καθαρισμός event listener
+      
       // Καθαρισμός όταν κλείνει το component
       if (document.body.contains(tooltipEl)) {
         document.body.removeChild(tooltipEl);
       }
     };
   }, []);
-
+  
   // --- 3. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
   const handleProjectLoaded = (projectData) => {
     const pName = projectData.project_name;
