@@ -6,6 +6,7 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 const Charaxi = ({ stakeoutData, setStakeoutData }) => {
   const { station, backsight, points, mij } = stakeoutData;
   const [loading, setLoading] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Το state που καθορίζει αν είμαστε σε Edit Mode ή αν προβάλλουμε αποτελέσματα
@@ -86,6 +87,45 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       toast.error("Αποτυχία σύνδεσης με το backend.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!isCalculated || !stakeoutData.plot) {
+      toast.error("Παρακαλώ υπολογίστε πρώτα τη χάραξη!");
+      return;
+    }
+
+    setLoadingReport(true);
+    const loadingToast = toast.loading("Δημιουργία Report (PDF)...");
+
+    try {
+      const response = await fetch('http://localhost:5000/api/projects/stakeout/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stakeoutData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Αποτυχία δημιουργίας report");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Stakeout_Report_${station.name || 'Station'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Το Report κατέβηκε επιτυχώς!", { id: loadingToast });
+    } catch (err) {
+      toast.error(err.message || "Αποτυχία λήψης του Report.", { id: loadingToast });
+    } finally {
+      setLoadingReport(false);
     }
   };
 
@@ -281,11 +321,20 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                       {isCalculated && (
                         <button
                           type="button"
-                          onClick={() => alert("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                          onClick={handleGenerateReport}
+                          disabled={loadingReport}
                           title="Εξαγωγή Report"
-                          className="group flex items-center justify-center w-7 h-7 rounded transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
+                          className={`group flex items-center justify-center w-7 h-7 rounded transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] border cursor-pointer active:scale-95 ${
+                            loadingReport 
+                              ? 'opacity-50 bg-slate-800 border-slate-700' 
+                              : 'bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)]'
+                          }`}
                         >
-                          <FileText size={12} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                          {loadingReport ? (
+                            <Cpu size={12} className="animate-spin text-pink-500" />
+                          ) : (
+                            <FileText size={12} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                          )}
                         </button>
                       )}
                     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import html2canvas from 'html2canvas';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from 'react-hot-toast';
 import { 
@@ -71,6 +72,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const statsRef = useRef(null);
+  const chartRef = useRef(null);
 
   const [klass, setKlass] = useState(metrics.klass || "Πρωτεύουσα");
   const [terrain, setTerrain] = useState(metrics.terrain || "Ομαλό");
@@ -247,7 +249,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
     const toastId = toast.loading("Δημιουργία DXF...");
     try {
-      const response = await fetch('http://localhost:5000/api/traverse/export-dxf', {
+      const response = await fetch('http://127.0.0.1:5000/api/traverse/export-dxf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ points: data })
@@ -274,6 +276,58 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     }
   };
 
+  // ΕΞΑΓΩΓΗ PDF REPORT ΜΕ ΣΤΑΤΙΣΤΙΚΑ ΚΑΙ ΔΙΑΓΡΑΜΜΑ
+  const handleDownloadReport = async () => {
+    if (!data || data.length === 0) {
+      toast.error("Δεν υπάρχουν δεδομένα για εξαγωγή.");
+      return;
+    }
+
+    const toastId = toast.loading("Δημιουργία PDF Report...");
+
+    try {
+      let finalPlotImage = plotImage;
+
+      // Αν δεν υπάρχει έτοιμη εικόνα από το backend, αποτυπώνουμε το UI container μέσω html2canvas
+      if (!finalPlotImage && chartRef.current) {
+        const canvas = await html2canvas(chartRef.current, {
+          backgroundColor: '#121212',
+          scale: 2
+        });
+        finalPlotImage = canvas.toDataURL('image/png');
+      }
+
+      const response = await fetch('http://127.0.0.1:5000/api/traverse/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          points: data,
+          metrics: metrics,
+          plot: finalPlotImage
+        })
+      });
+      
+      if (!response.ok) throw new Error("Αποτυχία δημιουργίας Report");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Traverse_Report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Το Report κατέβηκε επιτυχώς!", { id: toastId });
+
+    } catch (error) {
+      toast.error("Σφάλμα κατά τη δημιουργία του Report.", { id: toastId });
+      console.error(error);
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-transparent p-6 gap-6 overflow-hidden relative">
       <style dangerouslySetInnerHTML={{
@@ -288,7 +342,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       <div className="flex flex-1 gap-6 min-h-0">
         
         {/* ΑΡΙΣΤΕΡΗ ΣΤΗΛΗ */}
-        <div className="flex-[1.6] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
+        <div className="flex-[2] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
           
           {/* ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ */}
           <div className="flex-none min-h-[550px] flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
@@ -306,7 +360,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                 </div>
 
                 {/* ΓΡΑΜΜΗ ΧΕΙΡΙΣΤΗΡΙΩΝ (2x2 Grid) */}
-                <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-l border-slate-800/60 pl-5 py-1 w-full max-w-[460px]">
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-l border-slate-800/60 pl-5 py-1 w-full max-w-[540px]">
                   
                   <CustomDropdown 
                     label="Τάξη" 
@@ -341,14 +395,13 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                     ]} 
                   />
 
-                  {/* ΝΕΟ WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij (3 ΕΠΙΛΟΓΕΣ) */}
+                  {/* WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij */}
                   <div className="flex flex-col gap-1.5 w-full group">
                     <div className="flex justify-between items-center h-[14px]">
                       <label className="text-[10px] font-bold text-slate-400 tracking-wide group-hover:text-amber-500/70 transition-colors whitespace-nowrap overflow-hidden text-ellipsis">
                         Συντελεστής m<sub className="lowercase tracking-normal">ij</sub>
                       </label>
                       
-                      {/* Segmented Toggles 3 Επιλογών */}
                       <div className="flex items-center gap-0.5 bg-slate-950 p-0.5 rounded-md border border-slate-800 flex-shrink-0">
                         <button 
                           type="button" 
@@ -432,7 +485,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
                 <button
                   type="button"
-                  onClick={() => toast.success("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                  onClick={handleDownloadReport}
                   title="Εξαγωγή Report"
                   className="group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
                 >
@@ -606,7 +659,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
           </div>
           
           {plotImage ? (
-             <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden group">
+             <div ref={chartRef} className="flex-1 w-full h-full flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden group">
                <TransformWrapper
                  initialScale={1}
                  minScale={1}
@@ -649,7 +702,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                </div>
              </div>
           ) : (
-             <div className="flex-1 bg-transparent m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
+             <div ref={chartRef} className="flex-1 bg-transparent m-4 rounded-xl border border-slate-800/50 flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:30px_30px]"></div>
                 <div className="text-center z-10">
                    <ImageIcon size={32} className="mx-auto mb-3 text-slate-800 group-hover:text-pink-500/40 transition-all duration-700" />

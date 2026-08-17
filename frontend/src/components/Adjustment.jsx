@@ -196,6 +196,39 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     }
   };
 
+  const handleExportReport = async () => {
+    if (!isAdjusted) return;
+    setIsLoading(true);
+    
+    try {
+      const payload = {
+        measurements: displayObservations,
+        stats: adjMetrics.stats,
+        plot: plotImage
+      };
+      
+      const response = await axios.post('http://127.0.0.1:5000/api/adjustment/report', payload, {
+        responseType: 'blob' 
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Adjustment_Report.pdf');
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error("Σφάλμα κατά την εξαγωγή του Report:", error);
+      alert("Αποτυχία δημιουργίας PDF Report.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] p-6 gap-6 overflow-hidden relative">
       <style>
@@ -205,11 +238,9 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       </style>
 
       <div className="flex flex-1 gap-6 min-h-0">
-        {/* Αυξήσαμε το flex από 1.6 σε 2 για να πάρει περισσότερο χώρο το πινακάκι */}
         <div className="flex-[2] flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 min-h-0">
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col min-h-0">
             <div className="overflow-y-auto custom-scrollbar flex-1">
-              {/* Αλλαγή σε table-fixed */}
               <table className="w-full text-left border-collapse table-fixed relative">
                 <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
                   <tr className="border-b border-slate-800/50">
@@ -254,7 +285,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                         {isAdjusted && (
                           <button
                             type="button"
-                            onClick={() => alert("Η λειτουργία Report θα προστεθεί σύντομα!")}
+                            onClick={handleExportReport}
                             title="Εξαγωγή Report"
                             className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
                           >
@@ -271,7 +302,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                       <tr className="group hover:bg-blue-600/[0.03] transition-all">
                         <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
                         
-                        {/* FROM / TO */}
                         <td className="p-2">
                           <input 
                             disabled={isAdjusted}
@@ -293,7 +323,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                           />
                         </td>
 
-                        {/* CONDITIONAL COLUMNS */}
                         {!isAdjusted ? (
                           <>
                             <td className="p-2">
@@ -367,7 +396,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
             </div>
           </div>
 
-          {/* ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΣΤΑΘΜΟΥ / LOG (Εμφανίζεται μετά τη συνόρθωση) */}
           {isAdjusted && (
             <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <div className="flex items-center justify-between border-b border-slate-800/50 pb-2">
@@ -417,7 +445,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
           )}
         </div>
 
-        {/* Visualizer */}
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -449,7 +476,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         </div>
       </div>
 
-      {/* Fullscreen Overlay */}
       {isFullscreen && plotImage && (
         <div className="fixed inset-0 z-50 bg-[#030712]/95 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-300">
           <button onClick={() => setIsFullscreen(false)} className="absolute top-8 right-8 bg-slate-900/80 text-slate-400 p-3 rounded-xl border border-slate-800 hover:text-red-400 transition-all"><X size={24} /></button>
