@@ -938,8 +938,6 @@ def traverse_level_calc(measurements_json):
                 row['h'] = known_heights[st_name]
 
     return measurements_json
-import numpy as np
-import pandas as pd
 
 def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     """
