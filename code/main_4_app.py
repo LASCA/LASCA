@@ -1018,110 +1018,95 @@ def export_traverse_dxf():
         return jsonify({"error": str(e)}), 500
     
 # ==========================================
-#  ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ (TRAVERSE HEIGHT)
+#  ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ (TRAVERSE HEIGHT) - DEBUG VERSION
 # ==========================================
 @app.route('/api/traverse_height', methods=['POST'])
 def run_traverse_height():
     try:
         data = request.json
+        
         observations = data.get('observations', [])
         stations = data.get('stations', [])
-        
-        # Προσπαθούμε να πιάσουμε το όνομα του project απευθείας από το JSON
-        explicit_project_name = data.get('project_name') or data.get('activeProject')
 
+        # Έλεγχος αν ήρθαν άδεια δεδομένα
         if not observations or not stations:
+             print("❌ [DEBUG 4] ΣΦΑΛΜΑ: Λείπουν δεδομένα παρατηρήσεων ή στάσεων. Επιστρέφω 400.")
              return jsonify({"error": "Λείπουν δεδομένα παρατηρήσεων ή στάσεων."}), 400
 
         measurements_json = []
 
-        # 1. Προσθήκη των Στάσεων στο JSON
+        # 1. Προσθήκη των Στάσεων (Διατηρούμε το id της React)
         for st in stations:
             measurements_json.append({
+                "id": st.get("id"),
                 "name": st.get("name", ""),
                 "h": st.get("h", "")
             })
 
-        # 2. Προσθήκη των Παρατηρήσεων στο JSON
+        # 2. Προσθήκη των Παρατηρήσεων (Με τα ακριβή keys της React και το id)
         for obs in observations:
+            from_st = obs.get("From") or obs.get("from") or ""
+            to_st = obs.get("To") or obs.get("to") or ""
+            
+            # Τώρα ψάχνουμε τα "s", "hi", "ht" που στέλνει το Dashboard.jsx
+            dist_val = obs.get("s") or obs.get("Slope_D") or obs.get("dist") or 0.0
+            z_val = obs.get("z") or obs.get("Z[grad]") or 0.0
+            hs_val = obs.get("hi") or obs.get("H_station") or 0.0
+            ht_val = obs.get("ht") or obs.get("H_target") or 0.0
+
             measurements_json.append({
-                "From": obs.get("from", ""),
-                "To": obs.get("to", ""),
-                "Slope_D [m]": obs.get("s", ""),
-                "Z[grad]": obs.get("z", ""),
-                "H_station": obs.get("hi", ""),
-                "H_target": obs.get("ht", "")
+                "id": obs.get("id"), # Κρίσιμο για να ξέρει η React ποια γραμμή είναι!
+                "From": from_st,
+                "To": to_st,
+                "Dist": float(dist_val) if dist_val else 0.0, 
+                "Z_grad": float(z_val) if z_val else 0.0,
+                "H_station": float(hs_val) if hs_val else 0.0,
+                "H_target": float(ht_val) if ht_val else 0.0
             })
 
-        # 3. Κλήση της συνάρτησης υπολογισμού από το dpr
-        calculated_data = dpr.traverse_level_calc2(measurements_json)
+        # 3. Εκτέλεση Υπολογισμού
+        updated_json = dpr.traverse_level_calc2(measurements_json)
 
-        # 4. Εξαγωγή ΜΟΝΟ των στάσεων με τα νέα υψόμετρα για το UI
+        # 4. Φιλτράρισμα και διαχωρισμός των αποτελεσμάτων
         updated_stations = []
-        height_lookup = {} # Ευρετήριο για γρήγορη αναζήτηση των νέων υψομέτρων
-
-        for idx, row in enumerate(calculated_data):
-            if 'name' in row and row['name'] != "":
-                st_name = str(row.get("name", "")).strip()
-                st_h = row.get("h", "")
-                
-                updated_stations.append({
-                    "id": 1000 + idx,  
-                    "name": st_name,
-                    "h": st_h
-                })
-                
-                # Γεμίζουμε το ευρετήριο μόνο με έγκυρα υψόμετρα
-                if st_h != "" and st_h is not None:
-                    height_lookup[st_name] = st_h
-
-        # 5. --- ΓΕΦΥΡΑ: ΑΣΦΑΛΗΣ ΕΝΗΜΕΡΩΣΗ ΤΟΥ latest_traverse.json ---
-        # Χρησιμοποιούμε είτε το explicit όνομα, είτε τη γενική συνάρτηση του app.py
-        project_name = explicit_project_name or get_active_project_name()
-        print(f"🔍 [DEBUG TRAVERSE HEIGHT] Το backend διάβασε project_name = '{project_name}'")
+        updated_observations = []
         
-        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-        traverse_file = project_dir / "latest_traverse.json"
-        
-        if traverse_file.exists():
-            try:
-                # Βήμα Α: Ανάγνωση υπάρχοντος αρχείου
-                with open(traverse_file, 'r', encoding='utf-8') as f:
-                    traverse_data = json.load(f)
-                
-                # Βήμα Β: Στοχευμένη ενημέρωση ΜΟΝΟ του ZS
-                updated_count = 0
-                for pt in traverse_data:
-                    t_name = str(pt.get("Station_Name", "")).strip()
-                    
-                    if t_name in height_lookup:
-                        try:
-                            # Αλλάζουμε ΜΟΝΟ το ZS, το XS/YS μένει ανέπαφο!
-                            pt["ZS"] = round(float(height_lookup[t_name]), 3)
-                            updated_count += 1
-                        except ValueError:
-                            pass
-                
-                # Βήμα Γ: Εγγραφή πίσω στο αρχείο
-                with open(traverse_file, "w", encoding="utf-8") as f:
-                    json.dump(traverse_data, f, ensure_ascii=False, indent=4)
-                    
-                print(f"✅ Ενημερώθηκαν τα υψόμετρα (ZS) σε {updated_count} στάσεις στο: '{traverse_file}'")
-                
-            except Exception as e:
-                print(f"⚠️ Σφάλμα κατά την ενημέρωση του latest_traverse.json: {e}")
-        else:
-             print(f"ℹ️ Το latest_traverse.json δεν βρέθηκε στον φάκελο '{project_dir}', τα υψόμετρα δεν αποθηκεύτηκαν στο project.")
-        # -------------------------------------------------------------
+        if updated_json:
+            for row in updated_json:
+                # Αν είναι εγγραφή Στάσης
+                if "name" in row and row["name"] != "":
+                    updated_stations.append({
+                        "id": row.get("id"),
+                        "name": row.get("name"),
+                        "h": row.get("h")
+                    })
+                # Αν είναι εγγραφή Παρατήρησης (έχει From / To)
+                elif "From" in row and row["From"] != "":
+                    updated_observations.append({
+                        "id": row.get("id"),
+                        "from": row.get("From"),
+                        "to": row.get("To"),
+                        "s": row.get("Dist"),
+                        "z": row.get("Z_grad"),
+                        "hi": row.get("H_station"),
+                        "ht": row.get("H_target"),
+                        # Εδώ μπαίνουν τα αποτελέσματα που παρήγαγε η traverse_level_calc2
+                        "dh_mean": row.get("dh_mean"),
+                        "corr": row.get("corr"),
+                        "dh_final": row.get("dh_final")
+                    })
 
+        # 5. Επιστροφή ΟΛΩΝ των δεδομένων
         return jsonify({
             "status": "success",
-            "stations": updated_stations
+            "stations": updated_stations,
+            "observations": updated_observations
         })
 
     except Exception as e:
         import traceback
-        print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
+        print("\n💥 [DEBUG ERROR] Κάτι έσπασε άσχημα!")
+        print(f"{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 # ==========================================

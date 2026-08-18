@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  Target, MapPin, Database, PlusCircle, Trash2, Play, Cpu, Ruler, Activity, Info 
+  Target, MapPin, Database, PlusCircle, Trash2, Play, Cpu, Ruler, Activity, Info, ArrowLeft 
 } from 'lucide-react';
 
 const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS, themeColor }) => {
@@ -67,6 +67,7 @@ const TraverseHeight = ({
   // --- STATES ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ --- 
   const [localObs, setLocalObs] = useState([]);
   const [localStations, setLocalStations] = useState([]);
+  const [showTrigResults, setShowTrigResults] = useState(false);
 
   // --- STATES ΓΕΩΜΕΤΡΙΚΗΣ ΧΩΡΟΣΤΑΘΜΙΣΗΣ ---
   const [geoActiveTab, setGeoActiveTab] = useState('forward');
@@ -158,7 +159,13 @@ const TraverseHeight = ({
       const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
 
       if (response.data && response.data.status === "success") {
-        updateStationsData(response.data.stations);
+        if (response.data.stations) {
+          updateStationsData(response.data.stations);
+        }
+        if (response.data.observations) {
+          updateObsData(response.data.observations);
+        }
+        setShowTrigResults(true);
       } else {
         alert(response.data.error || "Προέκυψε σφάλμα.");
       }
@@ -322,7 +329,7 @@ const TraverseHeight = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-[2.5fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4">
+      <div className="grid grid-cols-[3.2fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4">
         
         {/* ==================================================== */}
         {/* === ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ (ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ Η ΓΕΩΜΕΤΡΙΚΗ) === */}
@@ -348,8 +355,27 @@ const TraverseHeight = ({
                         <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
                         <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
                         <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
-                        <th className="p-3 w-16">
+                        
+                        {/* ΣΤΗΛΕΣ ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
+                        {showTrigResults && (
+                          <>
+                            <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔH Μ.Ο. [m]</th>
+                            <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθ. [m]</th>
+                            <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">Τελικό ΔH [m]</th>
+                          </>
+                        )}
+                        
+                        <th className="p-3 w-24">
                           <div className="flex justify-end pr-2 gap-2">
+                            {showTrigResults && (
+                              <button 
+                                onClick={() => setShowTrigResults(false)}
+                                className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 bg-gradient-to-r from-slate-500/10 to-slate-400/10 border border-slate-500/30 cursor-pointer hover:bg-slate-700"
+                                title="Επιστροφή στην επεξεργασία"
+                              >
+                                <ArrowLeft size={14} className="text-slate-400" />
+                              </button>
+                            )}
                             <button 
                               onClick={handleTrigCalc}
                               disabled={isLoading}
@@ -376,16 +402,30 @@ const TraverseHeight = ({
                               <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} placeholder="-" /></td>
                               <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} placeholder="-" /></td>
                               <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} placeholder="-" /></td>
+                              
+                              {/* ΚΕΛΙΑ ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
+                              {showTrigResults && (
+                                <>
+                                  <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-purple-400 cursor-default" value={formatVal(obs.dh_mean ?? obs.dh, 3)} disabled placeholder="-" /></td>
+                                  <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-rose-400 cursor-default" value={formatVal(obs.corr, 3)} disabled placeholder="-" /></td>
+                                  <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-amber-400 cursor-default" value={formatVal(obs.dh_final, 3)} disabled placeholder="-" /></td>
+                                </>
+                              )}
+
                               <td className="p-4 text-right">
                                 <button onClick={() => removeObsRow(obs.id)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all cursor-pointer"><Trash2 size={15} /></button>
                               </td>
                             </tr>
-                            <tr className="h-0 p-0"><td colSpan={8} className="p-0 h-0 relative"><button onClick={() => addObsRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"><PlusCircle size={16} /></button></td></tr>
+                            <tr className="h-0 p-0">
+                              <td colSpan={showTrigResults ? 11 : 8} className="p-0 h-0 relative">
+                                <button onClick={() => addObsRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"><PlusCircle size={16} /></button>
+                              </td>
+                            </tr>
                           </React.Fragment>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="8" className="px-4 py-16 text-center text-slate-500">
+                          <td colSpan={showTrigResults ? 11 : 8} className="px-4 py-16 text-center text-slate-500">
                             <div className="flex flex-col items-center gap-4">
                               <Database size={28} className="opacity-50" />
                               <span className="text-sm">Δεν βρέθηκαν δεδομένα</span>
@@ -400,10 +440,9 @@ const TraverseHeight = ({
               </div>
             </>
           ) : (
-            /* --- ΠΛΗΡΕΣ UI ΓΕΩΜΕΤΡΙΚΗΣ ΧΩΡΟΣΤΑΘΜΙΣΗΣ (ΟΠΩΣ ΤΟ LEVELING.JSX) --- */
+            /* --- ΠΛΗΡΕΣ UI ΓΕΩΜΕΤΡΙΚΗΣ ΧΩΡΟΣΤΑΘΜΙΣΗΣ --- */
             <div className="flex flex-col gap-6 min-h-0 flex-1">
               
-              {/* ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ ΧΩΡΟΣΤΑΘΜΙΣΗΣ */}
               <div className="flex-none flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
                 <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between sticky top-0 z-30">
                   <div className="flex items-center gap-8">
@@ -461,7 +500,6 @@ const TraverseHeight = ({
                         <th className={`p-2 text-[10px] font-black text-slate-500 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[4%]' : 'w-[5%]'}`}>#</th>
                         <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[14%]' : 'w-[17%]'}`}>Σημείο Σκόπευσης</th>
                         
-                        {/* Οπισθοσκόπευση Group */}
                         <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>οπισθο-<br/>σκόπευση</th>
                         <th className={`p-0 text-[9px] font-bold text-blue-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
                           <div className="border-b border-slate-800/50 py-1.5">άνω</div>
@@ -469,7 +507,6 @@ const TraverseHeight = ({
                         </th>
                         <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
                         
-                        {/* Εμπροσθοσκόπευση Group */}
                         <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>εμπροσθο-<br/>σκόπευση</th>
                         <th className={`p-0 text-[9px] font-bold text-orange-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
                           <div className="border-b border-slate-800/50 py-1.5">άνω</div>
@@ -477,7 +514,6 @@ const TraverseHeight = ({
                         </th>
                         <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
                         
-                        {/* Results Headers */}
                         {geoHasResults && (
                           <>
                             <th className="w-[12%] p-2 text-[10px] font-black text-purple-500/80 tracking-widest text-right align-middle">Υψομετρική<br/>Διαφορά</th>
@@ -549,7 +585,6 @@ const TraverseHeight = ({
                                 />
                               </td>
 
-                              {/* ΕΜΠΡΟΣΘΟΣΚΟΠΕΥΣΗ (ΓΚΡΙΖΑΡΙΣΜΕΝΗ ΣΤΗΝ 1Η ΓΡΑΜΜΗ) */}
                               {idx === 0 ? (
                                 <>
                                   <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]" title="Δεν υφίσταται εμπροσθοσκόπευση στο 1ο σημείο"></td>

@@ -1077,7 +1077,10 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
                     break
             if path_nodes: break
             
-    # 6. Υπολογισμός Wh & Επιμερισμός Διορθώσεων
+# 6. Υπολογισμός Wh & Επιμερισμός Διορθώσεων
+    # ΠΡΟΣΘΗΚΗ: Δημιουργούμε ένα λεξικό για να κρατήσουμε τα αποτελέσματα
+    calculated_edges = {} 
+    
     if path_nodes:
         total_length = 0.0
         sum_dh = 0.0
@@ -1105,13 +1108,36 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
             # Αποθήκευση του υψομέτρου
             if v != end_known: 
                 known_heights[v] = round(current_h, 3)
+                
+            # ΠΡΟΣΘΗΚΗ: Αποθηκεύουμε τα νούμερα για να τα περάσουμε στο JSON
+            calculated_edges[(u, v)] = {
+                'dh_mean': round(dh, 4),
+                'corr': round(corr, 4),
+                'dh_final': round(dh_final, 4)
+            }
 
     # 7. Ενημέρωση του JSON
-    # Εδώ κάνουμε FORCE OVERWRITE τις τιμές για να διαγράψουμε τυχόν λάθος υπολογισμούς
     for row in measurements_json:
+        # Α. Ενημέρωση του Υψομέτρου (H) για τις στάσεις
         st_name = str(row.get('name', '')).strip()
         if st_name in known_heights:
             row['h'] = known_heights[st_name]
+            
+        # Β. ΠΡΟΣΘΗΚΗ: Ενημέρωση των ΔΗ, Διόρθωσης, και Τελικού ΔΗ για τις παρατηρήσεις
+        frm = str(row.get('From', '')).strip()
+        to = str(row.get('To', '')).strip()
+        
+        if frm and to:
+            # Ελέγχουμε αν υπάρχει ορθή μέτρηση (π.χ. Σ6 -> S1)
+            if (frm, to) in calculated_edges:
+                row['dh_mean'] = calculated_edges[(frm, to)]['dh_mean']
+                row['corr'] = calculated_edges[(frm, to)]['corr']
+                row['dh_final'] = calculated_edges[(frm, to)]['dh_final']
+            # Ελέγχουμε αν υπάρχει αντίστροφη μέτρηση (π.χ. S1 -> Σ6) και γυρνάμε τα πρόσημα
+            elif (to, frm) in calculated_edges:
+                row['dh_mean'] = -calculated_edges[(to, frm)]['dh_mean']
+                row['corr'] = -calculated_edges[(to, frm)]['corr']
+                row['dh_final'] = -calculated_edges[(to, frm)]['dh_final']
 
     return measurements_json
 
