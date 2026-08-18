@@ -1371,27 +1371,24 @@ def run_stakeout():
         if not data:
             return jsonify({"error": "Δεν ελήφθησαν δεδομένα"}), 400
 
-        # Απομόνωση των δεδομένων που στέλνει το React
         station = data.get('station', {})
         backsight = data.get('backsight', {})
         points_to_stake = data.get('points', [])
+        apply_scale_factor = data.get('applyScaleFactor', True)  # <-- ΝΕΟ FIELD (default True)
 
-        # Βασικός έλεγχος εγκυρότητας πριν τον υπολογισμό
         if not station.get('x') or not station.get('y') or not backsight.get('x') or not backsight.get('y'):
             return jsonify({"error": "Συμπληρώστε πρώτα τα δεδομένα Στάσης (X, Y) και Προσανατολισμού (X, Y)!"}), 400
 
-        # Κλήση της συνάρτησης υπολογισμού από το data_proccessing.py
-        result = dpr.calculate_stakeout(station, backsight, points_to_stake)
+        # Πέρασμα της παραμέτρου στη συνάρτηση
+        result = dpr.calculate_stakeout(station, backsight, points_to_stake, apply_scale_factor)
 
-        # Δημιουργία του Τοπογραφικού Γραφήματος!
         try:
             plot_base64 = vis.plot_stakeout_base64(station, backsight, result['points'])
-            result['plot'] = plot_base64  # Προσθέτουμε την εικόνα στο dictionary
+            result['plot'] = plot_base64
         except Exception as plot_err:
             print(f"Σφάλμα κατά τη δημιουργία γραφήματος χάραξης: {plot_err}")
             result['plot'] = None
 
-        # Επιστροφή των αποτελεσμάτων και του γραφήματος
         return jsonify(result)
 
     except Exception as e:

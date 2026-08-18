@@ -1178,31 +1178,24 @@ def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:
     
     return mij
 
-def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) -> dict:
-    """ 
-    Παράμετροι:
-      station: {'name': str, 'x': str/float, 'y': str/float}
-      backsight: {'name': str, 'x': str/float, 'y': str/float}
-      points_to_stake: [{'id': int/str, 'name': str, 'x': str/float, 'y': str/float}, ...]
-    """
+def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, apply_scale_factor: bool = True) -> dict:
     try:
-        # 1. Μετατροπή και απομόνωση συντεταγμένων Στάσης (St) και Προσανατολισμού (Bs)
         xs = float(station.get('x', 0))
         ys = float(station.get('y', 0))
         xo = float(backsight.get('x', 0))
         yo = float(backsight.get('y', 0))
 
-        # 2. Υπολογισμός Azimuth προσανατολισμού G(S->O) με τη δική σου deutero_themeliodes
         g_so, S_test = deutero_them(xs, ys, xo, yo)
 
-        # Υπολογισμός συντελεστή κλίμακας (Δεν χρειάζεται να περάσουμε m_0, R_0, παίρνει τα defaults)
-        mij = sintelestis_klimakas(xs)
-        
+        # Έλεγχος αν ο χρήστης θέλει συντελεστή κλίμακας
+        if apply_scale_factor:
+            mij = sintelestis_klimakas(xs)
+        else:
+            mij = 1.00
+            
         updated_points = []
 
-        # 3. Υπολογισμός για κάθε σημείο προς χάραξη
         for pt in points_to_stake:
-            # Αν το σημείο είναι άδειο, το προσπερνάμε χωρίς να κρασάρει το app
             if not pt.get('x') or not pt.get('y'):
                 updated_pt = pt.copy()
                 updated_pt['hz_stake'] = '---'
@@ -1213,18 +1206,15 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list) ->
             xp = float(pt['x'])
             yp = float(pt['y'])
 
-            # Υπολογισμός Azimuth G(S->P) και απόστασης από τη Στάση στο Σημείο P (στο επίπεδο προβολής)
             g_sp, dist_grid = deutero_them(xs, ys, xp, yp)
 
-            # Η γωνία χάραξης β είναι η διαφορά των δύο Azimuth, διορθωμένη με τη norm400
             beta = g_sp - g_so
             beta_normalized = norm400(beta)
 
-            # Αντιγραφή του σημείου και προσθήκη των υπολογισμένων στοιχείων
             updated_pt = pt.copy()
-            updated_pt['hz_stake'] = beta_normalized    # Hz γωνία στροφής σε grad
+            updated_pt['hz_stake'] = beta_normalized 
             
-            # ΔΙΑΙΡΕΣΗ με τον συντελεστή κλίμακας για να βρούμε την πραγματική απόσταση εδάφους
+            # Αν mij = 1.00, η απόσταση παραμένει η dist_grid
             updated_pt['dist_stake'] = dist_grid / mij  
             
             updated_points.append(updated_pt)

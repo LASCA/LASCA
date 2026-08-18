@@ -9,6 +9,9 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
   const [loadingReport, setLoadingReport] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // State για την επιλογή εφαρμογής του Συντελεστή Κλίμακας (m_ij)
+  const [applyScaleFactor, setApplyScaleFactor] = useState(true);
+  
   // Το state που καθορίζει αν είμαστε σε Edit Mode ή αν προβάλλουμε αποτελέσματα
   const [isCalculated, setIsCalculated] = useState(!!stakeoutData.plot);
 
@@ -66,7 +69,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ station, backsight, points })
+        body: JSON.stringify({ station, backsight, points, applyScaleFactor }) 
       });
       
       const result = await response.json();
@@ -297,43 +300,70 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                     </>
                   )}
                   
-                  <th className="p-2 w-28">
-                    <div className="flex justify-end gap-1.5">
+                  <th className="p-2 w-44">
+                    <div className="flex justify-end items-center gap-2">
+                      
+                      {/* Neon Toggle Button για Συντελεστή Κλίμακας (m_ij) */}
+                      <button
+                        type="button"
+                        disabled={isCalculated}
+                        onClick={() => {
+                          setApplyScaleFactor(prev => !prev);
+                          setIsCalculated(false);
+                        }}
+                        title={applyScaleFactor ? "Ενεργοποιημένος Συντελεστής Κλίμακας" : "Απενεργοποιημένος Συντελεστής Κλίμακας"}
+                        className={`flex items-center justify-center h-7 gap-1.5 px-2 rounded-md text-[10px] font-mono font-bold transition-all border select-none ${
+                          applyScaleFactor 
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                            : 'bg-slate-900 text-slate-500 border-slate-800 hover:border-slate-700 hover:text-slate-400'
+                        } ${isCalculated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full transition-colors ${applyScaleFactor ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-600'}`}></span>
+                        <span>m<sub>ij</sub></span>
+                      </button>
+
+                      <div className="w-px h-4 bg-slate-800/80 mx-0.5"></div>
+
                       {isCalculated && (
                         <button 
                           onClick={handleBackToEdit}
-                          className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all"
+                          className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-95"
                           title="Επιστροφή στην επεξεργασία"
                         >
                           <ArrowLeft size={12} />
                         </button>
                       )}
+                      
+                      {/* Βασικό Κουμπί Χάραξης (Play) στολισμένο στα πρότυπα των άλλων Tab */}
                       <button 
                         onClick={handleCalculate}
                         disabled={loading}
                         title="Εκτέλεση Χάραξης"
-                        className={`group flex items-center justify-center w-7 h-7 rounded transition-all duration-300 ${
-                          loading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30'
+                        className={`group flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300 border ${
+                          loading 
+                            ? 'opacity-50 bg-slate-800 border-slate-700' 
+                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(52,211,153,0.15)] cursor-pointer active:scale-95'
                         }`}
                       >
-                        {loading ? <Cpu size={12} className="animate-spin text-emerald-500" /> : <Play size={12} fill="currentColor" className="text-emerald-500 ml-0.5" />}
+                        {loading ? <Cpu size={12} className="animate-spin text-emerald-500" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
                       </button>
+
                       {isCalculated && (
                         <button
                           type="button"
                           onClick={handleGenerateReport}
                           disabled={loadingReport}
                           title="Εξαγωγή Report"
-                          className={`group flex items-center justify-center w-7 h-7 rounded transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] border cursor-pointer active:scale-95 ${
+                          className={`group flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300 border ${
                             loadingReport 
                               ? 'opacity-50 bg-slate-800 border-slate-700' 
-                              : 'bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)]'
+                              : 'bg-pink-500/10 border-pink-500/30 text-pink-500 hover:bg-pink-500/20 hover:border-pink-400/50 hover:shadow-[0_0_15px_rgba(236,72,153,0.15)] cursor-pointer active:scale-95'
                           }`}
                         >
                           {loadingReport ? (
-                            <Cpu size={12} className="animate-spin text-pink-500" />
+                            <Cpu size={12} className="animate-spin" />
                           ) : (
-                            <FileText size={12} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                            <FileText size={12} className="" />
                           )}
                         </button>
                       )}
@@ -479,10 +509,10 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                   </div>
                   
                   <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
-                    <button onClick={handleDownload} className="bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 p-2 rounded-lg border border-slate-700/50 transition-all shadow-lg" title="Λήψη">
+                    <button onClick={handleDownload} className="bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 p-2 rounded-md border border-slate-700/50 transition-all shadow-lg" title="Λήψη">
                       <Download size={14} />
                     </button>
-                    <button onClick={() => setIsFullscreen(true)} className="bg-slate-900/80 hover:bg-cyan-500/20 text-slate-300 p-2 rounded-lg border border-slate-700/50 transition-all shadow-lg" title="Πλήρης Οθόνη">
+                    <button onClick={() => setIsFullscreen(true)} className="bg-slate-900/80 hover:bg-cyan-500/20 text-slate-300 p-2 rounded-md border border-slate-700/50 transition-all shadow-lg" title="Πλήρης Οθόνη">
                       <Maximize2 size={14} />
                     </button>
                   </div>
