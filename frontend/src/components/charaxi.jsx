@@ -157,17 +157,17 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
   const noSpinnersClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 w-full max-w-[1920px] mx-auto h-full min-h-0 animate-fade-in relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full max-w-[1920px] mx-auto h-full min-h-0 animate-fade-in relative">
       <style>
-        {`.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        {`.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }`}
       </style>
 
       {/* ========================================================= */}
-      {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΔΕΔΟΜΕΝΑ & ΠΙΝΑΚΑΣ                        */}
+      {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΔΕΔΟΜΕΝΑ & ΠΙΝΑΚΑΣ (7/12 ή 8/12 πλάτος)    */}
       {/* ========================================================= */}
-      <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0 overflow-y-auto custom-scrollbar pr-1">
+      <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 h-full min-h-0 overflow-y-auto custom-scrollbar pr-1">
         
         {/* ΣΤΑΣΗ & ΠΡΟΣΑΝΑΤΟΛΙΣΜΟΣ */}
         <div className="grid grid-cols-2 gap-4 shrink-0">
@@ -288,19 +288,19 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
             <table className="w-full text-left border-collapse table-auto relative">
               <thead className="bg-slate-950 text-[12px] shadow-sm sticky top-0 z-30 font-mono tracking-wider">
                 <tr className="border-b border-slate-800/50 text-slate-400">
-                  <th className="p-2 w-10 text-center">#</th>
-                  <th className="p-2">Σημείο</th>
-                  <th className="p-2">X [m]</th>
-                  <th className="p-2">Y [m]</th>
+                  <th className="p-2 w-8 text-center">#</th>
+                  <th className="p-2 min-w-[70px]">Σημείο</th>
+                  <th className="p-2 min-w-[100px]">X [m]</th>
+                  <th className="p-2 min-w-[110px]">Y [m]</th>
                   
                   {isCalculated && (
                     <>
-                      <th className="p-2 text-blue-400 text-center w-32 min-w-[130px]">Hz [grad]</th>
-                      <th className="p-2 text-emerald-500 text-center w-32 min-w-[130px]">Dist [m]</th>
+                      <th className="p-2 text-blue-400 text-center min-w-[100px]">Hz [grad]</th>
+                      <th className="p-2 text-emerald-500 text-center min-w-[100px]">Dist [m]</th>
                     </>
                   )}
                   
-                  <th className="p-2 w-44">
+                  <th className="p-2">
                     <div className="flex justify-end items-center gap-2">
                       
                       {/* Neon Toggle Button για Συντελεστή Κλίμακας (m_ij) */}
@@ -334,7 +334,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                         </button>
                       )}
                       
-                      {/* Βασικό Κουμπί Χάραξης (Play) στολισμένο στα πρότυπα των άλλων Tab */}
+                      {/* Βασικό Κουμπί Χάραξης (Play) */}
                       <button 
                         onClick={handleCalculate}
                         disabled={loading}
@@ -383,12 +383,12 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                           type="text" 
                           value={pt.name || ''} 
                           onChange={(e) => handlePointChange(idx, 'name', e.target.value)} 
-                          className={`w-full bg-transparent px-1.5 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'}`} 
+                          className={`w-full min-w-[50px] bg-transparent px-1 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'}`} 
                           placeholder={`P${idx+1}`}
                         />
                       </td>
 
-                      {/* X [m] με 3 δεκαδικά */}
+                      {/* X [m] */}
                       <td className="p-1.5">
                         <input 
                           id={`input-pt-x-${idx}`}
@@ -401,12 +401,12 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                           } 
                           onChange={(e) => handlePointChange(idx, 'x', e.target.value)} 
                           onBlur={(e) => handlePointChange(idx, 'x', formatVal(e.target.value, 3))}
-                          className={`w-full bg-transparent px-1.5 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
+                          className={`w-full min-w-[90px] bg-transparent px-1 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
                           placeholder="0.000" 
                         />
                       </td>
 
-                      {/* Y [m] με 3 δεκαδικά */}
+                      {/* Y [m] */}
                       <td className="p-1.5">
                         <input 
                           id={`input-pt-y-${idx}`}
@@ -419,7 +419,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                           } 
                           onChange={(e) => handlePointChange(idx, 'y', e.target.value)} 
                           onBlur={(e) => handlePointChange(idx, 'y', formatVal(e.target.value, 3))}
-                          className={`w-full bg-transparent px-1.5 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
+                          className={`w-full min-w-[100px] bg-transparent px-1 py-1 outline-none rounded border border-transparent focus:border-blue-500 hover:border-slate-700 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium' : 'text-slate-200'} ${noSpinnersClass}`} 
                           placeholder="0.000" 
                         />
                       </td>
@@ -440,7 +440,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                         </>
                       )}
                       
-                      <td className="p-1.5 text-center relative">
+                      <td className="p-1.5 text-center relative w-8">
                         {!isCalculated && (
                           <button onClick={() => deleteRow(idx)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all cursor-pointer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-1">
                             <Trash2 size={14} />
@@ -469,9 +469,9 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       </div>
 
       {/* ========================================================= */}
-      {/* ΔΕΞΙ ΜΕΡΟΣ: ΧΩΡΟΣ ΠΛΟΤΑΡΙΣΜΑΤΟΣ                            */}
+      {/* ΔΕΞΙ ΜΕΡΟΣ: ΧΩΡΟΣ ΠΛΟΤΑΡΙΣΜΑΤΟΣ (5/12 ή 4/12 πλάτος)       */}
       {/* ========================================================= */}
-      <div className="lg:col-span-2 flex flex-col h-full min-h-[300px] lg:min-h-0">
+      <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full min-h-[300px] lg:min-h-0">
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
           
           <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between shrink-0">
@@ -527,7 +527,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
               )}
               
               <div className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-600 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800/50 z-20 backdrop-blur-sm shadow-sm">
-                System: EGSA'87
+             
               </div>
             </div>
           </div>
