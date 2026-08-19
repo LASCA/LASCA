@@ -1400,13 +1400,16 @@ def run_stakeout():
         station = data.get('station', {})
         backsight = data.get('backsight', {})
         points_to_stake = data.get('points', [])
-        apply_scale_factor = data.get('applyScaleFactor', True)  # <-- ΝΕΟ FIELD (default True)
+        
+        # --- ΝΕΑ ΛΟΓΙΚΗ ΣΥΝΤΕΛΕΣΤΗ ΚΛΙΜΑΚΑΣ ---
+        scale_mode = data.get('scale_mode', 'Χωρίς')
+        scale_factor = float(data.get('scale_factor', 1.0))
 
         if not station.get('x') or not station.get('y') or not backsight.get('x') or not backsight.get('y'):
             return jsonify({"error": "Συμπληρώστε πρώτα τα δεδομένα Στάσης (X, Y) και Προσανατολισμού (X, Y)!"}), 400
 
-        # Πέρασμα της παραμέτρου στη συνάρτηση
-        result = dpr.calculate_stakeout(station, backsight, points_to_stake, apply_scale_factor)
+        # Πέρασμα των νέων παραμέτρων στη συνάρτηση
+        result = dpr.calculate_stakeout(station, backsight, points_to_stake, scale_mode, scale_factor)
 
         try:
             plot_base64 = vis.plot_stakeout_base64(station, backsight, result['points'])

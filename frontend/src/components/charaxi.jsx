@@ -9,15 +9,38 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
   const [loadingReport, setLoadingReport] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // State για την επιλογή εφαρμογής του Συντελεστή Κλίμακας (m_ij)
-  const [applyScaleFactor, setApplyScaleFactor] = useState(true);
+  const [scaleMode, setScaleMode] = useState("Χωρίς");
+  const [scaleFactor, setScaleFactor] = useState("1.000000");
   
-  // Το state που καθορίζει αν είμαστε σε Edit Mode ή αν προβάλλουμε αποτελέσματα
   const [isCalculated, setIsCalculated] = useState(!!stakeoutData.plot);
 
   useEffect(() => {
     setIsCalculated(!!stakeoutData.plot);
   }, [stakeoutData.plot]);
+
+  const calculateScaleFactor = (xValue) => {
+    const E = parseFloat(xValue);
+    if (isNaN(E)) return "1.000000";
+    
+    const m_0 = 0.9996;
+    const R_0 = 6371000.0;
+    const Em_tonos = E - 500000.0;
+    
+    const mij_val = m_0 * (1.0 + Math.pow(Em_tonos, 2) / (2.0 * Math.pow(R_0, 2) * Math.pow(m_0, 2)));
+    return mij_val.toFixed(6);
+  };
+
+  useEffect(() => {
+    if (scaleMode === "Υπολογισμός") {
+      if (station?.x && !isNaN(parseFloat(station.x))) {
+        setScaleFactor(calculateScaleFactor(station.x));
+      } else {
+        setScaleFactor("1.000000");
+      }
+    } else if (scaleMode === "Χωρίς") {
+      setScaleFactor("1.000000");
+    }
+  }, [station?.x, scaleMode]);
 
   const formatVal = (val, decimals = 3) => {
     if (val === "" || val === undefined || val === null) return "";
@@ -69,7 +92,13 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ station, backsight, points, applyScaleFactor }) 
+        body: JSON.stringify({ 
+          station, 
+          backsight, 
+          points, 
+          scale_mode: scaleMode, 
+          scale_factor: parseFloat(scaleFactor) || 1.0 
+        }) 
       });
       
       const result = await response.json();
@@ -165,7 +194,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       </style>
 
       {/* ========================================================= */}
-      {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΔΕΔΟΜΕΝΑ & ΠΙΝΑΚΑΣ (7/12 ή 8/12 πλάτος)    */}
+      {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΔΕΔΟΜΕΝΑ & ΠΙΝΑΚΑΣ                         */}
       {/* ========================================================= */}
       <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 h-full min-h-0 overflow-y-auto custom-scrollbar pr-1">
         
@@ -261,12 +290,12 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
         {/* ΠΙΝΑΚΑΣ */}
         <div className="flex-1 bg-[#0b1120] border border-slate-800/50 rounded-xl flex flex-col overflow-hidden shadow-2xl min-h-0 relative">
           
-          {/* Header Πίνακα με τα results (G0, mij) */}
+          {/* Top Bar Πίνακα (Εμφανίζεται ΜΟΝΟ όταν υπάρχουν αποτελέσματα) */}
           {isCalculated && (
-            <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center shrink-0 flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-4 flex-wrap">
+            <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center shrink-0 flex-wrap gap-2">
+              <div className="flex items-center gap-4 flex-wrap min-h-[28px]">
                 <span className="text-xs font-bold text-slate-300 tracking-wider">Αποτελέσματα</span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                   <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/80 shadow-inner">
                     <span className="text-[10px] font-mono text-slate-400 font-bold">G₀ =</span>
                     <span className="text-amber-400 text-xs text-center outline-none font-mono font-bold">
@@ -300,73 +329,93 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                     </>
                   )}
                   
-                  <th className="p-2">
-                    <div className="flex justify-end items-center gap-2">
+                  <th className="p-2 text-right">
+                    <div className="flex justify-end items-center gap-3">
                       
-                      {/* Neon Toggle Button για Συντελεστή Κλίμακας (m_ij) */}
-                      <button
-                        type="button"
-                        disabled={isCalculated}
-                        onClick={() => {
-                          setApplyScaleFactor(prev => !prev);
-                          setIsCalculated(false);
-                        }}
-                        title={applyScaleFactor ? "Ενεργοποιημένος Συντελεστής Κλίμακας" : "Απενεργοποιημένος Συντελεστής Κλίμακας"}
-                        className={`flex items-center justify-center h-7 gap-1.5 px-2 rounded-md text-[10px] font-mono font-bold transition-all border select-none ${
-                          applyScaleFactor 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
-                            : 'bg-slate-900 text-slate-500 border-slate-800 hover:border-slate-700 hover:text-slate-400'
-                        } ${isCalculated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full transition-colors ${applyScaleFactor ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-600'}`}></span>
-                        <span>m<sub>ij</sub></span>
-                      </button>
-
-                      <div className="w-px h-4 bg-slate-800/80 mx-0.5"></div>
-
-                      {isCalculated && (
-                        <button 
-                          onClick={handleBackToEdit}
-                          className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-95"
-                          title="Επιστροφή στην επεξεργασία"
-                        >
-                          <ArrowLeft size={12} />
-                        </button>
+                      {/* Widget Συντελεστή (ΜΟΝΟ ΠΡΙΝ ΤΟΝ ΥΠΟΛΟΓΙΣΜΟ, στο επίπεδο του thead) */}
+                      {!isCalculated && (
+                        <div className="flex items-center gap-1 bg-slate-900/50 p-0.5 rounded-md border border-slate-800 shadow-inner">
+                          <div className="flex items-center gap-0.5 bg-slate-950 p-0.5 rounded border border-slate-800/80">
+                            <button 
+                              type="button" 
+                              onClick={() => setScaleMode("Χωρίς")}
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                                scaleMode === "Χωρίς" ? "bg-slate-700 text-white shadow" : "text-slate-500 hover:text-slate-300"
+                              }`}
+                            >ΧΩΡΙΣ</button>
+                            <button 
+                              type="button" 
+                              onClick={() => setScaleMode("Υπολογισμός")}
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                                scaleMode === "Υπολογισμός" ? "bg-emerald-500/20 text-emerald-400 shadow" : "text-slate-500 hover:text-slate-300"
+                              }`}
+                            >ΥΠΟΛ.</button>
+                            <button 
+                              type="button" 
+                              onClick={() => setScaleMode("Χειροκίνητα")}
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-colors ${
+                                scaleMode === "Χειροκίνητα" ? "bg-amber-500/20 text-amber-400 shadow" : "text-slate-500 hover:text-slate-300"
+                              }`}
+                            >ΧΕΙΡ.</button>
+                          </div>
+                          <input
+                            type="text"
+                            readOnly={scaleMode !== "Χειροκίνητα"}
+                            value={scaleFactor}
+                            onChange={(e) => setScaleFactor(e.target.value)}
+                            className={`w-16 bg-transparent border-none text-[10px] rounded px-1 outline-none transition-all font-mono text-center ${
+                              scaleMode === "Χειροκίνητα" ? "text-amber-300 focus:bg-slate-800" : 
+                              scaleMode === "Υπολογισμός" ? "text-emerald-400 cursor-not-allowed" : "text-slate-500 cursor-not-allowed"
+                            }`}
+                          />
+                        </div>
                       )}
-                      
-                      {/* Βασικό Κουμπί Χάραξης (Play) */}
-                      <button 
-                        onClick={handleCalculate}
-                        disabled={loading}
-                        title="Εκτέλεση Χάραξης"
-                        className={`group flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300 border ${
-                          loading 
-                            ? 'opacity-50 bg-slate-800 border-slate-700' 
-                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(52,211,153,0.15)] cursor-pointer active:scale-95'
-                        }`}
-                      >
-                        {loading ? <Cpu size={12} className="animate-spin text-emerald-500" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
-                      </button>
 
-                      {isCalculated && (
-                        <button
-                          type="button"
-                          onClick={handleGenerateReport}
-                          disabled={loadingReport}
-                          title="Εξαγωγή Report"
+                      <div className="flex items-center gap-2">
+                        {isCalculated && (
+                          <button 
+                            onClick={handleBackToEdit}
+                            className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-95"
+                            title="Επιστροφή στην επεξεργασία"
+                          >
+                            <ArrowLeft size={12} />
+                          </button>
+                        )}
+                        
+                        {/* Βασικό Κουμπί Χάραξης (Play) */}
+                        <button 
+                          onClick={handleCalculate}
+                          disabled={loading}
+                          title="Εκτέλεση Χάραξης"
                           className={`group flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300 border ${
-                            loadingReport 
+                            loading 
                               ? 'opacity-50 bg-slate-800 border-slate-700' 
-                              : 'bg-pink-500/10 border-pink-500/30 text-pink-500 hover:bg-pink-500/20 hover:border-pink-400/50 hover:shadow-[0_0_15px_rgba(236,72,153,0.15)] cursor-pointer active:scale-95'
+                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(52,211,153,0.15)] cursor-pointer active:scale-95'
                           }`}
                         >
-                          {loadingReport ? (
-                            <Cpu size={12} className="animate-spin" />
-                          ) : (
-                            <FileText size={12} className="" />
-                          )}
+                          {loading ? <Cpu size={12} className="animate-spin text-emerald-500" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
                         </button>
-                      )}
+
+                        {isCalculated && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateReport}
+                            disabled={loadingReport}
+                            title="Εξαγωγή Report"
+                            className={`group flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300 border ${
+                              loadingReport 
+                                ? 'opacity-50 bg-slate-800 border-slate-700' 
+                                : 'bg-pink-500/10 border-pink-500/30 text-pink-500 hover:bg-pink-500/20 hover:border-pink-400/50 hover:shadow-[0_0_15px_rgba(236,72,153,0.15)] cursor-pointer active:scale-95'
+                            }`}
+                          >
+                            {loadingReport ? (
+                              <Cpu size={12} className="animate-spin" />
+                            ) : (
+                              <FileText size={12} className="" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </th>
                 </tr>
@@ -388,7 +437,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                         />
                       </td>
 
-                      {/* X [m] */}
                       <td className="p-1.5">
                         <input 
                           id={`input-pt-x-${idx}`}
@@ -406,7 +454,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                         />
                       </td>
 
-                      {/* Y [m] */}
                       <td className="p-1.5">
                         <input 
                           id={`input-pt-y-${idx}`}
@@ -424,7 +471,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                         />
                       </td>
                       
-                      {/* Στήλες Αποτελεσμάτων */}
                       {isCalculated && (
                         <>
                           <td className="p-1.5 animate-in fade-in slide-in-from-left-2 duration-500">
@@ -469,7 +515,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       </div>
 
       {/* ========================================================= */}
-      {/* ΔΕΞΙ ΜΕΡΟΣ: ΧΩΡΟΣ ΠΛΟΤΑΡΙΣΜΑΤΟΣ (5/12 ή 4/12 πλάτος)       */}
+      {/* ΔΕΞΙ ΜΕΡΟΣ: ΧΩΡΟΣ ΠΛΟΤΑΡΙΣΜΑΤΟΣ                            */}
       {/* ========================================================= */}
       <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full min-h-[300px] lg:min-h-0">
         <div className="flex-1 flex flex-col bg-[#0b1120] rounded-xl border border-slate-800/50 shadow-2xl overflow-hidden relative">
@@ -525,19 +571,13 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
                   </p>
                 </div>
               )}
-              
-              <div className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-600 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800/50 z-20 backdrop-blur-sm shadow-sm">
-             
-              </div>
             </div>
           </div>
 
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* FULLSCREEN MODAL ΓΙΑ ΤΟ ΔΙΑΓΡΑΜΜΑ                         */}
-      {/* ========================================================= */}
+      {/* FULLSCREEN MODAL */}
       {isFullscreen && stakeoutData.plot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/95 backdrop-blur-md animate-in fade-in duration-300">
           

@@ -363,7 +363,7 @@ const Tachymetry = ({
                 <div className="p-1.5 bg-emerald-500/10 rounded-lg flex-shrink-0">
                   <LayoutGrid size={16} className="text-emerald-500" />
                 </div>
-                <span className="text-[11px] font-black text-slate-200 tracking-[0.2em] uppercase">
+                <span className="text-[11px] font-black text-slate-200 tracking-[0.2em]">
                   Ταχυμετρία
                 </span>
               </div>

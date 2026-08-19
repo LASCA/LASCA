@@ -1164,7 +1164,7 @@ def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:
     
     return mij
 
-def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, apply_scale_factor: bool = True) -> dict:
+def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, scale_mode: str = "Χωρίς", scale_factor: float = 1.0) -> dict:
     try:
         xs = float(station.get('x', 0))
         ys = float(station.get('y', 0))
@@ -1173,10 +1173,12 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, ap
 
         g_so, S_test = deutero_them(xs, ys, xo, yo)
 
-        # Έλεγχος αν ο χρήστης θέλει συντελεστή κλίμακας
-        if apply_scale_factor:
+        # Νέα λογική Συντελεστή Κλίμακας (όπως στην Όδευση)
+        if scale_mode == "Υπολογισμός":
             mij = sintelestis_klimakas(xs)
-        else:
+        elif scale_mode == "Χειροκίνητα":
+            mij = float(scale_factor)
+        else: # "Χωρίς"
             mij = 1.00
             
         updated_points = []
@@ -1200,7 +1202,7 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, ap
             updated_pt = pt.copy()
             updated_pt['hz_stake'] = beta_normalized 
             
-            # Αν mij = 1.00, η απόσταση παραμένει η dist_grid
+            # Υπολογισμός τελικής απόστασης χάραξης
             updated_pt['dist_stake'] = dist_grid / mij  
             
             updated_points.append(updated_pt)
