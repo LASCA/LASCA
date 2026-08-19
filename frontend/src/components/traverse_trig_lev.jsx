@@ -1,0 +1,208 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Target, Database, PlusCircle, Trash2, Play, Cpu, ArrowLeft } from 'lucide-react';
+
+const TraverseTrigLevel = ({
+  observations = [],
+  setObservations,
+  stations = [],
+  setStations,
+  projectSettings
+}) => {
+  const [localObs, setLocalObs] = useState([]);
+  const [showTrigResults, setShowTrigResults] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const to3 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(3);
+  };
+
+  const to4 = (val) => {
+    if (val === "" || val === null || val === undefined) return "";
+    const num = parseFloat(String(val).replace(',', '.'));
+    return isNaN(num) ? val : num.toFixed(4);
+  };
+
+  const formatVal = (val, decimals = 3) => {
+    if (val === "" || val === undefined || val === null) return "";
+    const num = parseFloat(val);
+    return isNaN(num) ? val : num.toFixed(decimals);
+  };
+
+  useEffect(() => {
+    if (observations && observations.length > 0) {
+      setLocalObs(observations.map(obs => ({
+        ...obs,
+        s: to3(obs.s),
+        z: to4(obs.z),
+        hi: to3(obs.hi),
+        ht: to3(obs.ht)
+      })));
+    } else if (localObs.length === 0) {
+      const initialRows = Array.from({ length: 3 }).map((_, index) => ({
+        id: Date.now() + index, 
+        from: "", to: "", s: "", z: "", hi: "", ht: ""
+      }));
+      setLocalObs(initialRows);
+      if (setObservations) setObservations(initialRows);
+    }
+  }, [observations]);
+
+  const updateObsData = (newData) => {
+    const finalData = typeof newData === 'function' ? newData(localObs) : newData;
+    setLocalObs(finalData);
+    if (setObservations) setObservations(finalData);
+  };
+
+  const handleTrigCalc = async () => {
+    setIsLoading(true);
+    try {
+      const payload = {
+        observations: localObs, 
+        stations: stations,
+        project_name: typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || '')
+      };
+
+      const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
+
+      if (response.data && response.data.status === "success") {
+        if (response.data.stations && setStations) {
+          setStations(response.data.stations);
+        }
+        if (response.data.observations) {
+          updateObsData(response.data.observations);
+        }
+        setShowTrigResults(true);
+      } else {
+        alert(response.data.error || "Προέκυψε σφάλμα.");
+      }
+    } catch (error) {
+      console.error("Σφάλμα στην Τριγωνομετρική Υψομετρία:", error);
+      alert("Αποτυχία σύνδεσης με το backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleObsInputChange = (id, field, value) => updateObsData(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: value } : obs));
+  
+  const handleObsBlur = (id, field, value) => {
+    if (field === 's' || field === 'hi' || field === 'ht') handleObsInputChange(id, field, to3(value));
+    else if (field === 'z') handleObsInputChange(id, field, to4(value));
+  };
+
+  const addObsRowAt = (index) => {
+    const newRow = { id: Date.now(), from: "", to: "", s: "", z: "", hi: "", ht: "" };
+    const updated = [...localObs];
+    updated.splice(index + 1, 0, newRow);
+    updateObsData(updated);
+  };
+
+  const removeObsRow = (id) => updateObsData(localObs.filter(o => o.id !== id));
+
+  return (
+    <>
+      <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
+        <Target size={14} className="text-blue-400" />
+        1. Πίνακας Παρατηρήσεων (Τριγωνομετρική)
+      </h3>
+      <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
+        <div className="overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse table-auto relative">
+            <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
+              <tr className="border-b border-slate-800/50">
+                <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">From</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">To</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope D [m]</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
+                
+                {showTrigResults && (
+                  <>
+                    <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔH Μ.Ο. [m]</th>
+                    <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθ. [m]</th>
+                    <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">Τελικό ΔH [m]</th>
+                  </>
+                )}
+                
+                <th className="p-3 w-24">
+                  <div className="flex justify-end pr-2 gap-2">
+                    {showTrigResults && (
+                      <button 
+                        onClick={() => setShowTrigResults(false)}
+                        className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 bg-gradient-to-r from-slate-500/10 to-slate-400/10 border border-slate-500/30 cursor-pointer hover:bg-slate-700"
+                        title="Επιστροφή στην επεξεργασία"
+                      >
+                        <ArrowLeft size={14} className="text-slate-400" />
+                      </button>
+                    )}
+                    <button 
+                      onClick={handleTrigCalc}
+                      disabled={isLoading}
+                      className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
+                        isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 cursor-pointer'
+                      }`}
+                      title="Υπολογισμός Υψομέτρων"
+                    >
+                      {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
+                    </button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/30">
+              {localObs.length > 0 ? (
+                localObs.map((obs, index) => (
+                  <React.Fragment key={obs.id || index}>
+                    <tr className="group hover:bg-slate-800/20 transition-all">
+                      <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.from} onChange={(e) => handleObsInputChange(obs.id, 'from', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.to} onChange={(e) => handleObsInputChange(obs.id, 'to', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.s} onBlur={(e) => handleObsBlur(obs.id, 's', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 's', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} placeholder="-" /></td>
+                      
+                      {showTrigResults && (
+                        <>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-purple-400 cursor-default" value={formatVal(obs.dh_mean ?? obs.dh, 3)} disabled placeholder="-" /></td>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-rose-400 cursor-default" value={formatVal(obs.corr, 3)} disabled placeholder="-" /></td>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-amber-400 cursor-default" value={formatVal(obs.dh_final, 3)} disabled placeholder="-" /></td>
+                        </>
+                      )}
+
+                      <td className="p-4 text-right">
+                        <button onClick={() => removeObsRow(obs.id)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all cursor-pointer"><Trash2 size={15} /></button>
+                      </td>
+                    </tr>
+                    <tr className="h-0 p-0">
+                      <td colSpan={showTrigResults ? 11 : 8} className="p-0 h-0 relative">
+                        <button onClick={() => addObsRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"><PlusCircle size={16} /></button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={showTrigResults ? 11 : 8} className="px-4 py-16 text-center text-slate-500">
+                    <div className="flex flex-col items-center gap-4">
+                      <Database size={28} className="opacity-50" />
+                      <span className="text-sm">Δεν βρέθηκαν δεδομένα</span>
+                      <button onClick={() => updateObsData([{ id: Date.now(), from: "", to: "", s: "", z: "", hi: "", ht: "" }])} className="flex items-center gap-2 px-4 py-2 mt-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-all text-xs font-bold cursor-pointer"><PlusCircle size={16} /> Προσθήκη</button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default TraverseTrigLevel;

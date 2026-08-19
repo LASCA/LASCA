@@ -961,10 +961,17 @@ def normalize_node(name):
         s = s.replace(gr, lat)
     return s
 
+import numpy as np
+import pandas as pd
+
+import numpy as np
+import pandas as pd
+
 def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     """
     Εκτελεί τον υπολογισμό τριγωνομετρικής υψομετρίας υποστηρίζοντας 
     ελληνικούς & αγγλικούς χαρακτήρες και πλήρη κάλυψη όλων των γραμμών.
+    Διατηρεί αυστηρά αμετάβλητα τα αρχικά γνωστά υψόμετρα (fixed benchmarks).
     """
     if not measurements_json:
         return measurements_json
@@ -1015,7 +1022,7 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     for col in ['Dist', 'Z_grad', 'H_station', 'H_target']:
         df_meas_clean[col] = pd.to_numeric(df_meas_clean[col], errors='coerce').fillna(0.0)
 
-    # 3. Τύπος Υψομετρικής Διαφοράς (tyo logic)
+    # 3. Τύπος Υψομετρικής Διαφοράς
     z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
     df_meas_clean['dh'] = (df_meas_clean['Dist'] / np.tan(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
     df_meas_clean['L_horiz'] = df_meas_clean['Dist']
@@ -1092,7 +1099,6 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     end_known = None
     
     if all_candidate_paths:
-        # Επιλογή της μεγαλύτερης διαδρομής (κύρια όδευση)
         all_candidate_paths.sort(key=lambda x: len(x[0]), reverse=True)
         path_nodes, start_known, end_known = all_candidate_paths[0]
 
@@ -1100,7 +1106,6 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     known_heights = known_heights_initial.copy()
     calculated_edges = {}
 
-    # Αρχικοποίηση όλων των πλευρών με 0 διόρθωση (για ελεύθερες πλευρές / ακτινοβολίες)
     for seg in segments:
         u, v = seg['From'], seg['To']
         calculated_edges[(u, v)] = {
@@ -1133,7 +1138,8 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
             dh_final = dh + corr
             current_h += dh_final
             
-            if v != end_known: 
+            # ΚΛΕΙΔΩΜΑ: Ενημερώνουμε το υψόμετρο ΜΟΝΟ αν δεν είναι αρχικά γνωστό σημείο (Fixed)
+            if v not in known_heights_initial: 
                 known_heights[v] = round(current_h, 3)
                 
             calculated_edges[(u, v)] = {
@@ -1147,11 +1153,43 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
                 'dh_final': round(-dh_final, 4)
             }
 
+    # 6.5 ΔΙΑΔΟΣΗ ΥΨΟΜΕΤΡΩΝ (Ελεύθερες Οδεύσεις & Ακτινοβολίες)
+    queue = list(known_heights.keys())
+    visited = set(known_heights.keys())
+
+    while queue:
+        current_node = queue.pop(0)
+        current_h = known_heights[current_node]
+
+        if current_node in graph:
+            for edge in graph[current_node]:
+                neighbor = edge['to']
+                if neighbor not in visited:
+                    edge_key = (current_node, neighbor)
+                    
+                    if edge_key in calculated_edges:
+                        dh_step = calculated_edges[edge_key]['dh_final']
+                    else:
+                        dh_step = edge['dh']
+
+                    new_h = current_h + dh_step
+                    
+                    # ΚΛΕΙΔΩΜΑ: Αν το neighbor ανήκει στα αρχικά γνωστά, διατηρούμε την αρχική τιμή
+                    if neighbor not in known_heights_initial:
+                        known_heights[neighbor] = round(new_h, 3)
+
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+
     # 7. Ενημέρωση του αρχικού JSON
     for row in measurements_json:
         st_name = normalize_node(row.get('name', ''))
-        if st_name in known_heights:
-            row['h'] = known_heights[st_name]
+        if st_name and st_name in known_heights:
+            # Διασφάλιση ότι τα αρχικά γνωστά σημεία επιστρέφουν με την ακριβή αρχική τους τιμή
+            if st_name in known_heights_initial:
+                row['h'] = known_heights_initial[st_name]
+            else:
+                row['h'] = known_heights[st_name]
             
         frm = normalize_node(row.get(from_col, ''))
         to = normalize_node(row.get(to_col, ''))
