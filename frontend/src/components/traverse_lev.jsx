@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Ruler, PlusCircle, Trash2, Play, Cpu, Activity, Info } from 'lucide-react';
+import { Ruler, PlusCircle, Trash2, Play, Cpu, Activity, Info, ArrowLeft } from 'lucide-react';
 
 const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS, themeColor }) => {
   const colorClass = themeColor === 'blue' ? 'text-blue-400' : 'text-orange-400';
@@ -59,6 +59,13 @@ const TraverseLeveling = ({
   const [localBackward, setLocalBackward] = useState([]);
   const [localMetrics, setLocalMetrics] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Κατάσταση Προβολής: 'data' (Εισαγωγή) ή 'results' (Πίνακας Αποτελεσμάτων/Πλευρών)
+  const [viewMode, setViewMode] = useState('data'); 
+  const [legsData, setLegsData] = useState([]);
+
+  // Ref για αυτόματο scroll down στα στατιστικά
+  const statsSectionRef = useRef(null);
 
   const formatVal = (val, decimals = 3) => {
     if (val === "" || val === undefined || val === null) return "";
@@ -154,6 +161,15 @@ const TraverseLeveling = ({
           setLocalMetrics(response.data.metrics);
           if (setMetrics) setMetrics(response.data.metrics);
         }
+        if (response.data.legs) {
+          setLegsData(response.data.legs);
+        }
+        setViewMode('results');
+
+        // Αυτόματο Scroll Down στους Γεωδαιτικούς Ελέγχους
+        setTimeout(() => {
+          statsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
       }
     } catch (error) {
       console.error("Σφάλμα κατά τη χωροστάθμιση:", error);
@@ -166,281 +182,341 @@ const TraverseLeveling = ({
   return (
     <div className="flex flex-col gap-6 min-h-0 flex-1">
       
-      <div className="flex-none flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
+      {/* ----------------- ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ / ΑΠΟΤΕΛΕΣΜΑΤΩΝ ----------------- */}
+      <div className="flex-none flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden min-h-[400px]">
+        
+        {/* HEADER */}
         <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-amber-500/10 rounded-lg">
                 <Ruler size={18} className="text-amber-500" />
               </div>
-              <div className="flex bg-[#030712] border border-slate-800/80 p-0.5 rounded-lg">
-                <button
-                  onClick={() => setGeoActiveTab('forward')}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                    geoActiveTab === 'forward'
-                      ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  1. Μετάβαση
-                </button>
-                <button
-                  onClick={() => setGeoActiveTab('backward')}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                    geoActiveTab === 'backward'
-                      ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  2. Επιστροφή
-                </button>
-              </div>
+              {viewMode === 'data' ? (
+                <div className="flex bg-[#030712] border border-slate-800/80 p-0.5 rounded-lg">
+                  <button
+                    onClick={() => setGeoActiveTab('forward')}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
+                      geoActiveTab === 'forward'
+                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    1. Μετάβαση
+                  </button>
+                  <button
+                    onClick={() => setGeoActiveTab('backward')}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider transition-all cursor-pointer ${
+                      geoActiveTab === 'backward'
+                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    2. Επιστροφή
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs font-black text-cyan-400 tracking-widest border-l border-slate-800 pl-4">
+                  Πίνακας Αποτελεσμάτων
+                </span>
+              )}
             </div>
           </div>
 
-          <button 
-            onClick={handleRunLeveling}
-            disabled={isLoading}
-            title="Υπολογισμός Χωροστάθμισης"
-            className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(99,102,241,0.05)] ${
-              isLoading 
-                ? 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
-                : 'bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 hover:from-indigo-500/20 hover:to-cyan-500/20 border border-indigo-500/30 hover:border-cyan-400/50 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 cursor-pointer'
-            }`}
-          >
-            {isLoading ? (
-              <Cpu size={14} className="animate-spin text-indigo-400" />
-            ) : (
-              <Play size={14} fill="currentColor" className="text-indigo-400 group-hover:text-cyan-400 transition-colors ml-0.5" />
+          {/* ICON BUTTON GROUP (BACK & PLAY) */}
+          <div className="flex items-center gap-2">
+            {viewMode === 'results' && (
+              <button
+                onClick={() => setViewMode('data')}
+                title="Επιστροφή στα Δεδομένα"
+                className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-400 hover:text-slate-200 transition-all cursor-pointer active:scale-95 shadow-md"
+              >
+                <ArrowLeft size={18} />
+              </button>
             )}
-          </button>
+
+            <button
+              onClick={handleRunLeveling}
+              disabled={isLoading}
+              title="Υπολογισμός Χωροστάθμισης"
+              className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all border active:scale-95 cursor-pointer shadow-md ${
+                isLoading
+                  ? 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed'
+                  : 'bg-emerald-950/30 hover:bg-emerald-900/40 border-emerald-500/40 hover:border-emerald-400/70 text-emerald-400 hover:text-emerald-300'
+              }`}
+            >
+              {isLoading ? (
+                <Cpu size={18} className="animate-spin text-emerald-400" />
+              ) : (
+                <Play size={18} fill="currentColor" className="ml-0.5" />
+              )}
+            </button>
+          </div>
         </div>
 
+        {/* BODY */}
         <div className="flex-1 overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
-            <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
-              <tr className="border-b border-slate-800/60 bg-slate-900/40">
-                <th className={`p-2 text-[10px] font-black text-slate-500 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[4%]' : 'w-[5%]'}`}>#</th>
-                <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[14%]' : 'w-[17%]'}`}>Σημείο Σκόπευσης</th>
-                
-                <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>οπισθο-<br/>σκόπευση</th>
-                <th className={`p-0 text-[9px] font-bold text-blue-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
-                  <div className="border-b border-slate-800/50 py-1.5">άνω</div>
-                  <div className="py-1.5">κάτω</div>
-                </th>
-                <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
-                
-                <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>εμπροσθο-<br/>σκόπευση</th>
-                <th className={`p-0 text-[9px] font-bold text-orange-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
-                  <div className="border-b border-slate-800/50 py-1.5">άνω</div>
-                  <div className="py-1.5">κάτω</div>
-                </th>
-                <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
-                
-                {geoHasResults && (
-                  <>
-                    <th className="w-[12%] p-2 text-[10px] font-black text-purple-500/80 tracking-widest text-right align-middle">Υψομετρική<br/>Διαφορά</th>
-                    <th className="w-[12%] p-2 text-[10px] font-black text-rose-400/80 tracking-widest text-right align-middle">Υψόμετρα από<br/>Επιστροφή</th>
-                    <th className="w-[12%] p-2 text-[10px] font-black text-amber-500/80 tracking-widest text-right align-middle">Τελικά<br/>Υψόμετρα</th>
-                  </>
-                )}
-                <th className="w-[30px] p-0 border-l border-slate-800/30"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20 relative">
-              {currentGeoData && currentGeoData.length > 0 ? (
-                currentGeoData.map((row, idx) => (
-                  <React.Fragment key={idx}>
-                    <tr className="hover:bg-slate-800/30 active:bg-slate-800/50 transition-all duration-150 group relative">
-                      <td className="p-2 text-center text-[10px] text-slate-600 font-mono font-bold border-r border-slate-800/30">{idx + 1}</td>
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-point`}
-                          type="text"
-                          value={row.point ?? ""}
-                          onChange={(e) => handleGeoInputChange(idx, 'point', e.target.value)}
-                          onKeyDown={(e) => handleGeoKeyDown(e, idx, 'point')}
-                          className="bg-transparent w-full font-bold text-slate-400 group-hover:text-cyan-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
-                      
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-backsight`}
-                          type="text"
-                          value={row.backsight ?? ""}
-                          onChange={(e) => handleGeoInputChange(idx, 'backsight', e.target.value)}
-                          onBlur={(e) => handleGeoInputChange(idx, 'backsight', formatVal(e.target.value, 3))}
-                          onKeyDown={(e) => handleGeoKeyDown(e, idx, 'backsight')}
-                          className="bg-transparent w-full font-mono text-blue-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
-                      <td className="p-0 border-r border-slate-800/30">
-                        <div className="flex flex-col h-full">
-                          <input 
-                            id={`input-leveling-${idx}-bs_upper`}
-                            type="text"
-                            value={row.bs_upper ?? ""}
-                            onChange={(e) => handleGeoInputChange(idx, 'bs_upper', e.target.value)}
-                            onBlur={(e) => handleGeoInputChange(idx, 'bs_upper', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_upper')}
-                            className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
-                          />
-                          <input 
-                            id={`input-leveling-${idx}-bs_lower`}
-                            type="text"
-                            value={row.bs_lower ?? ""}
-                            onChange={(e) => handleGeoInputChange(idx, 'bs_lower', e.target.value)}
-                            onBlur={(e) => handleGeoInputChange(idx, 'bs_lower', formatVal(e.target.value, 3))}
-                            onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_lower')}
-                            className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
-                          />
-                        </div>
-                      </td>
-                      <td className="p-2 border-r border-slate-800/30">
-                        <input 
-                          id={`input-leveling-${idx}-bs_s`}
-                          type="text"
-                          value={row.bs_s ?? ""}
-                          onChange={(e) => handleGeoInputChange(idx, 'bs_s', e.target.value)}
-                          onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_s')}
-                          className="bg-transparent w-full font-mono text-blue-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
-                        />
-                      </td>
-
-                      {idx === 0 ? (
-                        <>
-                          <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]" title="Δεν υφίσταται εμπροσθοσκόπευση στο 1ο σημείο"></td>
-                          <td className="p-0 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
-                          <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="p-2 border-r border-slate-800/30">
-                            <input 
-                              id={`input-leveling-${idx}-foresight`}
-                              type="text"
-                              value={row.foresight ?? ""}
-                              onChange={(e) => handleGeoInputChange(idx, 'foresight', e.target.value)}
-                              onBlur={(e) => handleGeoInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
-                              onKeyDown={(e) => handleGeoKeyDown(e, idx, 'foresight')}
-                              className="bg-transparent w-full font-mono text-orange-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 rounded px-1 py-2 transition-all"
-                            />
-                          </td>
-                          <td className="p-0 border-r border-slate-800/30">
-                            <div className="flex flex-col h-full">
-                              <input 
-                                id={`input-leveling-${idx}-fs_upper`}
-                                type="text"
-                                value={row.fs_upper ?? ""}
-                                onChange={(e) => handleGeoInputChange(idx, 'fs_upper', e.target.value)}
-                                onBlur={(e) => handleGeoInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
-                                onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_upper')}
-                                className="bg-transparent w-full font-mono text-orange-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 transition-all"
-                              />
-                              <input 
-                                id={`input-leveling-${idx}-fs_lower`}
-                                type="text"
-                                value={row.fs_lower ?? ""}
-                                onChange={(e) => handleGeoInputChange(idx, 'fs_lower', e.target.value)}
-                                onBlur={(e) => handleGeoInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
-                                onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_lower')}
-                                className="bg-transparent w-full font-mono text-orange-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 transition-all"
-                              />
-                            </div>
-                          </td>
-                          <td className="p-2 border-r border-slate-800/30">
-                            <input 
-                              id={`input-leveling-${idx}-fs_s`}
-                              type="text"
-                              value={row.fs_s ?? ""}
-                              onChange={(e) => handleGeoInputChange(idx, 'fs_s', e.target.value)}
-                              onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_s')}
-                              className="bg-transparent w-full font-mono text-orange-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 rounded px-1 py-2 transition-all"
-                            />
-                          </td>
-                        </>
-                      )}
-
-                      {geoHasResults && (
-                        <>
-                          <td className="p-2 border-r border-slate-800/30">
-                            <input 
-                              id={`input-leveling-${idx}-dh`}
-                              type="text"
-                              value={formatVal(row.dh, 4)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-purple-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                          <td className="p-2 border-r border-slate-800/30">
-                            <input 
-                              id={`input-leveling-${idx}-elev_backward`}
-                              type="text"
-                              value={formatVal(row.elev_backward, 3)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-rose-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                          <td className="p-2 border-r border-slate-800/30">
-                            <input 
-                              id={`input-leveling-${idx}-elevation`}
-                              type="text"
-                              value={formatVal(row.elevation, 3)}
-                              disabled
-                              className="bg-transparent w-full font-mono text-amber-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none cursor-default"
-                            />
-                          </td>
-                        </>
-                      )}
-
-                      <td className="w-[30px] p-0 text-center relative border-l border-slate-800/30">
-                        <button 
-                          onClick={() => deleteGeoRow(idx)} 
-                          className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-                          title="Διαγραφή Σημείου"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-
-                    <tr className="h-0 p-0">
-                      <td colSpan={geoHasResults ? 12 : 9} className="p-0 h-0 relative">
-                        <button 
-                          onClick={() => addGeoRowAt(idx)} 
-                          className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-cyan-400 hover:text-cyan-300 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                          title="Εισαγωγή Νέας Γραμμής"
-                        >
-                          <PlusCircle size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={geoHasResults ? 12 : 9} className="p-24 text-center">
-                    <div className="flex flex-col items-center opacity-50 hover:opacity-100 transition-opacity">
-                      <Info size={30} className="text-slate-500 mx-auto mb-3" />
-                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Αναμονή Δεδομένων Χωροστάθμισης</p>
-                      <button 
-                        onClick={() => addGeoRowAt(-1)} 
-                        className="bg-slate-800 hover:bg-slate-700 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold border border-slate-700/50 flex items-center gap-2 transition-colors cursor-pointer"
-                      >
-                        <PlusCircle size={14} /> Προσθήκη Πρώτης Εγγραφής
-                      </button>
-                    </div>
-                  </td>
+          {viewMode === 'data' ? (
+            /* ================== 1. ΠΡΟΒΟΛΗ ΕΙΣΑΓΩΓΗΣ ΔΕΔΟΜΕΝΩΝ ================== */
+            <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
+              <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
+                <tr className="border-b border-slate-800/60 bg-slate-900/40">
+                  <th className={`p-2 text-[10px] font-black text-slate-500 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[4%]' : 'w-[5%]'}`}>#</th>
+                  <th className={`p-2 text-[10px] font-black text-slate-400 tracking-widest border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[14%]' : 'w-[17%]'}`}>Σημείο Σκόπευσης</th>
+                  
+                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>οπισθο-<br/>σκόπευση</th>
+                  <th className={`p-0 text-[9px] font-bold text-blue-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
+                    <div className="border-b border-slate-800/50 py-1.5">άνω</div>
+                    <div className="py-1.5">κάτω</div>
+                  </th>
+                  <th className={`p-2 text-[10px] font-black text-blue-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
+                  
+                  <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[9%]' : 'w-[13%]'}`}>εμπροσθο-<br/>σκόπευση</th>
+                  <th className={`p-0 text-[9px] font-bold text-orange-400/60 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[6%]' : 'w-[9%]'}`}>
+                    <div className="border-b border-slate-800/50 py-1.5">άνω</div>
+                    <div className="py-1.5">κάτω</div>
+                  </th>
+                  <th className={`p-2 text-[10px] font-black text-orange-500/80 tracking-widest text-center border-r border-slate-800/30 align-middle ${geoHasResults ? 'w-[7%]' : 'w-[10%]'}`}>S</th>
+                  
+                  {geoHasResults && (
+                    <>
+                      <th className="w-[12%] p-2 text-[10px] font-black text-purple-500/80 tracking-widest text-right align-middle">Υψομετρική<br/>Διαφορά</th>
+                      <th className="w-[12%] p-2 text-[10px] font-black text-rose-400/80 tracking-widest text-right align-middle">Υψόμετρα από<br/>Επιστροφή</th>
+                      <th className="w-[12%] p-2 text-[10px] font-black text-amber-500/80 tracking-widest text-right align-middle">Τελικά<br/>Υψόμετρα</th>
+                    </>
+                  )}
+                  <th className="w-[30px] p-0 border-l border-slate-800/30"></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-900/60 bg-[#070c19]/20 relative">
+                {currentGeoData && currentGeoData.length > 0 ? (
+                  currentGeoData.map((row, idx) => (
+                    <React.Fragment key={idx}>
+                      <tr className="hover:bg-slate-800/30 active:bg-slate-800/50 transition-all duration-150 group relative">
+                        <td className="p-2 text-center text-[10px] text-slate-600 font-mono font-bold border-r border-slate-800/30">{idx + 1}</td>
+                        <td className="p-2 border-r border-slate-800/30">
+                          <input 
+                            id={`input-leveling-${idx}-point`}
+                            type="text"
+                            value={row.point ?? ""}
+                            onChange={(e) => handleGeoInputChange(idx, 'point', e.target.value)}
+                            onKeyDown={(e) => handleGeoKeyDown(e, idx, 'point')}
+                            className="bg-transparent w-full font-bold text-slate-400 group-hover:text-cyan-400 text-sm tracking-tight outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-500 rounded px-1 py-2 transition-all"
+                          />
+                        </td>
+                        
+                        <td className="p-2 border-r border-slate-800/30">
+                          <input 
+                            id={`input-leveling-${idx}-backsight`}
+                            type="text"
+                            value={row.backsight ?? ""}
+                            onChange={(e) => handleGeoInputChange(idx, 'backsight', e.target.value)}
+                            onBlur={(e) => handleGeoInputChange(idx, 'backsight', formatVal(e.target.value, 3))}
+                            onKeyDown={(e) => handleGeoKeyDown(e, idx, 'backsight')}
+                            className="bg-transparent w-full font-mono text-blue-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
+                          />
+                        </td>
+                        <td className="p-0 border-r border-slate-800/30">
+                          <div className="flex flex-col h-full">
+                            <input 
+                              id={`input-leveling-${idx}-bs_upper`}
+                              type="text"
+                              value={row.bs_upper ?? ""}
+                              onChange={(e) => handleGeoInputChange(idx, 'bs_upper', e.target.value)}
+                              onBlur={(e) => handleGeoInputChange(idx, 'bs_upper', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_upper')}
+                              className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            />
+                            <input 
+                              id={`input-leveling-${idx}-bs_lower`}
+                              type="text"
+                              value={row.bs_lower ?? ""}
+                              onChange={(e) => handleGeoInputChange(idx, 'bs_lower', e.target.value)}
+                              onBlur={(e) => handleGeoInputChange(idx, 'bs_lower', formatVal(e.target.value, 3))}
+                              onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_lower')}
+                              className="bg-transparent w-full font-mono text-blue-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-800/30">
+                          <input 
+                            id={`input-leveling-${idx}-bs_s`}
+                            type="text"
+                            value={row.bs_s ?? ""}
+                            onChange={(e) => handleGeoInputChange(idx, 'bs_s', e.target.value)}
+                            onKeyDown={(e) => handleGeoKeyDown(e, idx, 'bs_s')}
+                            className="bg-transparent w-full font-mono text-blue-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/50 rounded px-1 py-2 transition-all"
+                          />
+                        </td>
+
+                        {idx === 0 ? (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]" title="Δεν υφίσταται εμπροσθοσκόπευση στο 1ο σημείο"></td>
+                            <td className="p-0 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
+                            <td className="p-2 border-r border-slate-800/30 bg-[#0f172a]/60 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,0.02)_6px,rgba(255,255,255,0.02)_12px)]"></td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-foresight`}
+                                type="text"
+                                value={row.foresight ?? ""}
+                                onChange={(e) => handleGeoInputChange(idx, 'foresight', e.target.value)}
+                                onBlur={(e) => handleGeoInputChange(idx, 'foresight', formatVal(e.target.value, 3))}
+                                onKeyDown={(e) => handleGeoKeyDown(e, idx, 'foresight')}
+                                className="bg-transparent w-full font-mono text-orange-400 text-center text-sm font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 rounded px-1 py-2 transition-all"
+                              />
+                            </td>
+                            <td className="p-0 border-r border-slate-800/30">
+                              <div className="flex flex-col h-full">
+                                <input 
+                                  id={`input-leveling-${idx}-fs_upper`}
+                                  type="text"
+                                  value={row.fs_upper ?? ""}
+                                  onChange={(e) => handleGeoInputChange(idx, 'fs_upper', e.target.value)}
+                                  onBlur={(e) => handleGeoInputChange(idx, 'fs_upper', formatVal(e.target.value, 3))}
+                                  onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_upper')}
+                                  className="bg-transparent w-full font-mono text-orange-300/60 text-center text-[11px] outline-none px-1 py-1.5 border-b border-slate-800/50 border-dashed focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 transition-all"
+                                />
+                                <input 
+                                  id={`input-leveling-${idx}-fs_lower`}
+                                  type="text"
+                                  value={row.fs_lower ?? ""}
+                                  onChange={(e) => handleGeoInputChange(idx, 'fs_lower', e.target.value)}
+                                  onBlur={(e) => handleGeoInputChange(idx, 'fs_lower', formatVal(e.target.value, 3))}
+                                  onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_lower')}
+                                  className="bg-transparent w-full font-mono text-orange-300/60 text-center text-[11px] outline-none px-1 py-1.5 focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 transition-all"
+                                />
+                              </div>
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-fs_s`}
+                                type="text"
+                                value={row.fs_s ?? ""}
+                                onChange={(e) => handleGeoInputChange(idx, 'fs_s', e.target.value)}
+                                onKeyDown={(e) => handleGeoKeyDown(e, idx, 'fs_s')}
+                                className="bg-transparent w-full font-mono text-orange-300/80 text-center text-[12px] font-medium outline-none focus:bg-slate-800/80 focus:ring-1 focus:ring-orange-500/50 rounded px-1 py-2 transition-all"
+                              />
+                            </td>
+                          </>
+                        )}
+
+                        {geoHasResults && (
+                          <>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-dh`}
+                                type="text"
+                                value={formatVal(row.dh, 4)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-purple-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-elev_backward`}
+                                type="text"
+                                value={formatVal(row.elev_backward, 3)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-rose-400 text-right tabular-nums text-sm font-medium tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-slate-800/30">
+                              <input 
+                                id={`input-leveling-${idx}-elevation`}
+                                type="text"
+                                value={formatVal(row.elevation, 3)}
+                                disabled
+                                className="bg-transparent w-full font-mono text-amber-400 text-right tabular-nums text-sm font-bold tracking-wide outline-none cursor-default"
+                              />
+                            </td>
+                          </>
+                        )}
+
+                        <td className="w-[30px] p-0 text-center relative border-l border-slate-800/30">
+                          <button 
+                            onClick={() => deleteGeoRow(idx)} 
+                            className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+                            title="Διαγραφή Σημείου"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+
+                      <tr className="h-0 p-0">
+                        <td colSpan={geoHasResults ? 12 : 9} className="p-0 h-0 relative">
+                          <button 
+                            onClick={() => addGeoRowAt(idx)} 
+                            className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-cyan-400 hover:text-cyan-300 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                            title="Εισαγωγή Νέας Γραμμής"
+                          >
+                            <PlusCircle size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={geoHasResults ? 12 : 9} className="p-24 text-center">
+                      <div className="flex flex-col items-center opacity-50 hover:opacity-100 transition-opacity">
+                        <Info size={30} className="text-slate-500 mx-auto mb-3" />
+                        <p className="text-slate-400 text-[10px] font-black tracking-widest mb-4">Αναμονή Δεδομένων Χωροστάθμισης</p>
+                        <button 
+                          onClick={() => addGeoRowAt(-1)} 
+                          className="bg-slate-800 hover:bg-slate-700 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold border border-slate-700/50 flex items-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <PlusCircle size={14} /> Προσθήκη Πρώτης Εγγραφής
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          ) : (
+            /* ================== 2. ΠΡΟΒΟΛΗ ΑΠΟΤΕΛΕΣΜΑΤΩΝ ΠΛΕΥΡΩΝ ================== */
+            <table className="w-full text-left border-collapse min-w-[900px]">
+              <thead className="bg-[#0f172a] sticky top-0 z-20">
+                <tr className="border-b border-slate-800/60 bg-slate-900/80">
+                  <th className="p-3 text-[11px] font-black text-slate-400 tracking-widest text-center border-r border-slate-800/30 w-[15%]">Πλευρά (Από - Προς)</th>
+                  <th className="p-3 text-[11px] font-black text-blue-400 tracking-widest text-right border-r border-slate-800/30">ΔH Μετάβασης (m)</th>
+                  <th className="p-3 text-[11px] font-black text-orange-400 tracking-widest text-right border-r border-slate-800/30">ΔH Επιστροφής (m)</th>
+                  <th className="p-3 text-[11px] font-black text-purple-400 tracking-widest text-right border-r border-slate-800/30">Διόρθωση v (m)</th>
+                  <th className="p-3 text-[11px] font-black text-emerald-400 tracking-widest text-right">Τελικό ΔH (m)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 bg-[#070c19]/20">
+                {legsData.length > 0 ? (
+                  legsData.map((leg, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="p-3 text-center text-sm text-slate-300 font-bold border-r border-slate-800/30">
+                        {leg.point_from} <span className="text-slate-600 mx-1">→</span> {leg.point_to}
+                      </td>
+                      <td className="p-3 text-right font-mono text-sm text-blue-300 border-r border-slate-800/30">{formatVal(leg.dh_forward, 4)}</td>
+                      <td className="p-3 text-right font-mono text-sm text-orange-300 border-r border-slate-800/30">{formatVal(leg.dh_backward, 4)}</td>
+                      <td className="p-3 text-right font-mono text-sm text-purple-300 border-r border-slate-800/30">{formatVal(leg.correction * 1000, 1)}</td>
+                      <td className="p-3 text-right font-mono text-sm text-emerald-400 font-bold bg-emerald-900/10">{formatVal(leg.dh_final, 4)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-16 text-center text-slate-500 font-bold">
+                      Δεν βρέθηκαν δεδομένα πλευρών!
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ */}
-      <div className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
+      {/* ----------------- ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ ----------------- */}
+      <div ref={statsSectionRef} className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
         <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
           <Activity size={16} className="text-cyan-500" />
           <span className="text-[10px] font-black text-slate-400 tracking-[0.2em]">Συγκριτικός Έλεγχος Μετάβασης / Επιστροφής</span>
