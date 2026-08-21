@@ -552,12 +552,12 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.set_ylim(ymin, ymax)
 
     # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ ---
-    icon_path = r'C:\Users\akara\OneDrive\Desktop\survey_project\north.png' 
+    icon_path = r'C:\Users\akara\OneDrive\Desktop\survey_project\north-arrow-svgrepo-com.png' 
 
     if os.path.exists(icon_path):
         try:
             icon_img = Image.open(icon_path)
-            imagebox = OffsetImage(icon_img, zoom=0.10)
+            imagebox = OffsetImage(icon_img, zoom=0.09)
             ab = AnnotationBbox(imagebox, (0.95, 0.95),
                                 xycoords='axes fraction',
                                 frameon=False, 

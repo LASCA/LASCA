@@ -79,7 +79,7 @@ export const downloadSurveyTemplate = () => {
 
     //  Υψομετρία Όδευσης (traverse_height)
     const wsTrav_h = XLSX.utils.aoa_to_sheet([
-      ["From", "To", "Slope_D", "Z[grad]", "H_station", "H_target"]]);
+      ["From", "To", "D [m]", "Z[grad]", "H_station", "H_target"]]);
     applyProfessionalStyles(wsTrav_h);
     XLSX.utils.book_append_sheet(wb, wsTrav_h, "traverse_leveling");
 

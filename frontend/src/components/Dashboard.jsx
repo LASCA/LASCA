@@ -171,7 +171,7 @@ const Dashboard = ({
               id: Date.now() + 2000 + index,
               from: row['From'] !== undefined ? String(row['From']) : "",
               to: row['To'] !== undefined ? String(row['To']) : "",
-              s: row['Slope_D'] !== undefined ? String(row['Slope_D']) : "",
+              s: row['D [m]'] !== undefined ? String(row['D [m]']) : "",
               z: row['Z[grad]'] !== undefined ? String(row['Z[grad]']) : "",
               hi: row['H_station'] !== undefined ? String(row['H_station']) : "",
               ht: row['H_target'] !== undefined ? String(row['H_target']) : ""
