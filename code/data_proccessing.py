@@ -1025,6 +1025,8 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
             pair_dict[pair] = {'dh_fw': [dh], 'L_fw': [l_horiz], 'dh_bw': [], 'L_bw': []}
 
     segments = []
+    tolerance_errors = [] # ΝΕΟΣ ΠΙΝΑΚΑΣ ΓΙΑ ΤΙΣ ΑΝΟΧΕΣ
+
     for (start, end), data in pair_dict.items():
         dh_fw = np.mean(data['dh_fw']) if data['dh_fw'] else None
         dh_bw = np.mean(data['dh_bw']) if data['dh_bw'] else None
@@ -1033,6 +1035,30 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
         l_bw = np.mean(data['L_bw']) if data['L_bw'] else 0.0
 
         if dh_fw is not None and dh_bw is not None:
+            # --- ΕΛΕΓΧΟΣ ΑΝΟΧΩΝ ---
+            # Επειδή η επιστροφή έχει ανάποδο πρόσημο, το άθροισμα πρέπει να τείνει στο 0.
+            diff_dh = abs(dh_fw + dh_bw) 
+            diff_l = abs(l_fw - l_bw)
+            
+            edge_name = f"{start} - {end}"
+            
+            if diff_dh > tol_dh:
+                tolerance_errors.append({
+                    "edge": edge_name,
+                    "type": "ΔH",
+                    "diff": f"{diff_dh:.4f}",
+                    "limit": f"{tol_dh:.3f}"
+                })
+            
+            if diff_l > tol_s:
+                tolerance_errors.append({
+                    "edge": edge_name,
+                    "type": "D",
+                    "diff": f"{diff_l:.4f}",
+                    "limit": f"{tol_s:.3f}"
+                })
+            # ----------------------
+
             dh_mo = (dh_fw - dh_bw) / 2.0
             l_mean = (l_fw + l_bw) / 2.0
         else:
@@ -1040,7 +1066,6 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
             l_mean = l_fw if l_fw > 0 else l_bw
 
         segments.append({'From': start, 'To': end, 'dh_mean': dh_mo, 'L_mean': l_mean})
-
     # 5. Κατασκευή Γράφου & Αναζήτηση Κύριας Όδευσης
     graph = {}
     for seg in segments:
@@ -1151,8 +1176,16 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
                 row['dh_mean'] = round(dh_row, 4)
                 row['corr'] = 0.0
                 row['dh_final'] = round(dh_row, 4)
+    # 9. Δημιουργία Report Ανοχών
+    tolerance_report = {
+        "hasErrors": len(tolerance_errors) > 0,
+        "errors": tolerance_errors
+    }
 
-    return measurements_json
+    # Επιστρέφουμε ΠΛΕΟΝ TUPLE: (τα δεδομένα, το report)
+    return measurements_json, tolerance_report
+
+   
 
 # Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
 def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:

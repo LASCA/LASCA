@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Target, Database, PlusCircle, Trash2, Play, Cpu, ArrowLeft } from 'lucide-react';
+import { Target, Database, PlusCircle, Trash2, Play, Cpu, ArrowLeft, Settings2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const TraverseTrigLevel = ({
   observations = [],
@@ -12,6 +12,12 @@ const TraverseTrigLevel = ({
   const [localObs, setLocalObs] = useState([]);
   const [showTrigResults, setShowTrigResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // --- STATES ΓΙΑ ΤΙΣ ΑΝΟΧΕΣ ---
+  const [tolD, setTolD] = useState("0.050");
+  const [tolDH, setTolDH] = useState("0.020");
+  const [toleranceReport, setToleranceReport] = useState(null);
+  const reportRef = useRef(null);
 
   const to3 = (val) => {
     if (val === "" || val === null || val === undefined) return "";
@@ -62,7 +68,9 @@ const TraverseTrigLevel = ({
       const payload = {
         observations: localObs, 
         stations: stations,
-        project_name: typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || '')
+        project_name: typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || ''),
+        tolD: parseFloat(tolD) || 0.050,
+        tolDH: parseFloat(tolDH) || 0.020
       };
 
       const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
@@ -75,6 +83,15 @@ const TraverseTrigLevel = ({
           updateObsData(response.data.observations);
         }
         setShowTrigResults(true);
+
+        if (response.data.toleranceReport) {
+          setToleranceReport(response.data.toleranceReport);
+        }
+
+        setTimeout(() => {
+          reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 150);
+
       } else {
         alert(response.data.error || "Προέκυψε σφάλμα.");
       }
@@ -103,20 +120,54 @@ const TraverseTrigLevel = ({
   const removeObsRow = (id) => updateObsData(localObs.filter(o => o.id !== id));
 
   return (
-    <>
-      <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
-        <Target size={14} className="text-blue-400" />
-        1. Πίνακας Παρατηρήσεων (Τριγωνομετρική)
-      </h3>
-      <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
-        <div className="overflow-y-auto custom-scrollbar">
+    <div className="flex flex-col gap-4">
+      
+      {/* === ΕΝΙΑΙΟ ΠΛΑΙΣΙΟ (HEADER & ΠΙΝΑΚΑΣ ΜΑΖΙ) === */}
+      <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl flex flex-col relative overflow-hidden">
+        
+        {/* HEADER: ΤΙΤΛΟΣ & ΡΥΘΜΙΣΕΙΣ ΑΝΟΧΩΝ */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-800/50 bg-[#0b1120] z-40 relative">
+          <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
+            <Target size={14} className="text-blue-400" />
+            1. Πίνακας Παρατηρήσεων
+          </h3>
+          
+          <div className="flex items-center gap-4 border-l border-slate-800/60 pl-4">
+            <div className="flex items-center gap-2">
+              <Settings2 size={14} className="text-slate-500" />
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Ορια Ανοχης:</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-slate-400 font-mono">D [m]</label>
+              <input 
+                type="text" 
+                value={tolD} 
+                onChange={(e) => setTolD(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-amber-400 text-xs text-center rounded-md w-14 h-7 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all font-mono"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-slate-400 font-mono">ΔH [m]</label>
+              <input 
+                type="text" 
+                value={tolDH} 
+                onChange={(e) => setTolDH(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-emerald-400 text-xs text-center rounded-md w-14 h-7 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ΠΙΝΑΚΑΣ */}
+        <div className="overflow-y-auto custom-scrollbar h-fit max-h-[600px]">
           <table className="w-full text-left border-collapse table-auto relative">
             <thead className="bg-[#0f172a] text-[14px] shadow-sm sticky top-0 z-30">
               <tr className="border-b border-slate-800/50">
                 <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">From</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">To</th>
-                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Slope D [m]</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">D [m]</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
@@ -144,7 +195,7 @@ const TraverseTrigLevel = ({
                       onClick={handleTrigCalc}
                       disabled={isLoading}
                       className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
-                        isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 cursor-pointer'
+                        isLoading ? 'opacity-50 bg-slate-800' : 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                       }`}
                       title="Υπολογισμός Υψομέτρων"
                     >
@@ -201,7 +252,53 @@ const TraverseTrigLevel = ({
           </table>
         </div>
       </div>
-    </>
+
+      {/* ΣΤΑΤΙΣΤΙΚΑ / ΕΛΕΓΧΟΣ ΑΝΟΧΩΝ */}
+      {showTrigResults && toleranceReport && (
+        <div 
+          ref={reportRef}
+          className={`mt-2 p-5 rounded-xl border flex flex-col gap-4 shadow-2xl transition-all duration-500 ${
+            toleranceReport.hasErrors 
+              ? "bg-rose-950/20 border-rose-900/50" 
+              : "bg-emerald-950/20 border-emerald-900/50"
+          }`}
+        >
+          <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
+            {toleranceReport.hasErrors ? (
+              <AlertTriangle size={18} className="text-rose-500" />
+            ) : (
+              <CheckCircle size={18} className="text-emerald-500" />
+            )}
+            <span className="text-[11px] font-black text-slate-300 tracking-[0.2em] uppercase">
+              Ελεγχος Ανοχων Μεταβασης - Επιστροφης
+            </span>
+          </div>
+
+          {toleranceReport.hasErrors ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {toleranceReport.errors.map((err, idx) => (
+                <div key={idx} className="bg-[#0b1120]/80 p-3 rounded-lg border border-rose-500/20 flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-black tracking-wider">ΠΛΕΥΡΑ: <span className="text-slate-200">{err.edge}</span></span>
+                    <span className="text-[10px] text-slate-500">Σφάλμα {err.type === 'ΔH' ? 'Υψομετρικής (ΔH)' : 'Απόστασης (D)'}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 text-right border-l border-slate-800/50 pl-4">
+                    <span className="text-xs font-mono font-bold text-rose-400">{err.diff} m</span>
+                    <span className="text-[9px] font-mono text-slate-500">Όριο: {err.limit} m</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-center">
+              <span className="text-sm font-bold text-emerald-400/90 tracking-wide">
+                Όλες οι μετρήσεις βρίσκονται εντός των επιτρεπτών ορίων ανοχής.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -1027,14 +1027,15 @@ def run_traverse_height():
         
         observations = data.get('observations', [])
         stations = data.get('stations', [])
+        
+        tol_s = float(data.get('tolD', 0.050))
+        tol_dh = float(data.get('tolDH', 0.020))
 
         if not observations or not stations:
-            print("❌ [DEBUG] ΣΦΑΛΜΑ: Λείπουν δεδομένα παρατηρήσεων ή στάσεων. Επιστρέφω 400.")
             return jsonify({"error": "Λείπουν δεδομένα παρατηρήσεων ή στάσεων."}), 400
 
         measurements_json = []
 
-        # 1. Προσθήκη των Στάσεων (Διατηρούμε το id της React)
         for st in stations:
             measurements_json.append({
                 "id": st.get("id"),
@@ -1042,7 +1043,6 @@ def run_traverse_height():
                 "h": st.get("h", "")
             })
 
-        # 2. Προσθήκη των Παρατηρήσεων (Με τα ακριβή keys της React και το id)
         for obs in observations:
             from_st = obs.get("From") or obs.get("from") or ""
             to_st = obs.get("To") or obs.get("to") or ""
@@ -1062,10 +1062,12 @@ def run_traverse_height():
                 "H_target": float(ht_val) if ht_val else 0.0
             })
 
-        # 3. Εκτέλεση Υπολογισμού
-        updated_json = dpr.traverse_level_calc2(measurements_json)
+        updated_json, tolerance_report = dpr.traverse_level_calc2(
+            measurements_json, 
+            tol_dh=tol_dh, 
+            tol_s=tol_s
+        )
 
-        # 4. Φιλτράρισμα και διαχωρισμός των αποτελεσμάτων
         updated_stations = []
         updated_observations = []
         
@@ -1091,48 +1093,44 @@ def run_traverse_height():
                         "dh_final": row.get("dh_final")
                     })
 
-        # 4.5 ΕΝΗΜΕΡΩΣΗ ΤΟΥ latest_traverse.json ΜΕ ΤΑ ΥΠΟΛΟΓΙΣΜΕΝΑ ZS
+        # Ενημέρωση latest_traverse.json
         try:
-            project_name = get_active_project_name()
-            project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-            json_path = project_dir / "latest_traverse.json"
+            project_name = get_active_project_name() if 'get_active_project_name' in globals() else None
+            project_dir = WORKSPACE_DIR / project_name if (project_name and 'WORKSPACE_DIR' in globals()) else None
+            if project_dir:
+                json_path = project_dir / "latest_traverse.json"
+                if json_path.exists():
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        traverse_data = json.load(f)
 
-            if json_path.exists():
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    traverse_data = json.load(f)
+                    heights_map = {
+                        str(st["name"]): st["h"] 
+                        for st in updated_stations 
+                        if st.get("name") and st.get("h") not in [None, "", "---"]
+                    }
 
-                heights_map = {
-                    str(st["name"]): st["h"] 
-                    for st in updated_stations 
-                    if st.get("name") and st.get("h") not in [None, "", "---"]
-                }
+                    file_updated = False
+                    for station in traverse_data:
+                        st_name = station.get("Station_Name")
+                        if st_name in heights_map:
+                            station["ZS"] = float(heights_map[st_name])
+                            file_updated = True
 
-                file_updated = False
-                for station in traverse_data:
-                    st_name = station.get("Station_Name")
-                    if st_name in heights_map:
-                        station["ZS"] = float(heights_map[st_name])
-                        file_updated = True
-
-                if file_updated:
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(traverse_data, f, ensure_ascii=False, indent=4)
-                    print("✅ [DEBUG] Το latest_traverse.json ενημερώθηκε επιτυχώς με τα νέα ZS!")
-            else:
-                print(f"⚠️ [DEBUG] Δεν βρέθηκε το αρχείο {json_path}. Τα ZS δεν ενημερώθηκαν.")
+                    if file_updated:
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(traverse_data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            print(f"⚠️ [DEBUG] Μικρό σφάλμα κατά την αποθήκευση των ZS στο JSON (το API συνεχίζει): {e}")
+            print(f"⚠️ [DEBUG] Σφάλμα αποθήκευσης ZS: {e}")
 
-        # 5. Επιστροφή ΟΛΩΝ των δεδομένων
         return jsonify({
             "status": "success",
             "stations": updated_stations,
-            "observations": updated_observations
+            "observations": updated_observations,
+            "toleranceReport": tolerance_report
         })
 
     except Exception as e:
-        print("\n💥 [DEBUG ERROR] Κάτι έσπασε άσχημα!")
-        print(f"{traceback.format_exc()}")
+        print(f"💥 [DEBUG ERROR] {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 # ==========================================
