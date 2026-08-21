@@ -2,7 +2,7 @@ import pandas as pd
 import math
 import base64
 import ezdxf
-import os, json, io
+import os, json, io, traceback
 import traceback
 import data_proccessing as dpr  
 import vis_4_app as vis     
@@ -14,11 +14,18 @@ from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether, PageBreak, BaseDocTemplate, PageTemplate, Frame, NextPageTemplate
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+try:
+    pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf')) # Βάλε το σωστό path εδώ
+    font_name = 'ArialGreek'
+except:
+    print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
+    font_name = 'Helvetica' # Fallback αν δεν βρει το αρχείο
 
 app = Flask(__name__)
 CORS(app) 
@@ -245,18 +252,8 @@ def run_adjustment():
         print(f"Σφάλμα κατά την εκτέλεση της συνόρθωσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-import os
-from io import BytesIO
-from flask import request, send_file, jsonify
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
 # ==========================================
-# 1B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (ADJUSTMENT)
+# 1B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (ADJUSTMENT - CUSTOM STYLING)
 # ==========================================
 @app.route('/api/adjustment/report', methods=['POST'])
 def export_adjustment_report():
@@ -265,15 +262,18 @@ def export_adjustment_report():
         observations = data.get('measurements', [])
         stats = data.get('stats', [])
         
-        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΑΣ (Διορθώνει τα κουτάκια ■ σε ελληνικά & σύμβολα σ) ---
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ (Κανονική & Bold) ---
         font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
+            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
             my_font = 'GreekFont'
+            my_font_bold = 'GreekFont-Bold'
         except Exception:
             my_font = 'Helvetica'
+            my_font_bold = 'Helvetica-Bold'
 
-        # Βοηθητική συνάρτηση για στρογγυλοποίηση σε 4 δεκαδικά ψηφία
         def format_to_4(val):
             if val is None or val == "":
                 return "-"
@@ -291,31 +291,33 @@ def export_adjustment_report():
         )
         elements = []
         
-        # --- Dark Palette (Ομοιομορφία με το Traverse Report) ---
-        BG_CANVAS = colors.HexColor('#0b1120')
-        HEADER_BG = colors.HexColor('#1e293b')
-        ROW_BG_1 = colors.HexColor('#0f172a')
-        ROW_BG_2 = colors.HexColor('#182234')
-        GRID_COLOR = colors.HexColor('#334155')
+        # --- Light Palette & Custom Colors ---
+        HEADER_BG = colors.HexColor('#1e293b')     
+        ROW_BG_1 = colors.HexColor('#ffffff')      
+        ROW_BG_2 = colors.HexColor('#f8fafc')      
+        GRID_COLOR = colors.HexColor('#cbd5e1')    
         
-        TEXT_MAIN = colors.HexColor('#f8fafc')
-        ACCENT_CYAN = colors.HexColor('#38bdf8')
-        ACCENT_BLUE = colors.HexColor('#60a5fa')
-        ACCENT_GREEN = colors.HexColor('#34d399')
+        TEXT_MAIN = colors.HexColor('#0f172a')     
+        TITLE_COLOR = colors.HexColor('#0284c7')   
+        H2_COLOR = colors.HexColor('#2563eb')      
+        
+        # Νέα έντονα χρώματα για τα αποτελέσματα (Πίνακας 1)
+        BRIGHT_GREEN = colors.HexColor('#16a34a')  # Έντονο πράσινο
+        MATCHING_CYAN = colors.HexColor('#0891b2') # Έντονο Κυανό/Teal (ταιριάζει άψογα με το πράσινο)
 
         styles = getSampleStyleSheet()
         
         title_style = ParagraphStyle(
-            'DarkTitle', parent=styles['Title'], fontName=my_font,
-            fontSize=18, textColor=ACCENT_CYAN, alignment=1
+            'LightTitle', parent=styles['Title'], fontName=my_font,
+            fontSize=18, textColor=TITLE_COLOR, alignment=1
         )
         h2_style = ParagraphStyle(
-            'DarkH2', parent=styles['Heading2'], fontName=my_font,
-            fontSize=11, textColor=ACCENT_BLUE, spaceBefore=10, spaceAfter=8
+            'LightH2', parent=styles['Heading2'], fontName=my_font,
+            fontSize=11, textColor=H2_COLOR, spaceBefore=10, spaceAfter=8
         )
         header_style = ParagraphStyle(
             'TableHead', parent=styles['Normal'], fontName=my_font,
-            fontSize=8.5, textColor=TEXT_MAIN, alignment=1
+            fontSize=8.5, textColor=colors.white, alignment=1 
         )
 
         # --- Τίτλος ---
@@ -333,7 +335,7 @@ def export_adjustment_report():
             Paragraph("<b>Face I</b>", header_style),
             Paragraph("<b>Face II</b>", header_style),
             Paragraph("<b>Adj. Hz (grad)</b>", header_style),
-            Paragraph("<b>σ (cc)</b>", header_style) # Καθαρό 'σ' χωρίς Symbol font tag
+            Paragraph("<b>σ (cc)</b>", header_style)
         ]
         
         table_data = [t1_headers]
@@ -348,17 +350,25 @@ def export_adjustment_report():
                 format_to_4(obs.get('std_dev'))
             ])
             
-        # Καθορισμός σταθερού πλάτους στηλών (Σύνολο = 535pt - πλήρες πλάτος A4)
         t1 = Table(table_data, colWidths=[55, 55, 50, 90, 90, 100, 95])
         t1_cmds = [
-            ('FONTNAME', (0,0), (-1,-1), my_font),
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTSIZE', (0,0), (-1,-1), 8.5),
-            ('TEXTCOLOR', (0,1), (-1,-1), TEXT_MAIN),
-            ('TEXTCOLOR', (5,1), (5,-1), ACCENT_CYAN),   # Έμφαση στο Adj Hz
-            ('TEXTCOLOR', (6,1), (6,-1), ACCENT_GREEN),  # Έμφαση στο σ (cc)
+            
+            # 1. Θέτουμε κανονική γραμματοσειρά σε όλο τον πίνακα αρχικά
+            ('FONTNAME', (0,1), (-1,-1), my_font),
+            
+            # 2. Κάνουμε Bold ΜΟΝΟ τα From, To, Adj. Hz, και σ
+            ('FONTNAME', (0,1), (1,-1), my_font_bold), # From, To
+            ('FONTNAME', (5,1), (6,-1), my_font_bold), # Adj Hz, σ
+            
+            # 3. Ορίζουμε τα χρώματα κειμένου
+            ('TEXTCOLOR', (0,1), (4,-1), TEXT_MAIN),     # Στήλες 0 έως 4: Κανονικό σκούρο χρώμα
+            ('TEXTCOLOR', (5,1), (5,-1), BRIGHT_GREEN),  # Στήλη 5 (Adj Hz): Έντονο πράσινο
+            ('TEXTCOLOR', (6,1), (6,-1), MATCHING_CYAN), # Στήλη 6 (σ): Ταιριαστό έντονο κυανό
+            
             ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
             ('TOPPADDING', (0,0), (-1,-1), 5),
             ('BOTTOMPADDING', (0,0), (-1,-1), 5),
@@ -395,13 +405,17 @@ def export_adjustment_report():
             
         t2 = Table(stats_data, colWidths=[75, 110, 115, 115, 120])
         t2_cmds = [
-            ('FONTNAME', (0,0), (-1,-1), my_font),
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            
+            # Στατιστικά: ΟΛΑ BOLD
+            ('FONTNAME', (0,1), (-1,-1), my_font_bold),
+            
+            # Στατιστικά: ΟΛΑ το ίδιο ομοιόμορφο χρώμα (σκούρο κείμενο)
             ('TEXTCOLOR', (0,1), (-1,-1), TEXT_MAIN),
-            ('TEXTCOLOR', (3,1), (4,-1), ACCENT_GREEN), # Έμφαση στα σ0
+            
             ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
             ('TOPPADDING', (0,0), (-1,-1), 5),
             ('BOTTOMPADDING', (0,0), (-1,-1), 5),
@@ -413,14 +427,7 @@ def export_adjustment_report():
         t2.setStyle(TableStyle(t2_cmds))
         elements.append(t2)
         
-        # --- Εφαρμογή Dark Background στο PDF ---
-        def draw_dark_background(canvas, doc_obj):
-            canvas.saveState()
-            canvas.setFillColor(BG_CANVAS)
-            canvas.rect(0, 0, doc_obj.pagesize[0], doc_obj.pagesize[1], fill=True, stroke=False)
-            canvas.restoreState()
-
-        doc.build(elements, onFirstPage=draw_dark_background, onLaterPages=draw_dark_background)
+        doc.build(elements)
         buffer.seek(0)
         
         return send_file(
@@ -566,7 +573,8 @@ def run_traverse():
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
-# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE)
+# ==========================================
+# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - LIGHT THEME & CUSTOM PLOT PAGE)
 # ==========================================
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
@@ -576,62 +584,118 @@ def export_traverse_report():
         metrics = data.get('metrics', {})
         plot_base64 = data.get('plot') 
 
-        # --- ΕΠΙΛΥΣΗ ΠΡΟΒΛΗΜΑΤΟΣ ΜΕ ΤΑ ΕΛΛΗΝΙΚΑ ("ΚΟΥΤΑΚΙΑ") ---
-        # Φορτώνουμε την Arial από τα Windows. Αν το ανεβάσεις σε Linux server αργότερα, 
-        # απλά βάλε το αρχείο arial.ttf στον φάκελο του project σου και άλλαξε το path.
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΑΣ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             my_font = 'GreekFont'
         except Exception:
-            # Fallback αν δεν βρει τη γραμματοσειρά
             print("Δεν βρέθηκε η γραμματοσειρά Arial. Ενδέχεται να μην εμφανίζονται τα Ελληνικά.")
             my_font = 'Helvetica'
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=A4, 
-            rightMargin=30, leftMargin=30, 
-            topMargin=30, bottomMargin=30
+
+        # --- ΟΡΙΣΜΟΣ ΔΙΑΣΤΑΣΕΩΝ ΣΕΛΙΔΩΝ ---
+        a4_w, a4_h = A4
+        
+        # 1. Σελίδα Πινάκων: Standard A4 Portrait 
+        frame_a4 = Frame(30, 30, a4_w - 60, a4_h - 60, id='F_A4')
+        template_a4 = PageTemplate(id='A4_Portrait', frames=frame_a4, pagesize=A4)
+
+        # 2. Σελίδα Σκαριφήματος: Πλάτος ΙΔΙΟ με το Α4, Ύψος αναλογικό (ώστε να είναι ~16:9)
+        PLOT_PAGE_W = a4_w
+        PLOT_PAGE_H = 340  
+        
+        frame_plot = Frame(
+            0, 0, PLOT_PAGE_W, PLOT_PAGE_H, 
+            leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0, 
+            id='F_PLOT'
         )
+        template_plot = PageTemplate(id='Plot_Insert', frames=frame_plot, pagesize=(PLOT_PAGE_W, PLOT_PAGE_H))
+
+        # Αρχικοποίηση BaseDocTemplate
+        doc = BaseDocTemplate(buffer, pagesize=A4)
+        doc.addPageTemplates([template_a4, template_plot])
+
         elements = []
         
-        # --- Dark Palette ---
-        BG_CANVAS = colors.HexColor('#0b1120')
+        # --- Light Palette ---
         HEADER_BG = colors.HexColor('#1e293b')
-        ROW_BG_1 = colors.HexColor('#0f172a')
-        ROW_BG_2 = colors.HexColor('#182234')
-        GRID_COLOR = colors.HexColor('#334155')
+        ROW_BG_1 = colors.HexColor('#ffffff')
+        ROW_BG_2 = colors.HexColor('#f8fafc')
+        GRID_COLOR = colors.HexColor('#cbd5e1')
+        TEXT_MAIN = colors.HexColor('#0f172a')
+        ACCENT_TITLE = colors.HexColor('#0284c7')
         
-        TEXT_MAIN = colors.HexColor('#f8fafc')
-        ACCENT_CYAN = colors.HexColor('#38bdf8')
-        ACCENT_BLUE = colors.HexColor('#60a5fa')
-        ACCENT_GREEN = colors.HexColor('#34d399')
-        ACCENT_RED = colors.HexColor('#ef4444')
-        ACCENT_PINK = colors.HexColor('#ec4899')
+        # Πιο σκούρα/έντονα accents για να γράφουν καλά στο λευκό
+        ACCENT_BLUE = colors.HexColor('#2563eb')
+        ACCENT_GREEN = colors.HexColor('#059669')
+        ACCENT_PINK = colors.HexColor('#db2777') 
+        ACCENT_CYAN = colors.HexColor('#0891b2')
 
         styles = getSampleStyleSheet()
 
-        # Χρησιμοποιούμε τη νέα γραμματοσειρά (my_font) στα styles
         title_style = ParagraphStyle(
-            'DarkTitle', parent=styles['Title'], fontName=my_font,
-            fontSize=18, textColor=ACCENT_CYAN, alignment=1
-        )
-        text_style = ParagraphStyle(
-            'DarkText', parent=styles['Normal'], fontName=my_font,
-            fontSize=10, textColor=TEXT_MAIN, leading=14
+            'LightTitle', parent=styles['Title'], fontName=my_font,
+            fontSize=18, textColor=ACCENT_TITLE, alignment=1
         )
         th_style = ParagraphStyle(
-            'DarkTH', parent=styles['Normal'], fontName=my_font,
-            fontSize=9, textColor=TEXT_MAIN, alignment=1
+            'LightTH', parent=styles['Normal'], fontName=my_font,
+            fontSize=9, textColor=colors.white, alignment=1
         )
 
         # --- Τίτλος ---
         elements.append(Paragraph("Αναφορά Όδευσης (Traverse Report)", title_style))
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 20))
 
-        # --- ΝΕΟΣ ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΣΦΑΛΜΑΤΩΝ ---
+        # ========================================================
+        # 1. ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ (Μπήκε πρώτος)
+        # ========================================================
+        t_headers = [
+            Paragraph("<b>Στάση</b>", th_style),
+            Paragraph("<b>Γωνία [grad]</b>", th_style),
+            Paragraph("<b>Απόσταση [m]</b>", th_style),
+            Paragraph("<b>X [m]</b>", th_style),
+            Paragraph("<b>Y [m]</b>", th_style)
+        ]
+        
+        table_data = [t_headers]
+        for pt in points:
+            table_data.append([
+                str(pt.get('name', '-')),
+                f"{float(pt.get('hz', 0)):.4f}" if pt.get('hz') not in [None, '', '-'] else "-",
+                f"{float(pt.get('sd', 0)):.3f}" if pt.get('sd') not in [None, '', '-'] else "-",
+                f"{float(pt.get('x', 0)):.3f}" if pt.get('x') not in [None, '', '-'] else "-",
+                f"{float(pt.get('y', 0)):.3f}" if pt.get('y') not in [None, '', '-'] else "-"
+            ])
+            
+        t = Table(table_data, colWidths=[80, 80, 80, 100, 100])
+        t_style_cmds = [
+            ('FONTNAME', (0,0), (-1,-1), my_font), 
+            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('TEXTCOLOR', (0,1), (0,-1), TEXT_MAIN),
+            ('TEXTCOLOR', (1,1), (1,-1), ACCENT_BLUE),
+            ('TEXTCOLOR', (2,1), (2,-1), ACCENT_GREEN),
+            ('TEXTCOLOR', (3,1), (4,-1), ACCENT_CYAN),
+            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ]
+
+        for i in range(1, len(table_data)):
+            bg = ROW_BG_1 if i % 2 == 1 else ROW_BG_2
+            t_style_cmds.append(('BACKGROUND', (0, i), (-1, i), bg))
+
+        t.setStyle(TableStyle(t_style_cmds))
+        elements.append(t)
+        elements.append(Spacer(1, 25))
+
+        # ========================================================
+        # 2. ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΣΦΑΛΜΑΤΩΝ (Μπήκε δεύτερος)
+        # ========================================================
         metrics_table_data = [
             # Κεφαλίδες ενοτήτων
             [Paragraph("<b>Γενικά & Μέγιστα</b>", th_style), '', Paragraph("<b>Γωνιακή Ανάλυση</b>", th_style), '', Paragraph("<b>Γραμμική Ανάλυση</b>", th_style), ''],
@@ -651,7 +715,6 @@ def export_traverse_report():
             ["", "", "", "", "δs (W):", f"{metrics.get('w', '-')} m"]
         ]
 
-        # Στυλ για τον πίνακα στατιστικών
         metrics_table = Table(metrics_table_data, colWidths=[65, 75, 65, 80, 85, 70])
         metrics_style = TableStyle([
             ('FONTNAME', (0,0), (-1,-1), my_font),
@@ -680,72 +743,29 @@ def export_traverse_report():
         ])
         metrics_table.setStyle(metrics_style)
         elements.append(metrics_table)
-        elements.append(Spacer(1, 25))
 
-        # --- Πίνακας Στάσεων ---
-        t_headers = [
-            Paragraph("<b>Στάση</b>", th_style),
-            Paragraph("<b>Γωνία [grad]</b>", th_style),
-            Paragraph("<b>Απόσταση [m]</b>", th_style),
-            Paragraph("<b>X [m]</b>", th_style),
-            Paragraph("<b>Y [m]</b>", th_style)
-        ]
-        
-        table_data = [t_headers]
-        for pt in points:
-            table_data.append([
-                str(pt.get('name', '-')),
-                f"{float(pt.get('hz', 0)):.4f}" if pt.get('hz') not in [None, '', '-'] else "-",
-                f"{float(pt.get('sd', 0)):.3f}" if pt.get('sd') not in [None, '', '-'] else "-",
-                f"{float(pt.get('x', 0)):.3f}" if pt.get('x') not in [None, '', '-'] else "-",
-                f"{float(pt.get('y', 0)):.3f}" if pt.get('y') not in [None, '', '-'] else "-"
-            ])
-            
-        t = Table(table_data, colWidths=[80, 80, 80, 100, 100])
-        t_style_cmds = [
-            ('FONTNAME', (0,0), (-1,-1), my_font), # Εφαρμογή γραμματοσειράς και εδώ
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
-            ('TEXTCOLOR', (0,1), (0,-1), TEXT_MAIN),
-            ('TEXTCOLOR', (1,1), (1,-1), ACCENT_BLUE),
-            ('TEXTCOLOR', (2,1), (2,-1), ACCENT_GREEN),
-            ('TEXTCOLOR', (3,1), (4,-1), ACCENT_CYAN),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-        ]
-
-        for i in range(1, len(table_data)):
-            bg = ROW_BG_1 if i % 2 == 1 else ROW_BG_2
-            t_style_cmds.append(('BACKGROUND', (0, i), (-1, i), bg))
-
-        t.setStyle(TableStyle(t_style_cmds))
-        elements.append(t)
-        elements.append(Spacer(1, 20))
-
-        # --- Εισαγωγή Σκαριφήματος (Διάγραμμα) ---
+        # ========================================================
+        # 3. ΕΝΘΕΤΗ ΣΕΛΙΔΑ ΣΚΑΡΙΦΗΜΑΤΟΣ (ΟΜΟΙΟ ΠΛΑΤΟΣ ΜΕ A4)
+        # ========================================================
         if plot_base64 and "," in plot_base64:
             try:
                 encoded_image = plot_base64.split(",")[1]
                 img_data = base64.b64decode(encoded_image)
                 img_stream = BytesIO(img_data)
                 
-                img = Image(img_stream, width=480, height=350, kind='proportional')
-                img.hAlign = 'CENTER'
+                # Αλλαγή στο Plot Template & PageBreak
+                elements.append(NextPageTemplate('Plot_Insert'))
+                elements.append(PageBreak())
+                
+                # Η εικόνα παίρνει ΑΚΡΙΒΩΣ τις νέες διαστάσεις
+                img = Image(img_stream, width=PLOT_PAGE_W, height=PLOT_PAGE_H)
                 elements.append(img)
+                
             except Exception as img_err:
-                print(f"Σφάλμα κατά την επεξεργασία του διαγράμματος: {img_err}")
+                print(f"Σφάλμα εικόνας: {img_err}")
 
-        # --- Εφαρμογή Dark Background στο PDF ---
-        def draw_dark_background(canvas, doc_obj):
-            canvas.saveState()
-            canvas.setFillColor(BG_CANVAS)
-            canvas.rect(0, 0, doc_obj.pagesize[0], doc_obj.pagesize[1], fill=True, stroke=False)
-            canvas.restoreState()
-
-        doc.build(elements, onFirstPage=draw_dark_background, onLaterPages=draw_dark_background)
+        # Χτίσιμο εγγράφου
+        doc.build(elements)
         buffer.seek(0)
         
         return send_file(
@@ -1016,9 +1036,6 @@ def export_traverse_dxf():
         import traceback
         print(f"Σφάλμα κατά την εξαγωγή DXF:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-    
-import json
-import traceback
 
 @app.route('/api/traverse_height', methods=['POST'])
 def run_traverse_height():
@@ -1386,9 +1403,6 @@ def export_tachymetry_txt():
         "total_points": len(all_calculated_points)
     })
 
-import io
-import ezdxf
-
 @app.route('/api/tachymetry/export_dxf', methods=['POST'])
 def export_tachymetry_dxf():
     data = request.json or {}
@@ -1542,8 +1556,9 @@ def export_tachymetry_dxf():
         print(f"⚠️ Σφάλμα κατά τη δημιουργία του DXF: {e}")
         return jsonify({"error": "Αποτυχία δημιουργίας αρχείου DXF"}), 500
 
+# ==========================================
 # CHARAXI
-
+# ==========================================
 @app.route('/api/projects/stakeout', methods=['POST'])
 def run_stakeout():
     try:
@@ -1579,33 +1594,8 @@ def run_stakeout():
         print(f"Σφάλμα κατά τον υπολογισμό χάραξης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-import base64
-import os
-from io import BytesIO
-from flask import request, jsonify, send_file
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
 # ==========================================
-# ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΑΣ ΓΙΑ ΕΛΛΗΝΙΚΑ
-# ==========================================
-# Βεβαιώσου ότι έχεις το αρχείο arial.ttf (ή dejavu) στον φάκελο του project σου.
-# Αν είσαι σε Windows, συνήθως υπάρχει στο 'C:\Windows\Fonts\arial.ttf'
-try:
-    pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf')) # Βάλε το σωστό path εδώ
-    font_name = 'ArialGreek'
-except:
-    print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
-    font_name = 'Helvetica' # Fallback αν δεν βρει το αρχείο
-
-# ==========================================
-# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (GREEK & LIGHT)
+# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (GREEK & LIGHT - MATCH A4 WIDTH)
 # ==========================================
 @app.route('/api/projects/stakeout/report', methods=['POST'])
 def export_stakeout_report():
@@ -1619,31 +1609,44 @@ def export_stakeout_report():
         plot_base64 = data.get('plot')
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=A4, 
-            rightMargin=30, 
-            leftMargin=30, 
-            topMargin=30, 
-            bottomMargin=30
+
+        # --- ΟΡΙΣΜΟΣ ΔΙΑΣΤΑΣΕΩΝ ΣΕΛΙΔΩΝ ---
+        a4_w, a4_h = A4
+        
+        # 1. Σελίδα Πινάκων: Standard A4 Portrait (Κανονική σελίδα με 30pt περιθώρια)
+        frame_a4 = Frame(30, 30, a4_w - 60, a4_h - 60, id='F_A4')
+        template_a4 = PageTemplate(id='A4_Portrait', frames=frame_a4, pagesize=A4)
+
+        # 2. Σελίδα Σκαριφήματος: Πλάτος ΙΔΙΟ με το Α4, Ύψος αναλογικό (ώστε να είναι 16:9)
+        # Με αυτόν τον τρόπο δεν προεξέχει στο PDF viewer σε σχέση με την 1η σελίδα.
+        PLOT_PAGE_W = a4_w
+        PLOT_PAGE_H = 340  # Προσαρμοσμένο ύψος για να φαίνεται σωστά το γράφημα (περίπου 16:9 ratio)
+        
+        frame_plot = Frame(
+            0, 0, PLOT_PAGE_W, PLOT_PAGE_H, 
+            leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0, 
+            id='F_PLOT'
         )
+        template_plot = PageTemplate(id='Plot_Insert', frames=frame_plot, pagesize=(PLOT_PAGE_W, PLOT_PAGE_H))
+
+        # Αρχικοποίηση BaseDocTemplate
+        doc = BaseDocTemplate(buffer, pagesize=A4)
+        doc.addPageTemplates([template_a4, template_plot])
+
         elements = []
         
-        # --- Light Palette (Καθαρή & Επαγγελματική) ---
-        HEADER_BG = colors.HexColor('#1e293b')     # Σκούρο μπλε/γκρι για το Header
-        ROW_BG_1 = colors.HexColor('#ffffff')      # Γραμμή 1 (Λευκό)
-        ROW_BG_2 = colors.HexColor('#f8fafc')      # Γραμμή 2 (Απαλό γκρι)
-        GRID_COLOR = colors.HexColor('#cbd5e1')    # Διακριτικά περιγράμματα
-        
-        TEXT_MAIN = colors.HexColor('#0f172a')     # Βασικό κείμενο
-        ACCENT_TITLE = colors.HexColor('#0284c7')  # Μπλε ρουά για τίτλο
-        ACCENT_BLUE = colors.HexColor('#2563eb')   # Μπλε για Hz
-        ACCENT_GREEN = colors.HexColor('#059669')  # Πράσινο για Dist
-        ACCENT_AMBER = colors.HexColor('#d97706')  # Πορτοκαλί/Amber για G0
+        # --- Light Palette ---
+        HEADER_BG = colors.HexColor('#1e293b')
+        ROW_BG_1 = colors.HexColor('#ffffff')
+        ROW_BG_2 = colors.HexColor('#f8fafc')
+        GRID_COLOR = colors.HexColor('#cbd5e1')
+        TEXT_MAIN = colors.HexColor('#0f172a')
+        ACCENT_TITLE = colors.HexColor('#0284c7')
+        ACCENT_BLUE = colors.HexColor('#2563eb')
+        ACCENT_GREEN = colors.HexColor('#059669')
 
         styles = getSampleStyleSheet()
 
-        # Styles Κειμένου με τη νέα Ελληνική Γραμματοσειρά
         title_style = ParagraphStyle(
             'LightTitle', parent=styles['Title'], fontName=font_name,
             fontSize=16, textColor=ACCENT_TITLE, alignment=1, spaceAfter=15
@@ -1655,10 +1658,6 @@ def export_stakeout_report():
         th_style = ParagraphStyle(
             'LightTH', parent=styles['Normal'], fontName=font_name,
             fontSize=9, textColor=colors.white, alignment=1
-        )
-        caption_style = ParagraphStyle(
-            'Caption', parent=styles['Normal'], fontName=font_name,
-            fontSize=9, textColor=colors.HexColor('#64748b'), alignment=1, spaceBefore=5
         )
 
         # --- Τίτλος ---
@@ -1707,7 +1706,7 @@ def export_stakeout_report():
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), font_name), # Εφαρμογή γραμματοσειράς
+            ('FONTNAME', (0,0), (-1,-1), font_name),
             ('FONTSIZE', (0,0), (-1,-1), 9),
             ('TEXTCOLOR', (0,1), (3,-1), TEXT_MAIN),
             ('TEXTCOLOR', (4,1), (4,-1), ACCENT_BLUE),
@@ -1723,36 +1722,23 @@ def export_stakeout_report():
 
         t.setStyle(TableStyle(t_style_cmds))
         elements.append(t)
-        elements.append(Spacer(1, 25))
 
-# --- Σκαρίφημα με Επαγγελματικό Πλαίσιο ---
+        # --- ΕΝΘΕΤΗ ΣΕΛΙΔΑ ΣΚΑΡΙΦΗΜΑΤΟΣ (ΟΜΟΙΟ ΠΛΑΤΟΣ ΜΕ A4) ---
         if plot_base64 and "," in plot_base64:
             try:
                 encoded_image = plot_base64.split(",")[1]
                 img_data = base64.b64decode(encoded_image)
                 img_stream = BytesIO(img_data)
                 
-                # Κάνουμε την εικόνα ελαφρώς μεγαλύτερη για να γεμίζει ωραία τη σελίδα
-                img = Image(img_stream, width=480, height=335, kind='proportional')
+                # Αλλαγή στο Plot Template & PageBreak
+                elements.append(NextPageTemplate('Plot_Insert'))
+                elements.append(PageBreak())
                 
-                # Μινιμαλιστικός πίνακας: ΚΑΘΟΛΟΥ padding, ΚΑΘΟΛΟΥ background χρώμα. 
-                # Μόνο ένα πολύ λεπτό σκούρο border που εφαρμόζει ακριβώς πάνω στην εικόνα.
-                plot_table = Table([[img]], colWidths=[480])
-                plot_table.setStyle(TableStyle([
-                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                    ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#0f172a')), # Σούπερ λεπτό, αυστηρό σκούρο περίγραμμα
-                    ('LEFTPADDING', (0,0), (-1,-1), 0),
-                    ('RIGHTPADDING', (0,0), (-1,-1), 0),
-                    ('TOPPADDING', (0,0), (-1,-1), 0),
-                    ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-                ]))
+                # Η εικόνα παίρνει ΑΚΡΙΒΩΣ τις νέες διαστάσεις (Πλάτος A4 x Προσαρμοσμένο Ύψος)
+                img = Image(img_stream, width=PLOT_PAGE_W, height=PLOT_PAGE_H)
                 
-                caption = Paragraph("<b>Σχήμα 1:</b> Σκαρίφημα σημείων χάραξης", caption_style)
-                
-                # KeepTogether: Εξασφαλίζει ότι η εικόνα και η λεζάντα δεν θα κοπούν σε διαφορετικές σελίδες
-                elements.append(Spacer(1, 10))
-                elements.append(KeepTogether([plot_table, caption]))
+                # Προσθέτουμε ΜΟΝΟ την εικόνα
+                elements.append(img)
                 
             except Exception as img_err:
                 print(f"Σφάλμα εικόνας: {img_err}")
