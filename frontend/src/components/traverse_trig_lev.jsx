@@ -167,16 +167,23 @@ const TraverseTrigLevel = ({
                 <th className="p-4 w-12 text-center text-[10px] font-black text-slate-500 tracking-widest uppercase">#</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">From</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">To</th>
-                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">D [m]</th>
-                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
-                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
-                <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
                 
+                {/* ΕΜΦΑΝΙΣΗ ΑΡΧΙΚΩΝ ΔΕΔΟΜΕΝΩΝ ΜΟΝΟ ΑΝ ΔΕΝ ΦΑΙΝΟΝΤΑΙ ΤΑ ΑΠΟΤΕΛΕΣΜΑΤΑ */}
+                {!showTrigResults && (
+                  <>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">D [m]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">Z [grad]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H station [m]</th>
+                    <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">H target [m]</th>
+                  </>
+                )}
+                
+                {/* ΕΜΦΑΝΙΣΗ ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
                 {showTrigResults && (
                   <>
-                    <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔH Μ.Ο. [m]</th>
-                    <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθ. [m]</th>
-                    <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">Τελικό ΔH [m]</th>
+                    <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔH (αρχικό) [m]</th>
+                    <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθωση [m]</th>
+                    <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">ΔH (τελικό) [m]</th>
                   </>
                 )}
                 
@@ -186,7 +193,7 @@ const TraverseTrigLevel = ({
                       <button 
                         onClick={() => setShowTrigResults(false)}
                         className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 bg-gradient-to-r from-slate-500/10 to-slate-400/10 border border-slate-500/30 cursor-pointer hover:bg-slate-700"
-                        title="Επιστροφή στην επεξεργασία"
+                        title="Επιστροφή στην επεξεργασία (Εμφάνιση Αρχικών)"
                       >
                         <ArrowLeft size={14} className="text-slate-400" />
                       </button>
@@ -211,13 +218,18 @@ const TraverseTrigLevel = ({
                   <React.Fragment key={obs.id || index}>
                     <tr className="group hover:bg-slate-800/20 transition-all">
                       <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.from} onChange={(e) => handleObsInputChange(obs.id, 'from', e.target.value)} placeholder="-" /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.to} onChange={(e) => handleObsInputChange(obs.id, 'to', e.target.value)} placeholder="-" /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.s} onBlur={(e) => handleObsBlur(obs.id, 's', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 's', e.target.value)} placeholder="-" /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} placeholder="-" /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} placeholder="-" /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} placeholder="-" /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.from} onChange={(e) => handleObsInputChange(obs.id, 'from', e.target.value)} placeholder="-" disabled={showTrigResults} /></td>
+                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.to} onChange={(e) => handleObsInputChange(obs.id, 'to', e.target.value)} placeholder="-" disabled={showTrigResults} /></td>
                       
+                      {!showTrigResults && (
+                        <>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.s} onBlur={(e) => handleObsBlur(obs.id, 's', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 's', e.target.value)} placeholder="-" /></td>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} placeholder="-" /></td>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} placeholder="-" /></td>
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} placeholder="-" /></td>
+                        </>
+                      )}
+
                       {showTrigResults && (
                         <>
                           <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-purple-400 cursor-default" value={formatVal(obs.dh_mean ?? obs.dh, 3)} disabled placeholder="-" /></td>
@@ -231,7 +243,7 @@ const TraverseTrigLevel = ({
                       </td>
                     </tr>
                     <tr className="h-0 p-0">
-                      <td colSpan={showTrigResults ? 11 : 8} className="p-0 h-0 relative">
+                      <td colSpan={showTrigResults ? 7 : 8} className="p-0 h-0 relative">
                         <button onClick={() => addObsRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"><PlusCircle size={16} /></button>
                       </td>
                     </tr>
@@ -239,7 +251,7 @@ const TraverseTrigLevel = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={showTrigResults ? 11 : 8} className="px-4 py-16 text-center text-slate-500">
+                  <td colSpan={showTrigResults ? 7 : 8} className="px-4 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-4">
                       <Database size={28} className="opacity-50" />
                       <span className="text-sm">Δεν βρέθηκαν δεδομένα</span>
