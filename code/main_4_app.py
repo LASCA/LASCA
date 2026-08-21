@@ -1386,6 +1386,162 @@ def export_tachymetry_txt():
         "total_points": len(all_calculated_points)
     })
 
+import io
+import ezdxf
+
+@app.route('/api/tachymetry/export_dxf', methods=['POST'])
+def export_tachymetry_dxf():
+    data = request.json or {}
+    measurements = data.get('measurements', [])
+    stations = data.get('stations', [])
+
+    if not measurements:
+        return jsonify({"error": "Δεν βρέθηκαν μετρήσεις"}), 400
+
+    # 1. Μετατροπή σε DataFrames & renaming (ΟΛΟ ΙΔΙΟ ΜΕ TXT)
+    df_meas = pd.DataFrame(measurements)
+    df_st = pd.DataFrame(stations)
+    
+    rename_st = {}
+    for col in df_st.columns:
+        if col.lower() in ['station_name', 'station']: rename_st[col] = 'Station_Name'
+        if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
+        if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
+        if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
+    df_st.rename(columns=rename_st, inplace=True)
+
+    # 2. Ανάγνωση στάσεων από τα αρχεία του project (ΟΛΟ ΙΔΙΟ ΜΕ TXT)
+    project_name = get_active_project_name()
+    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+    traverse_file = project_dir / "latest_traverse.json"
+    project_state_file = project_dir / "project_state.json"
+    
+    traverse_stations = []
+    
+    if traverse_file.exists():
+        try:
+            with open(traverse_file, 'r', encoding='utf-8') as f:
+                traverse_stations = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            
+    elif project_state_file.exists():
+        try:
+            with open(project_state_file, 'r', encoding='utf-8') as f:
+                p_state = json.load(f)
+                t_data = p_state.get('traverse_data', [])
+                for pt in t_data:
+                    if pt.get('name') and pt.get('x') and pt.get('y'):
+                        traverse_stations.append({
+                            "Station_Name": str(pt['name']),
+                            "XS": float(pt['x']),
+                            "YS": float(pt['y']),
+                            "ZS": 0.0
+                        })
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+
+    # Συγχώνευση των στάσεων
+    if traverse_stations:
+        try:
+            df_trav = pd.DataFrame(traverse_stations)
+            if 'Station_Name' in df_st.columns:
+                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
+            if 'Station_Name' in df_trav.columns:
+                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
+            
+            df_st = pd.concat([df_st, df_trav], ignore_index=True)
+            df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
+        except Exception as e:
+            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+
+    # 3. Εντοπισμός στηλών Στάσης & Προσανατολισμού (ΟΛΟ ΙΔΙΟ ΜΕ TXT)
+    st_col = None
+    or_col = None
+    for c in df_meas.columns:
+        if c.lower() in ['_filledstation', 'station', 'from']: st_col = c
+        if c.lower() in ['_filledorientation', 'orientation', 'o', 'backsight']: or_col = c
+
+    all_calculated_points = []
+    seen_keys = set()
+
+    if st_col and or_col:
+        # Fill down για σιγουριά
+        df_meas[st_col] = df_meas[st_col].replace('', None).ffill()
+        df_meas[or_col] = df_meas[or_col].replace('', None).ffill()
+
+        # Εύρεση μοναδικών συνδυασμών Στάσης - Προσανατολισμού
+        unique_pairs = df_meas[[st_col, or_col]].dropna().drop_duplicates().to_dict('records')
+
+        for pair in unique_pairs:
+            target_st = str(pair[st_col]).strip()
+            target_or = str(pair[or_col]).strip()
+
+            try:
+                res_df, _, _ = dpr.tachymetry(
+                    data_meas=df_meas,
+                    data_st=df_st,
+                    target_station=target_st,
+                    target_orientation=target_or
+                )
+                if res_df is not None and not res_df.empty:
+                    for rec in res_df.to_dict('records'):
+                        pt_name = str(rec.get('Σημείο', rec.get('Point_ID', '')))
+                        st_name = str(rec.get('Στάση', target_st))
+                        dedup_key = (st_name.upper(), pt_name.upper())
+
+                        if dedup_key not in seen_keys:
+                            seen_keys.add(dedup_key)
+                            all_calculated_points.append({
+                                'station': st_name,
+                                'point': pt_name,
+                                'x': float(rec.get('X', 0.0)),
+                                'y': float(rec.get('Y', 0.0)),
+                                'z': float(rec.get('Z', 0.0))
+                            })
+            except Exception as err:
+                print(f"⚠️ Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
+
+    # 4. ΔΗΜΙΟΥΡΓΙΑ ΤΟΥ DXF (ΝΕΟΣ ΚΩΔΙΚΑΣ)
+    try:
+        # Δημιουργία ενός νέου εγγράφου DXF (R2010 είναι ασφαλής και ευρέως συμβατή έκδοση)
+        doc = ezdxf.new('R2010')
+        msp = doc.modelspace()
+        
+        # Προαιρετικά: Δημιουργία Layers για καλύτερη οργάνωση στο AutoCAD
+        doc.layers.add("TACHYMETRY_POINTS", color=3) # Πράσινο
+        doc.layers.add("TACHYMETRY_TEXTS", color=2)  # Κίτρινο
+
+        for p in all_calculated_points:
+            x, y, z = p['x'], p['y'], p['z']
+            pt_id = p['point']
+            
+            # Προσθήκη του Σημείου (Point Entity)
+            msp.add_point((x, y, z), dxfattribs={'layer': 'TACHYMETRY_POINTS'})
+            
+            # Προσθήκη του Κειμένου (Text Entity) λίγο πιο δίπλα (π.χ. +0.5m) για να μην πέφτει πάνω στο σημείο
+            msp.add_text(pt_id, dxfattribs={
+                'layer': 'TACHYMETRY_TEXTS', 
+                'height': 0.5 # Ύψος κειμένου σε μέτρα
+            }).set_placement((x + 0.3, y + 0.3, z))
+
+        # Εγγραφή του DXF σε string/bytes μέσω io.StringIO
+        stream = io.StringIO()
+        doc.write(stream)
+        dxf_content = stream.getvalue()
+
+        filename = f"tachymetry_all_points_{project_name if project_name else 'export'}.dxf"
+
+        return jsonify({
+            "dxf_content": dxf_content,
+            "filename": filename,
+            "total_points": len(all_calculated_points)
+        })
+
+    except Exception as e:
+        print(f"⚠️ Σφάλμα κατά τη δημιουργία του DXF: {e}")
+        return jsonify({"error": "Αποτυχία δημιουργίας αρχείου DXF"}), 500
+
 # CHARAXI
 
 @app.route('/api/projects/stakeout', methods=['POST'])

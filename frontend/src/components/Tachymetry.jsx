@@ -3,7 +3,7 @@ import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
   Crosshair, Compass, LayoutGrid, Map as MapIcon, Info, ChevronRight, 
-  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown, FileText
+  Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown, FileText, Layers
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -79,6 +79,7 @@ const Tachymetry = ({
   const [selectedOrientation, setSelectedOrientation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingDxf, setIsExportingDxf] = useState(false);
   const [viewMode, setViewMode] = useState('local'); 
   const [isFullscreen, setIsFullscreen] = useState(false); 
 
@@ -292,6 +293,46 @@ const Tachymetry = ({
     }
   };
 
+  // 4. ΕΞΑΓΩΓΗ ΟΛΩΝ ΤΩΝ ΣΗΜΕΙΩΝ ΣΕ .DXF
+  const handleExportDxf = async () => {
+    if (!measurements.length) {
+      toast.error("Δεν υπάρχουν διαθέσιμα δεδομένα μετρήσεων.");
+      return;
+    }
+
+    setIsExportingDxf(true);
+    try {
+      const processedMeasurements = getProcessedMeasurements();
+
+      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry/export_dxf', {
+        project_name: projectSettings,
+        measurements: processedMeasurements,
+        stations: stationsData
+      });
+
+      if (response.data && response.data.dxf_content) {
+        const blob = new Blob([response.data.dxf_content], { type: 'application/dxf' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = response.data.filename || 'tachymetry_all_points.dxf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .dxf!`);
+      } else {
+        toast.error(response.data?.error || "Δεν επιστράφηκαν αποτελέσματα για εξαγωγή.");
+      }
+    } catch (error) {
+      console.error("Σφάλμα κατά την εξαγωγή DXF:", error);
+      toast.error("Αποτυχία εξαγωγής αρχείου DXF.");
+    } finally {
+      setIsExportingDxf(false);
+    }
+  };
+
   const handleDownload = () => {
     if (!plotImage) return;
     const a = document.createElement('a');
@@ -487,6 +528,21 @@ const Tachymetry = ({
                 >
                   {isExporting ? <Cpu size={12} className="animate-spin" /> : <FileText size={12} className="group-hover:text-cyan-300" />}
                   Export TXT
+                </button>
+
+                {/* ΝΕΟ ΚΟΥΜΠΙ ΕΞΑΓΩΓΗΣ DXF */}
+                <button 
+                  onClick={handleExportDxf}
+                  disabled={isExportingDxf || measurements.length === 0}
+                  title="Εξαγωγή όλων των σημείων σε CAD (DXF)"
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                    isExportingDxf
+                      ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 hover:border-amber-500/50 cursor-pointer'
+                  }`}
+                >
+                  {isExportingDxf ? <Cpu size={12} className="animate-spin" /> : <Layers size={12} className="group-hover:text-amber-300" />}
+                  Export DXF
                 </button>
               </div>
 
