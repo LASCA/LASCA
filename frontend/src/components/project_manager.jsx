@@ -157,13 +157,13 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               
               {/* Όνομα Project */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-1">
+                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   Όνομα Έργου <span className="text-amber-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="π.χ. Odos_Ermou"
+                  placeholder="π.χ. Campus ΑΠΘ"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-mono"
@@ -172,12 +172,12 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
 
               {/* Μελετητής */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-1">
+                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   <User size={10} /> Μελετητής / Μηχανικός
                 </label>
                 <input
                   type="text"
-                  placeholder="Όνομα Μηχανικού"
+                  placeholder="π.χ. LASCA Developers"
                   value={designer}
                   onChange={(e) => setDesigner(e.target.value)}
                   className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
