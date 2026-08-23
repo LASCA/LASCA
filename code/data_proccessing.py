@@ -939,9 +939,6 @@ def traverse_level_calc(measurements_json):
 
     return measurements_json
 
-import numpy as np
-import pandas as pd
-
 def normalize_node(name):
     """
     Διατηρεί αυτούσιο το όνομα του σταθμού όπως το έδωσε ο χρήστης,
@@ -1185,7 +1182,149 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     # Επιστρέφουμε ΠΛΕΟΝ TUPLE: (τα δεδομένα, το report)
     return measurements_json, tolerance_report
 
-   
+def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
+    """
+    Υπολογίζει τη χωροστάθμιση για Μετάβαση και Επιστροφή:
+    1. Υπολογισμός ΔΗ μετάβασης & ΔΗ επιστροφής ανά πλευρά (leg).
+    2. Υπολογισμός τελικού ΔΗ ανά πλευρά ως μέσος όρος: (ΔΗ_μετ - ΔΗ_επιστρ) / 2.
+    3. Υπολογισμός τελικού υψομέτρου κάθε στάσης βάσει του τελικού ΔΗ.
+    """
+    print("\n========== DEBUG START: traverse_spirit_leveling ==========")
+    print(f"Start Elevation given: {start_elevation}")
+    
+    def to_float(val):
+        if val in [None, "", "---"]: 
+            return 0.0
+        try: 
+            return float(val)
+        except (ValueError, TypeError): 
+            return 0.0
+
+    # 1. Υπολογισμός συνολικών δεικτών (metrics) για Μετάβαση & Επιστροφή
+    def calc_overall_metrics(data):
+        sum_bs = sum_fs = sum_bs_s = sum_fs_s = 0.0
+        for row in data:
+            sum_bs += to_float(row.get('backsight'))
+            sum_fs += to_float(row.get('foresight'))
+            sum_bs_s += to_float(row.get('bs_s'))
+            sum_fs_s += to_float(row.get('fs_s'))
+            
+        dh = sum_bs - sum_fs
+        total_s = sum_bs_s + sum_fs_s
+        
+        return {
+            "sum_backsights": round(sum_bs, 4),
+            "sum_foresights": round(sum_fs, 4),
+            "sum_bs_s": round(sum_bs_s, 2),
+            "sum_fs_s": round(sum_fs_s, 2),
+            "dh": round(dh, 4),
+            "total_s": round(total_s, 2)
+        }
+
+    forward_metrics = calc_overall_metrics(forward_data) if forward_data else {}
+    backward_metrics = calc_overall_metrics(backward_data) if backward_data else {}
+    
+    # Σφάλμα κλεισίματος (w = δh_μετάβασης + δh_επιστροφής)
+    error_dh = 0.0
+    if forward_metrics and backward_metrics:
+        error_dh = round(forward_metrics.get('dh', 0.0) + backward_metrics.get('dh', 0.0), 4)
+        print(f"Total error_dh (w) in meters: {error_dh}")
+
+    # 2. Χάρτης πλευρών Επιστροφής (B -> A) για αυτόματη αντιστοίχιση
+    print("\n--- DEBUG: Building backward legs map ---")
+    bwd_legs_map = {}
+    if backward_data and len(backward_data) > 1:
+        for i in range(1, len(backward_data)):
+            p_from = str(backward_data[i-1].get('point', '')).strip()
+            p_to = str(backward_data[i].get('point', '')).strip()
+            bs_val = to_float(backward_data[i-1].get('backsight'))
+            fs_val = to_float(backward_data[i].get('foresight'))
+            dh_val = bs_val - fs_val
+            bwd_legs_map[(p_from, p_to)] = dh_val
+            print(f"BWD Leg [{i}]: '{p_from}' -> '{p_to}' | dh_bwd = {dh_val}")
+
+    print(f"Available keys in bwd_legs_map: {list(bwd_legs_map.keys())}")
+
+    # 3. Υπολογισμός ανά Πλευρά (Legs) & Τελικών Υψομέτρων
+    legs = []
+    current_elevation = float(start_elevation)
+    
+    if forward_data and len(forward_data) > 0:
+        forward_data[0]['elevation'] = round(current_elevation, 4)
+        print(f"\n--- DEBUG: Start Point '{forward_data[0].get('point')}' elevation set to {forward_data[0]['elevation']} ---")
+
+    if forward_data and len(forward_data) > 1:
+        print("\n--- DEBUG: Processing Forward Legs & Elevations ---")
+        for i in range(1, len(forward_data)):
+            p_from = str(forward_data[i-1].get('point', '')).strip()
+            p_to = str(forward_data[i].get('point', '')).strip()
+            
+            print(f"\n>> FWD Leg [{i}]: '{p_from}' -> '{p_to}'")
+            
+            # ΔΗ Μετάβασης (p_from -> p_to)
+            bs_fwd = to_float(forward_data[i-1].get('backsight'))
+            fs_fwd = to_float(forward_data[i].get('foresight'))
+            dh_fwd = bs_fwd - fs_fwd
+            print(f"   Calculated dh_fwd: {dh_fwd}")
+            
+            # Αντιστοίχιση ΔΗ Επιστροφής (p_to -> p_from)
+            search_key = (p_to, p_from)
+            print(f"   Searching bwd map for exact key: {search_key}")
+            
+            if search_key in bwd_legs_map:
+                dh_bwd = bwd_legs_map[search_key]
+                print(f"   ✅ Exact Match found! dh_bwd = {dh_bwd}")
+            elif len(backward_data) >= len(forward_data):
+                # Fallback βάσει θέσης αν τα ονόματα διαφέρουν
+                bwd_idx_from = len(backward_data) - i
+                bwd_idx_to = len(backward_data) - i - 1
+                bs_bwd = to_float(backward_data[bwd_idx_to].get('backsight'))
+                fs_bwd = to_float(backward_data[bwd_idx_from].get('foresight'))
+                dh_bwd = bs_bwd - fs_bwd
+                print(f"   ⚠️ NO EXACT MATCH. Using index fallback! dh_bwd = {dh_bwd}")
+            else:
+                dh_bwd = 0.0
+                print("   ❌ NO MATCH AND FALLBACK FAILED. dh_bwd set to 0.0")
+
+            # Τελικό ΔΗ (Μέσος όρος): ΔΗ_final = (ΔΗ_fwd - ΔΗ_bwd) / 2
+            dh_final = (dh_fwd - dh_bwd) / 2.0
+            correction = dh_final - dh_fwd  # Διόρθωση v σε μέτρα
+            
+            print(f"   dh_final = ({dh_fwd} - ({dh_bwd})) / 2 = {dh_final}")
+            
+            # Ενημέρωση υψομέτρου επόμενης στάσης
+            current_elevation += dh_final
+            
+            # Ενημέρωση του πίνακα forward_data για προβολή στο UI
+            forward_data[i]['dh'] = round(dh_fwd, 4)
+            forward_data[i]['elevation'] = round(current_elevation, 4)
+            
+            print(f"   New Elevation for point '{p_to}' = {forward_data[i]['elevation']}")
+            
+            legs.append({
+                "point_from": p_from,
+                "point_to": p_to,
+                "dh_forward": round(dh_fwd, 4),
+                "dh_backward": round(dh_bwd, 4),
+                "correction": round(correction, 4),
+                "dh_final": round(dh_final, 4),
+                "elevation_to": round(current_elevation, 4)
+            })
+
+    metrics = {
+        "forward": forward_metrics,
+        "backward": backward_metrics,
+        "error_dh": error_dh
+    }
+
+    print("========== DEBUG END ==========\n")
+
+    return {
+        "forward_results": forward_data,
+        "backward_results": backward_data,
+        "metrics": metrics,
+        "legs": legs
+    }
 
 # Ορίζουμε default τιμές για ΕΓΣΑ'87 (m0 = 0.9996, R0 ≈ 6371000m για τη μέση ακτίνα της γης)
 def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:

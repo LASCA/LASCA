@@ -54,30 +54,59 @@ const TraverseLeveling = ({
   metrics = {}, setMetrics,
   projectSettings
 }) => {
-  const [geoActiveTab, setGeoActiveTab] = useState('forward');
-  const [localForward, setLocalForward] = useState([]);
-  const [localBackward, setLocalBackward] = useState([]);
-  const [localMetrics, setLocalMetrics] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Κατάσταση Προβολής: 'data' (Εισαγωγή) ή 'results' (Πίνακας Αποτελεσμάτων/Πλευρών)
-  const [viewMode, setViewMode] = useState('data'); 
-  const [legsData, setLegsData] = useState([]);
+  // 1. Δημιουργία μοναδικού κλειδιού για το LocalStorage βάσει του project
+  const projectName = typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || 'default');
+  const storageKey = `traverse_leveling_${projectName}`;
 
-  // Ref για αυτόματο scroll down στα στατιστικά
+  // 2. Helper συνάρτηση για ανάγνωση cache (ώστε να μη χάνονται δεδομένα στις καρτέλες)
+  const getStoredState = (key, fallback) => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed[key] !== undefined) return parsed[key];
+      }
+    } catch (e) { console.error("Σφάλμα ανάγνωσης LocalStorage", e); }
+    return fallback;
+  };
+
+  // 3. Αρχικοποίηση State (προσπαθεί να πάρει δεδομένα από Props -> μετά LocalStorage -> μετά κενό)
+  const [geoActiveTab, setGeoActiveTab] = useState(() => getStoredState('geoActiveTab', 'forward'));
+  const [localForward, setLocalForward] = useState(() => forwardData.length > 0 ? forwardData : getStoredState('localForward', []));
+  const [localBackward, setLocalBackward] = useState(() => backwardData.length > 0 ? backwardData : getStoredState('localBackward', []));
+  const [localMetrics, setLocalMetrics] = useState(() => Object.keys(metrics).length > 0 ? metrics : getStoredState('localMetrics', {}));
+  const [viewMode, setViewMode] = useState(() => getStoredState('viewMode', 'data')); 
+  const [legsData, setLegsData] = useState(() => getStoredState('legsData', []));
+
+  const [isLoading, setIsLoading] = useState(false);
   const statsSectionRef = useRef(null);
+
+  // 4. Αποθήκευση στο LocalStorage κάθε φορά που αλλάζει οποιοδήποτε State
+  useEffect(() => {
+    const stateToSave = { geoActiveTab, localForward, localBackward, localMetrics, viewMode, legsData };
+    localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+  }, [geoActiveTab, localForward, localBackward, localMetrics, viewMode, legsData, storageKey]);
+
+  // 5. Συγχρονισμός με το Parent Component (ώστε να έχει και αυτό τα σωστά δεδομένα)
+  useEffect(() => {
+    if (localForward.length > 0 && setForwardData && (!forwardData || forwardData.length === 0)) setForwardData(localForward);
+    if (localBackward.length > 0 && setBackwardData && (!backwardData || backwardData.length === 0)) setBackwardData(localBackward);
+    if (Object.keys(localMetrics).length > 0 && setMetrics && (!metrics || Object.keys(metrics).length === 0)) setMetrics(localMetrics);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Συγχρονισμός αν τα props αλλάξουν "απ' έξω"
+  useEffect(() => {
+    if (forwardData && forwardData.length > 0) setLocalForward(forwardData);
+    if (backwardData && backwardData.length > 0) setLocalBackward(backwardData);
+    if (metrics && Object.keys(metrics).length > 0) setLocalMetrics(metrics);
+  }, [forwardData, backwardData, metrics]);
 
   const formatVal = (val, decimals = 3) => {
     if (val === "" || val === undefined || val === null) return "";
     const num = parseFloat(val);
     return isNaN(num) ? val : num.toFixed(decimals);
   };
-
-  useEffect(() => {
-    if (forwardData && forwardData.length > 0) setLocalForward(forwardData);
-    if (backwardData && backwardData.length > 0) setLocalBackward(backwardData);
-    if (metrics && Object.keys(metrics).length > 0) setLocalMetrics(metrics);
-  }, [forwardData, backwardData, metrics]);
 
   const currentGeoData = geoActiveTab === 'forward' ? localForward : localBackward;
   
@@ -106,10 +135,7 @@ const TraverseLeveling = ({
   };
 
   const addGeoRowAt = (index) => {
-    const newRow = {
-      point: "", backsight: "", bs_upper: "", bs_lower: "", bs_s: "",
-      foresight: "", fs_upper: "", fs_lower: "", fs_s: ""
-    };
+    const newRow = { point: "", backsight: "", bs_upper: "", bs_lower: "", bs_s: "", foresight: "", fs_upper: "", fs_lower: "", fs_s: "" };
     const newData = [...currentGeoData];
     newData.splice(index + 1, 0, newRow);
     setGeoCurrentData(newData);
@@ -136,10 +162,11 @@ const TraverseLeveling = ({
     }
   };
 
+  // Επικοινωνία με το ενημερωμένο Flask Endpoint
   const handleRunLeveling = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/leveling', {
+      const response = await axios.post('http://127.0.0.1:5000/api/traverse_spirit_leveling', {
         forward: localForward,
         backward: localBackward
       }, {
@@ -166,7 +193,6 @@ const TraverseLeveling = ({
         }
         setViewMode('results');
 
-        // Αυτόματο Scroll Down στους Γεωδαιτικούς Ελέγχους
         setTimeout(() => {
           statsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }, 100);
@@ -181,11 +207,7 @@ const TraverseLeveling = ({
 
   return (
     <div className="flex flex-col gap-6 min-h-0 flex-1">
-      
-      {/* ----------------- ΠΙΝΑΚΑΣ ΔΕΔΟΜΕΝΩΝ / ΑΠΟΤΕΛΕΣΜΑΤΩΝ ----------------- */}
       <div className="flex-none flex flex-col bg-[#0b1120] rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden min-h-[400px]">
-        
-        {/* HEADER */}
         <div className="p-4 border-b border-slate-800 bg-[#0f172a]/50 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-4">
@@ -223,7 +245,6 @@ const TraverseLeveling = ({
             </div>
           </div>
 
-          {/* ICON BUTTON GROUP (BACK & PLAY) */}
           <div className="flex items-center gap-2">
             {viewMode === 'results' && (
               <button
@@ -254,10 +275,8 @@ const TraverseLeveling = ({
           </div>
         </div>
 
-        {/* BODY */}
         <div className="flex-1 overflow-x-auto custom-scrollbar">
           {viewMode === 'data' ? (
-            /* ================== 1. ΠΡΟΒΟΛΗ ΕΙΣΑΓΩΓΗΣ ΔΕΔΟΜΕΝΩΝ ================== */
             <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                 <tr className="border-b border-slate-800/60 bg-slate-900/40">
@@ -478,7 +497,6 @@ const TraverseLeveling = ({
               </tbody>
             </table>
           ) : (
-            /* ================== 2. ΠΡΟΒΟΛΗ ΑΠΟΤΕΛΕΣΜΑΤΩΝ ΠΛΕΥΡΩΝ ================== */
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead className="bg-[#0f172a] sticky top-0 z-20">
                 <tr className="border-b border-slate-800/60 bg-slate-900/80">
@@ -515,7 +533,6 @@ const TraverseLeveling = ({
         </div>
       </div>
 
-      {/* ----------------- ΓΕΩΔΑΙΤΙΚΟΙ ΕΛΕΓΧΟΙ ----------------- */}
       <div ref={statsSectionRef} className="flex-none bg-[#0b1120] p-5 rounded-2xl border border-slate-800/50 shadow-2xl flex flex-col gap-4">
         <div className="flex items-center gap-3 border-b border-slate-800/50 pb-3">
           <Activity size={16} className="text-cyan-500" />

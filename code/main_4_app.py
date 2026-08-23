@@ -573,7 +573,6 @@ def run_traverse():
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
-# ==========================================
 # ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - LIGHT THEME & CUSTOM PLOT PAGE)
 # ==========================================
 @app.route('/api/traverse/report', methods=['POST'])
@@ -1037,6 +1036,9 @@ def export_traverse_dxf():
         print(f"Σφάλμα κατά την εξαγωγή DXF:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+# ==========================================
+# 3. ENDPOINT ΓΙΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ
+# ==========================================
 @app.route('/api/traverse_height', methods=['POST'])
 def run_traverse_height():
     try:
@@ -1149,7 +1151,72 @@ def run_traverse_height():
     except Exception as e:
         print(f"💥 [DEBUG ERROR] {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-    
+
+## ==========================================
+# ENDPOINT ΓΙΑ ΧΩΡΟΣΤΑΘΜΗΣΗ (SPIRIT LEVELING)
+# ==========================================
+@app.route('/api/traverse_spirit_leveling', methods=['POST'])  # Alias για συμβατότητα με το axios request του UI
+def run_traverse_spirit_level():
+    try:
+        data = request.json or {}
+        
+        # Λήψη δεδομένων (Υποστήριξη για 'forward'/'backward' του UI & 'forward_data'/'backward_data')
+        forward_data = data.get('forward') or data.get('forward_data') or []
+        backward_data = data.get('backward') or data.get('backward_data') or []
+        start_elevation = float(data.get('start_elevation', 0.0))
+
+        if not forward_data:
+            return jsonify({"error": "Λείπουν δεδομένα μετάβασης."}), 400
+
+        # 1. Κλήση της ενημερωμένης συνάρτησης υπολογισμού
+        result = dpr.traverse_spirit_leveling(forward_data, backward_data, start_elevation)
+
+        # ----------------------------------------------------------------------
+        # 2. Ενημέρωση του latest_traverse.json με τα νέα υψόμετρα (ZS)
+        # ----------------------------------------------------------------------
+        try:
+            # Ανάγνωση του Active-Project από τα headers της αίτησης (όπως τα στέλνει το UI)
+            project_name = request.headers.get('Active-Project') or (
+                get_active_project_name() if 'get_active_project_name' in globals() else None
+            )
+            project_dir = WORKSPACE_DIR / project_name if (project_name and 'WORKSPACE_DIR' in globals()) else None
+
+            if project_dir:
+                json_path = project_dir / "latest_traverse.json"
+                if json_path.exists():
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        traverse_data = json.load(f)
+
+                    # Χάρτης με τα νέα τελικά υψόμετρα των σημείων
+                    heights_map = {}
+                    for row in result.get('forward_results', []):
+                        pt_name = row.get('point')
+                        elev = row.get('elevation')
+                        if pt_name and elev not in [None, "", "---"]:
+                            heights_map[str(pt_name).strip()] = float(elev)
+
+                    # Ενημέρωση των ZS πεδίων στο αρχείο της όδευσης
+                    file_updated = False
+                    for station in traverse_data:
+                        st_name = str(station.get("Station_Name", "")).strip()
+                        if st_name in heights_map:
+                            station["ZS"] = heights_map[st_name]
+                            file_updated = True
+
+                    if file_updated:
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(traverse_data, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"⚠️ [DEBUG] Σφάλμα αποθήκευσης ZS από Χωροστάθμιση: {e}")
+
+        # 3. Προσθήκη status και επιστροφή της πλήρους δομής (forward_results, backward_results, metrics, legs)
+        result["status"] = "success"
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"💥 [DEBUG ERROR] {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
 # ==========================================
 # 3. ENDPOINT ΓΙΑ ΤΑΧΥΜΕΤΡΙΑ (TACHYMETRY) 
 # ==========================================
