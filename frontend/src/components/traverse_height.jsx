@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, PlusCircle, Trash2 } from 'lucide-react';
 import TraverseTrigLevel from './traverse_trig_lev.jsx'; 
-import TraverseLeveling from './traverse_lev.jsx';
+// Το TraverseLeveling αφαιρέθηκε
 
 const TraverseHeight = ({ 
   observations = [], setObservations,   
   stations = [], setStations,
-  projectSettings,
-  forwardData = [], setForwardData,
-  backwardData = [], setBackwardData,
-  metrics = {}, setMetrics
+  projectSettings
+  // Αφαιρέθηκαν τα props: forwardData, backwardData, metrics[cite: 10]
 }) => {
-  const [calcMethod, setCalcMethod] = useState('trigonometric');
   const [localStations, setLocalStations] = useState([]);
 
   const to3 = (val) => {
@@ -62,38 +59,13 @@ const TraverseHeight = ({
         `
       }} />
 
-      {/* ΔΙΑΚΟΠΤΗΣ ΕΠΙΛΟΓΗΣ ΜΕΘΟΔΟΥ */}
-      <div className="flex justify-start mb-4">
-        <div className="flex bg-[#030712] border border-slate-800/80 p-1 rounded-lg">
-          <button
-            onClick={() => setCalcMethod('trigonometric')}
-            className={`px-6 py-2 rounded-md text-xs font-black tracking-wider transition-all cursor-pointer ${
-              calcMethod === 'trigonometric'
-                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
-                : 'text-slate-500 hover:text-slate-300 border border-transparent'
-            }`}
-          >
-            1. Τριγωνομετρική Υψομετρία
-          </button>
-          <button
-            onClick={() => setCalcMethod('geometric')}
-            className={`px-6 py-2 rounded-md text-xs font-black tracking-wider transition-all cursor-pointer ${
-              calcMethod === 'geometric'
-                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
-                : 'text-slate-500 hover:text-slate-300 border border-transparent'
-            }`}
-          >
-            2. Γεωμετρική Χωροστάθμιση
-          </button>
-        </div>
-      </div>
+      {/* Αφαιρέθηκε ο διακόπτης επιλογής μεθόδου */}
 
       {/* GRID LAYOUT */}
-      <div className="grid grid-cols-[3.2fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4">
+      <div className="grid grid-cols-[3.2fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4 mt-2">
         
-        {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΔΥΝΑΜΙΚΟ COMPONENT */}
+        {/* ΑΡΙΣΤΕΡΟ ΜΕΡΟΣ: ΜΟΝΟ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ */}
         <div className="flex flex-col gap-3 min-h-0 max-h-full overflow-y-auto custom-scrollbar pr-1">
-          {calcMethod === 'trigonometric' ? (
             <TraverseTrigLevel 
               observations={observations} 
               setObservations={setObservations}
@@ -101,24 +73,13 @@ const TraverseHeight = ({
               setStations={updateStationsData}
               projectSettings={projectSettings}
             />
-          ) : (
-            <TraverseLeveling 
-              forwardData={forwardData}
-              setForwardData={setForwardData}
-              backwardData={backwardData}
-              setBackwardData={setBackwardData}
-              metrics={metrics}
-              setMetrics={setMetrics}
-              projectSettings={projectSettings}
-            />
-          )}
         </div>
 
         {/* ΔΕΞΙ ΜΕΡΟΣ: ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ */}
         <div className="flex flex-col gap-3 min-h-0 max-h-full">
           <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
             <MapPin size={14} className="text-emerald-400" />
-            2. Πίνακας Στάσεων
+            Πίνακας Στάσεων
           </h3>
           <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl h-fit max-h-full flex flex-col relative overflow-hidden">
             <div className="overflow-y-auto custom-scrollbar">

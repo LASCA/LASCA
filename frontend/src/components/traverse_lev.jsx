@@ -2,6 +2,42 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Ruler, PlusCircle, Trash2, Play, Cpu, Activity, Info, ArrowLeft } from 'lucide-react';
 
+// Εικονικά Δεδομένα Μετάβασης (Forward Path)
+const mockForwardData = [
+  { point: "Σ7", backsight: "1.500", bs_upper: "1.625", bs_lower: "1.375", bs_s: "25.00", foresight: "", fs_upper: "", fs_lower: "", fs_s: "" },
+  { point: "Σ6", backsight: "1.450", bs_upper: "1.560", bs_lower: "1.340", bs_s: "22.00", foresight: "2.503", fs_upper: "2.628", fs_lower: "2.378", fs_s: "25.00" },
+  { point: "S1", backsight: "1.600", bs_upper: "1.710", bs_lower: "1.490", bs_s: "22.00", foresight: "1.510", fs_upper: "1.620", fs_lower: "1.400", fs_s: "22.00" },
+  { point: "S2", backsight: "1.350", bs_upper: "1.470", bs_lower: "1.230", bs_s: "24.00", foresight: "2.930", fs_upper: "3.040", fs_lower: "2.820", fs_s: "22.00" },
+  { point: "S3", backsight: "1.720", bs_upper: "1.840", bs_lower: "1.600", bs_s: "24.00", foresight: "0.559", fs_upper: "0.679", fs_lower: "0.439", fs_s: "24.00" },
+  { point: "S4", backsight: "1.800", bs_upper: "1.920", bs_lower: "1.680", bs_s: "24.00", foresight: "0.478", fs_upper: "0.598", fs_lower: "0.358", fs_s: "24.00" },
+  { point: "S5", backsight: "1.250", bs_upper: "1.350", bs_lower: "1.150", bs_s: "20.00", foresight: "1.091", fs_upper: "1.211", fs_lower: "0.971", fs_s: "24.00" },
+  { point: "S6", backsight: "3.800", bs_upper: "3.900", bs_lower: "3.700", bs_s: "20.00", foresight: "1.656", fs_upper: "1.756", fs_lower: "1.556", fs_s: "20.00" },
+  { point: "S7", backsight: "1.100", bs_upper: "1.200", bs_lower: "1.000", bs_s: "20.00", foresight: "6.598", fs_upper: "6.698", fs_lower: "6.498", fs_s: "20.00" },
+  { point: "S8", backsight: "1.550", bs_upper: "1.650", bs_lower: "1.450", bs_s: "20.00", foresight: "0.851", fs_upper: "0.951", fs_lower: "0.751", fs_s: "20.00" },
+  { point: "5",  backsight: "1.700", bs_upper: "1.800", bs_lower: "1.600", bs_s: "20.00", foresight: "0.675", fs_upper: "0.775", fs_lower: "0.575", fs_s: "20.00" },
+  { point: "S9", backsight: "1.600", bs_upper: "1.700", bs_lower: "1.500", bs_s: "20.00", foresight: "1.094", fs_upper: "1.194", fs_lower: "0.994", fs_s: "20.00" },
+  { point: "Σ6", backsight: "1.800", bs_upper: "1.900", bs_lower: "1.700", bs_s: "20.00", foresight: "1.558", fs_upper: "1.658", fs_lower: "1.458", fs_s: "20.00" },
+  { point: "Σ7", backsight: "",      bs_upper: "",      bs_lower: "",      bs_s: "",      foresight: "0.797", fs_upper: "0.897", fs_lower: "0.697", fs_s: "20.00" }
+];
+
+// Εικονικά Δεδομένα Επιστροφής (Backward Path)
+const mockBackwardData = [
+  { point: "Σ7", backsight: "2.503", bs_upper: "2.603", bs_lower: "2.403", bs_s: "20.00", foresight: "", fs_upper: "", fs_lower: "", fs_s: "" },
+  { point: "Σ6", backsight: "1.510", bs_upper: "1.610", bs_lower: "1.410", bs_s: "20.00", foresight: "1.500", fs_upper: "1.600", fs_lower: "1.400", fs_s: "20.00" },
+  { point: "S9", backsight: "1.842", bs_upper: "1.942", bs_lower: "1.742", bs_s: "20.00", foresight: "1.800", fs_upper: "1.900", fs_lower: "1.700", fs_s: "20.00" },
+  { point: "5",  backsight: "2.206", bs_upper: "2.306", bs_lower: "2.106", bs_s: "20.00", foresight: "1.600", fs_upper: "1.700", fs_lower: "1.500", fs_s: "20.00" },
+  { point: "S8", backsight: "2.575", bs_upper: "2.675", bs_lower: "2.475", bs_s: "20.00", foresight: "1.700", fs_upper: "1.800", fs_lower: "1.600", fs_s: "20.00" },
+  { point: "S7", backsight: "1.301", bs_upper: "1.401", bs_lower: "1.201", bs_s: "20.00", foresight: "1.550", fs_upper: "1.650", fs_lower: "1.450", fs_s: "20.00" },
+  { point: "S6", backsight: "1.002", bs_upper: "1.102", bs_lower: "0.902", bs_s: "20.00", foresight: "3.800", fs_upper: "3.900", fs_lower: "3.700", fs_s: "20.00" },
+  { point: "S5", backsight: "0.844", bs_upper: "0.944", bs_lower: "0.744", bs_s: "20.00", foresight: "1.250", fs_upper: "1.350", fs_lower: "1.150", fs_s: "20.00" },
+  { point: "S4", backsight: "2.509", bs_upper: "2.609", bs_lower: "2.409", bs_s: "20.00", foresight: "1.800", fs_upper: "1.900", fs_lower: "1.700", fs_s: "20.00" },
+  { point: "S3", backsight: "3.042", bs_upper: "3.142", bs_lower: "2.942", bs_s: "20.00", foresight: "1.720", fs_upper: "1.820", fs_lower: "1.620", fs_s: "20.00" },
+  { point: "S2", backsight: "0.559", bs_upper: "0.659", bs_lower: "0.459", bs_s: "20.00", foresight: "1.350", fs_upper: "1.450", fs_lower: "1.250", fs_s: "20.00" },
+  { point: "S1", backsight: "2.930", bs_upper: "3.030", bs_lower: "2.830", bs_s: "20.00", foresight: "1.600", fs_upper: "1.700", fs_lower: "1.500", fs_s: "20.00" },
+  { point: "Σ6", backsight: "1.510", bs_upper: "1.610", bs_lower: "1.410", bs_s: "20.00", foresight: "1.450", fs_upper: "1.550", fs_lower: "1.350", fs_s: "20.00" },
+  { point: "Σ7", backsight: "",      bs_upper: "",      bs_lower: "",      bs_s: "",      foresight: "1.500", fs_upper: "1.600", fs_lower: "1.400", fs_s: "20.00" }
+];
+
 const DirectionStatsGroup = ({ title, sumBS, sumBS_S, sumFS, sumFS_S, dh, totalS, themeColor }) => {
   const colorClass = themeColor === 'blue' ? 'text-blue-400' : 'text-orange-400';
   const borderColorClass = themeColor === 'blue' ? 'border-blue-500/20' : 'border-orange-500/20';
@@ -52,13 +88,12 @@ const TraverseLeveling = ({
   forwardData = [], setForwardData,
   backwardData = [], setBackwardData,
   metrics = {}, setMetrics,
-  projectSettings
+  projectSettings,
+  onLevelingComplete // <-- 1. ΠΡΟΣΘΗΚΗ ΤΟΥ ΝΕΟΥ PROP ΕΔΩ
 }) => {
-  // 1. Δημιουργία μοναδικού κλειδιού για το LocalStorage βάσει του project
   const projectName = typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || 'default');
   const storageKey = `traverse_leveling_${projectName}`;
 
-  // 2. Helper συνάρτηση για ανάγνωση cache (ώστε να μη χάνονται δεδομένα στις καρτέλες)
   const getStoredState = (key, fallback) => {
     try {
       const stored = localStorage.getItem(storageKey);
@@ -70,10 +105,9 @@ const TraverseLeveling = ({
     return fallback;
   };
 
-  // 3. Αρχικοποίηση State (προσπαθεί να πάρει δεδομένα από Props -> μετά LocalStorage -> μετά κενό)
   const [geoActiveTab, setGeoActiveTab] = useState(() => getStoredState('geoActiveTab', 'forward'));
-  const [localForward, setLocalForward] = useState(() => forwardData.length > 0 ? forwardData : getStoredState('localForward', []));
-  const [localBackward, setLocalBackward] = useState(() => backwardData.length > 0 ? backwardData : getStoredState('localBackward', []));
+  const [localForward, setLocalForward] = useState(() => forwardData.length > 0 ? forwardData : mockForwardData);
+  const [localBackward, setLocalBackward] = useState(() => backwardData.length > 0 ? backwardData : mockBackwardData);
   const [localMetrics, setLocalMetrics] = useState(() => Object.keys(metrics).length > 0 ? metrics : getStoredState('localMetrics', {}));
   const [viewMode, setViewMode] = useState(() => getStoredState('viewMode', 'data')); 
   const [legsData, setLegsData] = useState(() => getStoredState('legsData', []));
@@ -81,13 +115,11 @@ const TraverseLeveling = ({
   const [isLoading, setIsLoading] = useState(false);
   const statsSectionRef = useRef(null);
 
-  // 4. Αποθήκευση στο LocalStorage κάθε φορά που αλλάζει οποιοδήποτε State
   useEffect(() => {
     const stateToSave = { geoActiveTab, localForward, localBackward, localMetrics, viewMode, legsData };
     localStorage.setItem(storageKey, JSON.stringify(stateToSave));
   }, [geoActiveTab, localForward, localBackward, localMetrics, viewMode, legsData, storageKey]);
 
-  // 5. Συγχρονισμός με το Parent Component (ώστε να έχει και αυτό τα σωστά δεδομένα)
   useEffect(() => {
     if (localForward.length > 0 && setForwardData && (!forwardData || forwardData.length === 0)) setForwardData(localForward);
     if (localBackward.length > 0 && setBackwardData && (!backwardData || backwardData.length === 0)) setBackwardData(localBackward);
@@ -95,7 +127,6 @@ const TraverseLeveling = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Συγχρονισμός αν τα props αλλάξουν "απ' έξω"
   useEffect(() => {
     if (forwardData && forwardData.length > 0) setLocalForward(forwardData);
     if (backwardData && backwardData.length > 0) setLocalBackward(backwardData);
@@ -162,13 +193,14 @@ const TraverseLeveling = ({
     }
   };
 
-  // Επικοινωνία με το ενημερωμένο Flask Endpoint
   const handleRunLeveling = async () => {
     setIsLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:5000/api/traverse_spirit_leveling', {
         forward: localForward,
-        backward: localBackward
+        backward: localBackward,
+        known_point: "Σ6",
+        start_elevation: 59.706
       }, {
         headers: {
           'Active-Project': typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || projectSettings?.id || '')
@@ -192,6 +224,11 @@ const TraverseLeveling = ({
           setLegsData(response.data.legs);
         }
         setViewMode('results');
+
+        // 2. ΚΛΗΣΗ ΤΟΥ CALLBACK ΕΦΟΣΟΝ ΥΠΑΡΧΕΙ 
+        if (onLevelingComplete) {
+          onLevelingComplete();
+        }
 
         setTimeout(() => {
           statsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -503,7 +540,6 @@ const TraverseLeveling = ({
                   <th className="p-3 text-[11px] font-black text-slate-400 tracking-widest text-center border-r border-slate-800/30 w-[15%]">Πλευρά (Από - Προς)</th>
                   <th className="p-3 text-[11px] font-black text-blue-400 tracking-widest text-right border-r border-slate-800/30">ΔH Μετάβασης (m)</th>
                   <th className="p-3 text-[11px] font-black text-orange-400 tracking-widest text-right border-r border-slate-800/30">ΔH Επιστροφής (m)</th>
-                  <th className="p-3 text-[11px] font-black text-purple-400 tracking-widest text-right border-r border-slate-800/30">Διόρθωση v (m)</th>
                   <th className="p-3 text-[11px] font-black text-emerald-400 tracking-widest text-right">Τελικό ΔH (m)</th>
                 </tr>
               </thead>
@@ -516,13 +552,12 @@ const TraverseLeveling = ({
                       </td>
                       <td className="p-3 text-right font-mono text-sm text-blue-300 border-r border-slate-800/30">{formatVal(leg.dh_forward, 4)}</td>
                       <td className="p-3 text-right font-mono text-sm text-orange-300 border-r border-slate-800/30">{formatVal(leg.dh_backward, 4)}</td>
-                      <td className="p-3 text-right font-mono text-sm text-purple-300 border-r border-slate-800/30">{formatVal(leg.correction * 1000, 1)}</td>
                       <td className="p-3 text-right font-mono text-sm text-emerald-400 font-bold bg-emerald-900/10">{formatVal(leg.dh_final, 4)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-16 text-center text-slate-500 font-bold">
+                    <td colSpan={4} className="p-16 text-center text-slate-500 font-bold">
                       Δεν βρέθηκαν δεδομένα πλευρών!
                     </td>
                   </tr>

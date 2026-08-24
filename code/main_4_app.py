@@ -1210,7 +1210,16 @@ def run_traverse_spirit_level():
             print(f"⚠️ [DEBUG] Σφάλμα αποθήκευσης ZS από Χωροστάθμιση: {e}")
 
         # 3. Προσθήκη status και επιστροφή της πλήρους δομής (forward_results, backward_results, metrics, legs)
+   
         result["status"] = "success"
+        
+        # --- ΠΡΟΣΘΕΣΕ ΑΥΤΕΣ ΤΙΣ ΓΡΑΜΜΕΣ ΕΔΩ ---
+        if "forward" in result and "forward_results" not in result:
+            result["forward_results"] = result.pop("forward")
+            
+        if "backward" in result and "backward_results" not in result:
+            result["backward_results"] = result.pop("backward")
+
         return jsonify(result)
 
     except Exception as e:

@@ -1288,7 +1288,6 @@ def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
 
             # Τελικό ΔΗ (Μέσος όρος): ΔΗ_final = (ΔΗ_fwd - ΔΗ_bwd) / 2
             dh_final = (dh_fwd - dh_bwd) / 2.0
-            correction = dh_final - dh_fwd  # Διόρθωση v σε μέτρα
             
             print(f"   dh_final = ({dh_fwd} - ({dh_bwd})) / 2 = {dh_final}")
             
@@ -1306,7 +1305,6 @@ def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
                 "point_to": p_to,
                 "dh_forward": round(dh_fwd, 4),
                 "dh_backward": round(dh_bwd, 4),
-                "correction": round(correction, 4),
                 "dh_final": round(dh_final, 4),
                 "elevation_to": round(current_elevation, 4)
             })
