@@ -19,7 +19,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
 try:
     pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf')) # Βάλε το σωστό path εδώ
     font_name = 'ArialGreek'
@@ -255,10 +257,47 @@ def run_adjustment():
 # ==========================================
 # 1B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (ADJUSTMENT - CUSTOM STYLING)
 # ==========================================
+# --- CUSTOM CANVAS ΓΙΑ ADJUSTMENT REPORT ---
+class AdjustmentNumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, font_name='Helvetica', **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+        self.font_name = font_name
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, page_count):
+        self.saveState()
+        self.setFont(self.font_name, 8)
+        self.setFillColor(colors.HexColor('#475569'))
+        
+        # Πάνω Κεφαλίδα (Header)
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(0.75)
+        self.line(30, A4[1] - 30, A4[0] - 30, A4[1] - 30)
+        self.drawString(30, A4[1] - 24, "ΑΝΑΦΟΡΑ ΣΥΝΟΡΘΩΣΗΣ ΔΙΚΤΥΟΥ (STATION ADJUSTMENT)")
+        
+        # Κάτω Υποσέλιδο (Footer)
+        self.line(30, 35, A4[0] - 30, 35)
+        self.drawString(30, 22, "LASCA GEODETIC SUITE | Τεύχος Συνορθώσεων")
+        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
+        self.drawRightString(A4[0] - 30, 22, page_str)
+        self.restoreState()
+
 @app.route('/api/adjustment/report', methods=['POST'])
 def export_adjustment_report():
     try:
-        data = request.json
+        data = request.json or {}
         observations = data.get('measurements', [])
         stats = data.get('stats', [])
         
@@ -268,6 +307,7 @@ def export_adjustment_report():
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
+            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
             my_font = 'GreekFont'
             my_font_bold = 'GreekFont-Bold'
         except Exception:
@@ -283,59 +323,70 @@ def export_adjustment_report():
                 return str(val)
 
         buffer = BytesIO()
+        a4_w, a4_h = A4
+
+        # Χρήση SimpleDocTemplate με σταθερά περιθώρια A4 (ίδια με Traverse)
         doc = SimpleDocTemplate(
             buffer, 
             pagesize=A4, 
-            rightMargin=30, leftMargin=30, 
-            topMargin=30, bottomMargin=30
+            leftMargin=30, 
+            rightMargin=30, 
+            topMargin=45, 
+            bottomMargin=45
         )
         elements = []
         
-        # --- Light Palette & Custom Colors ---
-        HEADER_BG = colors.HexColor('#1e293b')     
+        # --- Κοινή Παλέτα Χρωμάτων ---
+        HEADER_BG = colors.HexColor('#0f172a')     # Dark Slate/Navy (από Traverse)
+        SUBHEADER_BG = colors.HexColor('#1e293b')  # Dark Slate Blue
         ROW_BG_1 = colors.HexColor('#ffffff')      
         ROW_BG_2 = colors.HexColor('#f8fafc')      
         GRID_COLOR = colors.HexColor('#cbd5e1')    
-        
         TEXT_MAIN = colors.HexColor('#0f172a')     
-        TITLE_COLOR = colors.HexColor('#0284c7')   
-        H2_COLOR = colors.HexColor('#2563eb')      
+        ACCENT_TITLE = colors.HexColor('#0284c7')  
         
         # Νέα έντονα χρώματα για τα αποτελέσματα (Πίνακας 1)
-        BRIGHT_GREEN = colors.HexColor('#16a34a')  # Έντονο πράσινο
-        MATCHING_CYAN = colors.HexColor('#0891b2') # Έντονο Κυανό/Teal (ταιριάζει άψογα με το πράσινο)
+        BRIGHT_GREEN = colors.HexColor('#15803d')  # Λίγο πιο σκούρο πράσινο για καλύτερη αντίθεση στο χαρτί
+        MATCHING_CYAN = colors.HexColor('#0369a1') # Ταιριαστό μπλε/κυανό
 
         styles = getSampleStyleSheet()
         
+        # Στυλ Παραγράφων (Ευθυγραμμισμένα με Traverse)
         title_style = ParagraphStyle(
-            'LightTitle', parent=styles['Title'], fontName=my_font,
-            fontSize=18, textColor=TITLE_COLOR, alignment=1
+            'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
+            fontSize=16, leading=20, textColor=ACCENT_TITLE, alignment=0
+        )
+        subtitle_style = ParagraphStyle(
+            'TopoSubtitle', parent=styles['Normal'], fontName=my_font,
+            fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), alignment=0
         )
         h2_style = ParagraphStyle(
-            'LightH2', parent=styles['Heading2'], fontName=my_font,
-            fontSize=11, textColor=H2_COLOR, spaceBefore=10, spaceAfter=8
+            'TopoSecH', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG
         )
         header_style = ParagraphStyle(
-            'TableHead', parent=styles['Normal'], fontName=my_font,
+            'TableHead', parent=styles['Normal'], fontName=my_font_bold,
             fontSize=8.5, textColor=colors.white, alignment=1 
         )
 
-        # --- Τίτλος ---
+        # --- Τίτλος Τεύχους ---
         elements.append(Paragraph("Adjustment Network Report", title_style))
+        elements.append(Paragraph("Αναλυτικοί πίνακες μετρήσεων, διορθώσεων και στατιστικών ελέγχων δικτύου", subtitle_style))
         elements.append(Spacer(1, 15))
         
-        # --- Πίνακας 1: Μετρήσεις & Αποτελέσματα ---
+        # ========================================================
+        # Πίνακας 1: Μετρήσεις & Αποτελέσματα
+        # ========================================================
         elements.append(Paragraph("1. Network Observations & Adjusted Values", h2_style))
-        elements.append(Spacer(1, 5))
+        elements.append(Spacer(1, 6))
         
         t1_headers = [
-            Paragraph("<b>From</b>", header_style),
-            Paragraph("<b>To</b>", header_style),
-            Paragraph("<b>Period</b>", header_style),
-            Paragraph("<b>Face I</b>", header_style),
-            Paragraph("<b>Face II</b>", header_style),
-            Paragraph("<b>Adj. Hz (grad)</b>", header_style),
-            Paragraph("<b>σ (cc)</b>", header_style)
+            Paragraph("From", header_style),
+            Paragraph("To", header_style),
+            Paragraph("Period", header_style),
+            Paragraph("Face I", header_style),
+            Paragraph("Face II", header_style),
+            Paragraph("Adj. Hz [grad]", header_style),
+            Paragraph("σ [cc]", header_style)
         ]
         
         table_data = [t1_headers]
@@ -355,19 +406,19 @@ def export_adjustment_report():
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
             
-            # 1. Θέτουμε κανονική γραμματοσειρά σε όλο τον πίνακα αρχικά
+            # 1. Κανονική γραμματοσειρά σε όλο τον πίνακα
             ('FONTNAME', (0,1), (-1,-1), my_font),
             
-            # 2. Κάνουμε Bold ΜΟΝΟ τα From, To, Adj. Hz, και σ
+            # 2. Bold στα: From, To, Adj. Hz, και σ
             ('FONTNAME', (0,1), (1,-1), my_font_bold), # From, To
             ('FONTNAME', (5,1), (6,-1), my_font_bold), # Adj Hz, σ
             
-            # 3. Ορίζουμε τα χρώματα κειμένου
-            ('TEXTCOLOR', (0,1), (4,-1), TEXT_MAIN),     # Στήλες 0 έως 4: Κανονικό σκούρο χρώμα
-            ('TEXTCOLOR', (5,1), (5,-1), BRIGHT_GREEN),  # Στήλη 5 (Adj Hz): Έντονο πράσινο
-            ('TEXTCOLOR', (6,1), (6,-1), MATCHING_CYAN), # Στήλη 6 (σ): Ταιριαστό έντονο κυανό
+            # 3. Χρώματα Κειμένου
+            ('TEXTCOLOR', (0,1), (4,-1), TEXT_MAIN),     # Στήλες 0-4
+            ('TEXTCOLOR', (5,1), (5,-1), BRIGHT_GREEN),  # Στήλη 5
+            ('TEXTCOLOR', (6,1), (6,-1), MATCHING_CYAN), # Στήλη 6
             
             ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
             ('TOPPADDING', (0,0), (-1,-1), 5),
@@ -381,16 +432,18 @@ def export_adjustment_report():
         elements.append(t1)
         elements.append(Spacer(1, 20))
         
-        # --- Πίνακας 2: Στατιστικά Στάσεων ---
+        # ========================================================
+        # Πίνακας 2: Στατιστικά Στάσεων
+        # ========================================================
         elements.append(Paragraph("2. Station Statistics (Log)", h2_style))
-        elements.append(Spacer(1, 5))
+        elements.append(Spacer(1, 6))
         
         t2_headers = [
-            Paragraph("<b>Station</b>", header_style),
-            Paragraph("<b>Degrees of Freedom (f)</b>", header_style),
-            Paragraph("<b>Optimization Criterion [vv]</b>", header_style),
-            Paragraph("<b>A-posteriori Variance (σ<sub>0</sub><sup>2</sup>)</b>", header_style),
-            Paragraph("<b>A-posteriori Std. Dev. σ<sub>0</sub> (cc)</b>", header_style)
+            Paragraph("Station", header_style),
+            Paragraph("Degrees of Freedom (f)", header_style),
+            Paragraph("Optim. Criterion [vv]", header_style),
+            Paragraph("A-post. Variance (σ<sub>0</sub><sup>2</sup>)", header_style),
+            Paragraph("A-post. Std. Dev. σ<sub>0</sub> [cc]", header_style)
         ]
         
         stats_data = [t2_headers]
@@ -403,17 +456,15 @@ def export_adjustment_report():
                 format_to_4(st.get('std'))
             ])
             
-        t2 = Table(stats_data, colWidths=[75, 110, 115, 115, 120])
+        t2 = Table(stats_data, colWidths=[75, 115, 110, 115, 120])
         t2_cmds = [
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
             
-            # Στατιστικά: ΟΛΑ BOLD
+            # Στατιστικά: ΟΛΑ BOLD και Ίδιο χρώμα
             ('FONTNAME', (0,1), (-1,-1), my_font_bold),
-            
-            # Στατιστικά: ΟΛΑ το ίδιο ομοιόμορφο χρώμα (σκούρο κείμενο)
             ('TEXTCOLOR', (0,1), (-1,-1), TEXT_MAIN),
             
             ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
@@ -427,7 +478,8 @@ def export_adjustment_report():
         t2.setStyle(TableStyle(t2_cmds))
         elements.append(t2)
         
-        doc.build(elements)
+        # Δημιουργία με χρήση του προσαρμοσμένου Canvas
+        doc.build(elements, canvasmaker=lambda *args, **kwargs: AdjustmentNumberedCanvas(*args, font_name=my_font, **kwargs))
         buffer.seek(0)
         
         return send_file(
@@ -439,7 +491,7 @@ def export_adjustment_report():
         
     except Exception as e:
         import traceback
-        print(f"Σφάλμα κατά τη δημιουργία Report:\n{traceback.format_exc()}")
+        print(f"Σφάλμα κατά τη δημιουργία Adjustment Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 # ==========================================
@@ -572,116 +624,159 @@ def run_traverse():
         print(f"Σφάλμα κατά την εκτέλεση της όδευσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-# ==========================================
-# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - LIGHT THEME & CUSTOM PLOT PAGE)
-# ==========================================
+# --- CUSTOM CANVAS ΓΙΑ ΕΠΑΓΓΕΛΜΑΤΙΚΟ HEADER / FOOTER & ΑΡΙΘΜΗΣΗ ΣΕΛΙΔΩΝ ---
+class TopoNumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, font_name='Helvetica', **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+        self.font_name = font_name
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, page_count):
+        self.saveState()
+        self.setFont(self.font_name, 8)
+        self.setFillColor(colors.HexColor('#475569'))
+        
+        # Πάνω Κεφαλίδα (Header)
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(0.75)
+        self.line(30, A4[1] - 30, A4[0] - 30, A4[1] - 30)
+        self.drawString(30, A4[1] - 24, "ΑΝΑΦΟΡΑ ΥΠΟΛΟΓΙΣΜΟΥ & ΕΛΕΓΧΟΥ ΟΔΕΥΣΗΣ")
+        
+        # Κάτω Υποσέλιδο (Footer)
+        self.line(30, 35, A4[0] - 30, 35)
+        self.drawString(30, 22, "LASCA GEODETIC SUITE | Τεύχος Υπολογισμών")
+        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
+        self.drawRightString(A4[0] - 30, 22, page_str)
+        self.restoreState()
+
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
     try:
-        data = request.json
+        data = request.json or {}
         points = data.get('points', [])
         metrics = data.get('metrics', {})
         plot_base64 = data.get('plot') 
 
-        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΑΣ ---
+        # --- ΕΓΓΡΑΦΗ REGULAR & BOLD ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
+            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
+            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
             my_font = 'GreekFont'
+            my_font_bold = 'GreekFont-Bold'
         except Exception:
-            print("Δεν βρέθηκε η γραμματοσειρά Arial. Ενδέχεται να μην εμφανίζονται τα Ελληνικά.")
             my_font = 'Helvetica'
+            my_font_bold = 'Helvetica-Bold'
 
         buffer = BytesIO()
-
-        # --- ΟΡΙΣΜΟΣ ΔΙΑΣΤΑΣΕΩΝ ΣΕΛΙΔΩΝ ---
         a4_w, a4_h = A4
-        
-        # 1. Σελίδα Πινάκων: Standard A4 Portrait 
-        frame_a4 = Frame(30, 30, a4_w - 60, a4_h - 60, id='F_A4')
-        template_a4 = PageTemplate(id='A4_Portrait', frames=frame_a4, pagesize=A4)
 
-        # 2. Σελίδα Σκαριφήματος: Πλάτος ΙΔΙΟ με το Α4, Ύψος αναλογικό (ώστε να είναι ~16:9)
-        PLOT_PAGE_W = a4_w
-        PLOT_PAGE_H = 340  
-        
-        frame_plot = Frame(
-            0, 0, PLOT_PAGE_W, PLOT_PAGE_H, 
-            leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0, 
-            id='F_PLOT'
+        # Χρήση SimpleDocTemplate με σταθερά περιθώρια A4 Portrait
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=30,
+            rightMargin=30,
+            topMargin=45,
+            bottomMargin=45
         )
-        template_plot = PageTemplate(id='Plot_Insert', frames=frame_plot, pagesize=(PLOT_PAGE_W, PLOT_PAGE_H))
-
-        # Αρχικοποίηση BaseDocTemplate
-        doc = BaseDocTemplate(buffer, pagesize=A4)
-        doc.addPageTemplates([template_a4, template_plot])
 
         elements = []
         
-        # --- Light Palette ---
-        HEADER_BG = colors.HexColor('#1e293b')
+        # --- Παλέτα Χρωμάτων ---
+        HEADER_BG = colors.HexColor('#0f172a')     # Dark Slate/Navy
+        SUBHEADER_BG = colors.HexColor('#1e293b')  # Dark Slate Blue
         ROW_BG_1 = colors.HexColor('#ffffff')
-        ROW_BG_2 = colors.HexColor('#f8fafc')
+        ROW_BG_2 = colors.HexColor('#f8fafc')     # Light Gray zebra
         GRID_COLOR = colors.HexColor('#cbd5e1')
         TEXT_MAIN = colors.HexColor('#0f172a')
         ACCENT_TITLE = colors.HexColor('#0284c7')
-        
-        # Πιο σκούρα/έντονα accents για να γράφουν καλά στο λευκό
-        ACCENT_BLUE = colors.HexColor('#2563eb')
-        ACCENT_GREEN = colors.HexColor('#059669')
-        ACCENT_PINK = colors.HexColor('#db2777') 
-        ACCENT_CYAN = colors.HexColor('#0891b2')
 
         styles = getSampleStyleSheet()
 
         title_style = ParagraphStyle(
-            'LightTitle', parent=styles['Title'], fontName=my_font,
-            fontSize=18, textColor=ACCENT_TITLE, alignment=1
+            'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
+            fontSize=16, leading=20, textColor=ACCENT_TITLE, alignment=0
+        )
+        subtitle_style = ParagraphStyle(
+            'TopoSubtitle', parent=styles['Normal'], fontName=my_font,
+            fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), alignment=0
         )
         th_style = ParagraphStyle(
-            'LightTH', parent=styles['Normal'], fontName=my_font,
-            fontSize=9, textColor=colors.white, alignment=1
+            'TopoTH', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8, leading=10, textColor=colors.white, alignment=1
+        )
+        
+        # --- ΣΤΥΛ ΚΕΛΙΩΝ (Κεντραρισμένα) ---
+        # 1. Κανονική γραφή για Στάση, Γωνία, Απόσταση
+        td_norm_style = ParagraphStyle(
+            'TopoTDNorm', parent=styles['Normal'], fontName=my_font,
+            fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
+        )
+        # 2. Έντονη γραφή (Bold) αποκλειστικά για X και Y
+        td_bold_style = ParagraphStyle(
+            'TopoTDBold', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
 
-        # --- Τίτλος ---
-        elements.append(Paragraph("Αναφορά Όδευσης (Traverse Report)", title_style))
-        elements.append(Spacer(1, 20))
+        # --- Τίτλος Τεύχους ---
+        elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
+        elements.append(Paragraph("Αναλυτικοί πίνακες συντεταγμένων, γωνιών, αποστάσεων & ελέγχου ανοχών", subtitle_style))
+        elements.append(Spacer(1, 15))
 
         # ========================================================
-        # 1. ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ (Μπήκε πρώτος)
+        # 1. ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ & ΣΥΝΤΕΤΑΓΜΕΝΩΝ (Topographical Format)
         # ========================================================
+        elements.append(Paragraph("1. Πίνακας Στάσεων & Συντεταγμένων", ParagraphStyle('SecH', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
+        elements.append(Spacer(1, 6))
+
         t_headers = [
-            Paragraph("<b>Στάση</b>", th_style),
-            Paragraph("<b>Γωνία [grad]</b>", th_style),
-            Paragraph("<b>Απόσταση [m]</b>", th_style),
-            Paragraph("<b>X [m]</b>", th_style),
-            Paragraph("<b>Y [m]</b>", th_style)
+            Paragraph("Στάση", th_style),
+            Paragraph("Γωνία θλάσης [grad]", th_style),
+            Paragraph("Απόσταση [m]", th_style),
+            Paragraph("Τετμημένη X [m]", th_style),
+            Paragraph("Τεταγμένη Y [m]", th_style)
         ]
         
         table_data = [t_headers]
         for pt in points:
+            hz_val = f"{float(pt.get('hz')):.4f}" if pt.get('hz') not in [None, '', '-'] else "-"
+            sd_val = f"{float(pt.get('sd')):.3f}" if pt.get('sd') not in [None, '', '-'] else "-"
+            x_val  = f"{float(pt.get('x')):.3f}" if pt.get('x') not in [None, '', '-'] else "-"
+            y_val  = f"{float(pt.get('y')):.3f}" if pt.get('y') not in [None, '', '-'] else "-"
+
             table_data.append([
-                str(pt.get('name', '-')),
-                f"{float(pt.get('hz', 0)):.4f}" if pt.get('hz') not in [None, '', '-'] else "-",
-                f"{float(pt.get('sd', 0)):.3f}" if pt.get('sd') not in [None, '', '-'] else "-",
-                f"{float(pt.get('x', 0)):.3f}" if pt.get('x') not in [None, '', '-'] else "-",
-                f"{float(pt.get('y', 0)):.3f}" if pt.get('y') not in [None, '', '-'] else "-"
+                Paragraph(str(pt.get('name', '-')), td_norm_style),  # Κανονικό
+                Paragraph(hz_val, td_norm_style),                   # Κανονικό
+                Paragraph(sd_val, td_norm_style),                   # Κανονικό
+                Paragraph(x_val, td_bold_style),                    # BOLD X
+                Paragraph(y_val, td_bold_style)                     # BOLD Y
             ])
             
-        t = Table(table_data, colWidths=[80, 80, 80, 100, 100])
+        t = Table(table_data, colWidths=[55, 120, 90, 135, 135])
         t_style_cmds = [
-            ('FONTNAME', (0,0), (-1,-1), my_font), 
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
-            ('TEXTCOLOR', (0,1), (0,-1), TEXT_MAIN),
-            ('TEXTCOLOR', (1,1), (1,-1), ACCENT_BLUE),
-            ('TEXTCOLOR', (2,1), (2,-1), ACCENT_GREEN),
-            ('TEXTCOLOR', (3,1), (4,-1), ACCENT_CYAN),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
         ]
 
         for i in range(1, len(table_data)):
@@ -690,61 +785,82 @@ def export_traverse_report():
 
         t.setStyle(TableStyle(t_style_cmds))
         elements.append(t)
-        elements.append(Spacer(1, 25))
+        elements.append(Spacer(1, 15))
 
         # ========================================================
-        # 2. ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΣΦΑΛΜΑΤΩΝ (Μπήκε δεύτερος)
+        # 2. ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΕΛΕΓΧΟΥ ΑΝΟΧΩΝ (Audit Grid)
         # ========================================================
+        elements.append(Paragraph("2. Στοιχεία Επίλυσης & Έλεγχος Ανοχών", ParagraphStyle('SecH2', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
+        elements.append(Spacer(1, 6))
+
+        def safe_fmt(val, decimals=3, suffix=""):
+            if val in [None, '', '-']: return "-"
+            try: return f"{float(val):.{decimals}f}{suffix}"
+            except: return str(val)
+
+        wb_act = safe_fmt(metrics.get('fb'), 4, " g")
+        wb_max = safe_fmt(metrics.get('Wb_max'), 4, " g")
+        ds_act = safe_fmt(metrics.get('w'), 3, " m")
+        ds_max = safe_fmt(metrics.get('ds_max'), 3, " m")
+
+        try:
+            pass_wb = abs(float(metrics.get('fb', 0))) <= float(metrics.get('Wb_max', 0))
+            pass_ds = abs(float(metrics.get('w', 0))) <= float(metrics.get('ds_max', 0))
+            status_text = "ΕΝΤΟΣ ΑΝΟΧΩΝ" if (pass_wb and pass_ds) else "ΕΚΤΟΣ ΑΝΟΧΩΝ"
+            status_color = colors.HexColor('#15803d') if (pass_wb and pass_ds) else colors.HexColor('#b91c1c')
+        except:
+            status_text = "ΕΛΕΓΧΟΣ ΟΛΟΚΛΗΡΩΘΗΚΕ"
+            status_color = colors.HexColor('#0369a1')
+
+        status_p = Paragraph(f"ΚΑΤΑΣΤΑΣΗ: {status_text}", ParagraphStyle('StatP', fontName=my_font_bold, fontSize=8.5, leading=10, textColor=status_color, alignment=1))
+
+        # Helper συνάρτηση για επιστροφή κεντραρισμένου & BOLD Paragraph στον 2ο πίνακα
+        def val_p(val):
+            return Paragraph(str(val), td_bold_style)
+
         metrics_table_data = [
-            # Κεφαλίδες ενοτήτων
-            [Paragraph("<b>Γενικά & Μέγιστα</b>", th_style), '', Paragraph("<b>Γωνιακή Ανάλυση</b>", th_style), '', Paragraph("<b>Γραμμική Ανάλυση</b>", th_style), ''],
-            # Γραμμή 1
-            ["Κορυφές (n):", str(metrics.get('n', '-')), "G (πρέπει):", str(metrics.get('gTarget', '-')), "ΔX (πρέπει):", str(metrics.get('dxTarget', '-'))],
-            # Γραμμή 2
-            ["Μήκος (L):", f"{metrics.get('totalLength', '-')} m", "G (είναι):", str(metrics.get('gActual', '-')), "ΔX (είναι):", str(metrics.get('dxActual', '-'))],
-            # Γραμμή 3
-            ["Wβ Max:", f"{metrics.get('Wb_max', '-')} g", "Wβ:", f"{metrics.get('fb', '-')} g", "δx:", str(metrics.get('dx', '-'))],
-            # Γραμμή 4
-            ["δs Max:", f"{metrics.get('ds_max', '-')} m", "wβi:", str(metrics.get('wbi', '-')), "ΔY (πρέπει):", str(metrics.get('dyTarget', '-'))],
-            # Γραμμή 5
-            ["", "", "", "", "ΔY (είναι):", str(metrics.get('dyActual', '-'))],
-            # Γραμμή 6
-            ["", "", "", "", "δy:", str(metrics.get('dy', '-'))],
-            # Γραμμή 7
-            ["", "", "", "", "δs (W):", f"{metrics.get('w', '-')} m"]
+            [Paragraph("Γενικά Στοιχεία & Γωνιακός Έλεγχος", th_style), '', '', ''],
+            ["Αριθμός Στάσεων (n):", val_p(metrics.get('n', '-')), "G (πρέπει):", val_p(safe_fmt(metrics.get('gTarget'), 4, " g"))],
+            ["Συνολικό Μήκος (L):", val_p(safe_fmt(metrics.get('totalLength'), 2, " m")), "G (είναι):", val_p(safe_fmt(metrics.get('gActual'), 4, " g"))],
+            ["Μέγιστη Γωνιακή Ανοχή (Wβmax):", val_p(wb_max), "Γωνιακό Σφάλμα (Wβ):", val_p(wb_act)],
+            
+            [Paragraph("Γραμμικός Έλεγχος & Σφάλματα Κλεισίματος", th_style), '', '', ''],
+            ["ΔX (πρέπει):", val_p(safe_fmt(metrics.get('dxTarget'), 3, " m")), "ΔY (πρέπει):", val_p(safe_fmt(metrics.get('dyTarget'), 3, " m"))],
+            ["ΔX (είναι):", val_p(safe_fmt(metrics.get('dxActual'), 3, " m")), "ΔY (είναι):", val_p(safe_fmt(metrics.get('dyActual'), 3, " m"))],
+            ["Σφάλμα δX:", val_p(safe_fmt(metrics.get('dx'), 3, " m")), "Σφάλμα δY:", val_p(safe_fmt(metrics.get('dy'), 3, " m"))],
+            ["Ολικό Γραμμικό Σφάλμα (fs / δs):", val_p(ds_act), "Μέγιστη Γραμμική Ανοχή (δs_max):", val_p(ds_max)],
+            
+            [status_p, '', '', '']
         ]
 
-        metrics_table = Table(metrics_table_data, colWidths=[65, 75, 65, 80, 85, 70])
+        metrics_table = Table(metrics_table_data, colWidths=[140, 127, 140, 128])
         metrics_style = TableStyle([
-            ('FONTNAME', (0,0), (-1,-1), my_font),
-            ('FONTSIZE', (0,0), (-1,-1), 8),
-            ('TEXTCOLOR', (0,0), (-1,-1), TEXT_MAIN),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, -1), my_font),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), TEXT_MAIN),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             
-            # Κεφαλίδες Ενοτήτων (Span)
-            ('SPAN', (0,0), (1,0)),
-            ('SPAN', (2,0), (3,0)),
-            ('SPAN', (4,0), (5,0)),
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,0), 'CENTER'),
-            
-            # Χρώματα στις τιμές για έμφαση
-            ('TEXTCOLOR', (1,1), (1,2), ACCENT_BLUE),  # n, L
-            ('TEXTCOLOR', (1,3), (1,4), ACCENT_PINK),  # Max Wb, Max ds
-            ('TEXTCOLOR', (3,3), (3,3), ACCENT_GREEN), # Wb
-            ('TEXTCOLOR', (5,7), (5,7), ACCENT_GREEN), # ds (W)
-            
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('BACKGROUND', (0,1), (-1,-1), ROW_BG_1),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('SPAN', (0, 0), (3, 0)),
+            ('BACKGROUND', (0, 0), (3, 0), SUBHEADER_BG),
+            ('SPAN', (0, 4), (3, 4)),
+            ('BACKGROUND', (0, 4), (3, 4), SUBHEADER_BG),
+            ('SPAN', (0, 9), (3, 9)),
+            ('BACKGROUND', (0, 9), (3, 9), colors.HexColor('#f1f5f9')),
+
+            ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ('ALIGN', (1, 1), (1, 3), 'CENTER'),
+            ('ALIGN', (3, 1), (3, 3), 'CENTER'),
+            ('ALIGN', (1, 5), (1, 8), 'CENTER'),
+            ('ALIGN', (3, 5), (3, 8), 'CENTER'),
+
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ])
         metrics_table.setStyle(metrics_style)
         elements.append(metrics_table)
 
         # ========================================================
-        # 3. ΕΝΘΕΤΗ ΣΕΛΙΔΑ ΣΚΑΡΙΦΗΜΑΤΟΣ (ΟΜΟΙΟ ΠΛΑΤΟΣ ΜΕ A4)
+        # 3. ΣΚΑΡΙΦΗΜΑ / ΔΙΑΓΡΑΜΜΑ
         # ========================================================
         if plot_base64 and "," in plot_base64:
             try:
@@ -752,19 +868,33 @@ def export_traverse_report():
                 img_data = base64.b64decode(encoded_image)
                 img_stream = BytesIO(img_data)
                 
-                # Αλλαγή στο Plot Template & PageBreak
-                elements.append(NextPageTemplate('Plot_Insert'))
-                elements.append(PageBreak())
+                img_reader = ImageReader(img_stream)
+                orig_w, orig_h = img_reader.getSize()
                 
-                # Η εικόνα παίρνει ΑΚΡΙΒΩΣ τις νέες διαστάσεις
-                img = Image(img_stream, width=PLOT_PAGE_W, height=PLOT_PAGE_H)
-                elements.append(img)
-                
-            except Exception as img_err:
-                print(f"Σφάλμα εικόνας: {img_err}")
+                max_width = a4_w - 60
+                max_height = 380
 
-        # Χτίσιμο εγγράφου
-        doc.build(elements)
+                aspect = orig_w / float(orig_h)
+                if (max_width / max_height) < aspect:
+                    final_w = max_width
+                    final_h = max_width / aspect
+                else:
+                    final_h = max_height
+                    final_w = max_height * aspect
+
+                elements.append(PageBreak())
+                elements.append(Paragraph("3. Σκαρίφημα & Διάγραμμα Όδευσης", ParagraphStyle('SecH3', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
+                elements.append(Spacer(1, 10))
+
+                plot_img = Image(img_stream, width=final_w, height=final_h)
+                plot_img.hAlign = 'CENTER'
+                
+                elements.append(plot_img)
+
+            except Exception as img_err:
+                print(f"Σφάλμα επεξεργασίας εικόνας διαγράμματος: {img_err}")
+
+        doc.build(elements, canvasmaker=lambda *args, **kwargs: TopoNumberedCanvas(*args, font_name=my_font, **kwargs))
         buffer.seek(0)
         
         return send_file(
@@ -778,7 +908,7 @@ def export_traverse_report():
         import traceback
         print(f"Σφάλμα κατά τη δημιουργία Traverse Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
+    
 # ==========================================
 # 3. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ ΠΛΗΡΟΥΣ DXF (TRAVERSE)
 # ==========================================
@@ -1670,13 +1800,48 @@ def run_stakeout():
         print(f"Σφάλμα κατά τον υπολογισμό χάραξης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-# ==========================================
-# ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (GREEK & LIGHT - MATCH A4 WIDTH)
-# ==========================================
+# --- CUSTOM CANVAS ΓΙΑ STAKEOUT REPORT ---
+class StakeoutNumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, font_name='Helvetica', **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+        self.font_name = font_name
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, page_count):
+        self.saveState()
+        self.setFont(self.font_name, 8)
+        self.setFillColor(colors.HexColor('#475569'))
+        
+        # Πάνω Κεφαλίδα (Header)
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(0.75)
+        self.line(30, A4[1] - 30, A4[0] - 30, A4[1] - 30)
+        self.drawString(30, A4[1] - 24, "ΑΝΑΦΟΡΑ ΣΤΟΙΧΕΙΩΝ ΧΑΡΑΞΗΣ")
+        
+        # Κάτω Υποσέλιδο (Footer)
+        self.line(30, 35, A4[0] - 30, 35)
+        self.drawString(30, 22, "LASCA GEODETIC SUITE | Τεύχος Υπολογισμών Χάραξης")
+        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
+        self.drawRightString(A4[0] - 30, 22, page_str)
+        self.restoreState()
+
+
 @app.route('/api/projects/stakeout/report', methods=['POST'])
 def export_stakeout_report():
     try:
-        data = request.json
+        data = request.json or {}
         station = data.get('station', {})
         backsight = data.get('backsight', {})
         points = data.get('points', [])
@@ -1684,112 +1849,183 @@ def export_stakeout_report():
         mij = data.get('mij')
         plot_base64 = data.get('plot')
 
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ (Κανονική & Bold) ---
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        try:
+            pdfmetrics.registerFont(TTFont('GreekFont', font_path))
+            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
+            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
+            my_font = 'GreekFont'
+            my_font_bold = 'GreekFont-Bold'
+        except Exception:
+            my_font = 'Helvetica'
+            my_font_bold = 'Helvetica-Bold'
+
         buffer = BytesIO()
-
-        # --- ΟΡΙΣΜΟΣ ΔΙΑΣΤΑΣΕΩΝ ΣΕΛΙΔΩΝ ---
         a4_w, a4_h = A4
-        
-        # 1. Σελίδα Πινάκων: Standard A4 Portrait (Κανονική σελίδα με 30pt περιθώρια)
-        frame_a4 = Frame(30, 30, a4_w - 60, a4_h - 60, id='F_A4')
-        template_a4 = PageTemplate(id='A4_Portrait', frames=frame_a4, pagesize=A4)
 
-        # 2. Σελίδα Σκαριφήματος: Πλάτος ΙΔΙΟ με το Α4, Ύψος αναλογικό (ώστε να είναι 16:9)
-        # Με αυτόν τον τρόπο δεν προεξέχει στο PDF viewer σε σχέση με την 1η σελίδα.
-        PLOT_PAGE_W = a4_w
-        PLOT_PAGE_H = 340  # Προσαρμοσμένο ύψος για να φαίνεται σωστά το γράφημα (περίπου 16:9 ratio)
-        
-        frame_plot = Frame(
-            0, 0, PLOT_PAGE_W, PLOT_PAGE_H, 
-            leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0, 
-            id='F_PLOT'
+        # Χρήση SimpleDocTemplate με περιθώρια A4 (30pt αριστερά/δεξιά)
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=A4, 
+            leftMargin=30, 
+            rightMargin=30, 
+            topMargin=45, 
+            bottomMargin=45
         )
-        template_plot = PageTemplate(id='Plot_Insert', frames=frame_plot, pagesize=(PLOT_PAGE_W, PLOT_PAGE_H))
-
-        # Αρχικοποίηση BaseDocTemplate
-        doc = BaseDocTemplate(buffer, pagesize=A4)
-        doc.addPageTemplates([template_a4, template_plot])
-
         elements = []
         
-        # --- Light Palette ---
-        HEADER_BG = colors.HexColor('#1e293b')
-        ROW_BG_1 = colors.HexColor('#ffffff')
-        ROW_BG_2 = colors.HexColor('#f8fafc')
-        GRID_COLOR = colors.HexColor('#cbd5e1')
-        TEXT_MAIN = colors.HexColor('#0f172a')
-        ACCENT_TITLE = colors.HexColor('#0284c7')
-        ACCENT_BLUE = colors.HexColor('#2563eb')
-        ACCENT_GREEN = colors.HexColor('#059669')
+        # --- Κοινή Παλέτα Χρωμάτων ---
+        HEADER_BG = colors.HexColor('#0f172a')     # Dark Slate/Navy
+        SUBHEADER_BG = colors.HexColor('#1e293b')  # Dark Slate Blue
+        ROW_BG_1 = colors.HexColor('#ffffff')      
+        ROW_BG_2 = colors.HexColor('#f8fafc')      
+        GRID_COLOR = colors.HexColor('#cbd5e1')    
+        TEXT_MAIN = colors.HexColor('#0f172a')     
+        ACCENT_TITLE = colors.HexColor('#0284c7')  
+        ACCENT_BLUE = colors.HexColor('#0369a1')   # Έντονο μπλε/κυανό για Hz
+        ACCENT_GREEN = colors.HexColor('#15803d')  # Έντονο πράσινο για D (Απόσταση)
 
         styles = getSampleStyleSheet()
-
+        
+        # Στυλ Παραγράφων
         title_style = ParagraphStyle(
-            'LightTitle', parent=styles['Title'], fontName=font_name,
-            fontSize=16, textColor=ACCENT_TITLE, alignment=1, spaceAfter=15
+            'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
+            fontSize=16, leading=20, textColor=ACCENT_TITLE, alignment=0
         )
-        text_style = ParagraphStyle(
-            'LightText', parent=styles['Normal'], fontName=font_name,
-            fontSize=10, textColor=TEXT_MAIN, leading=16
+        subtitle_style = ParagraphStyle(
+            'TopoSubtitle', parent=styles['Normal'], fontName=my_font,
+            fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), alignment=0
+        )
+        h2_style = ParagraphStyle(
+            'TopoSecH', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG
         )
         th_style = ParagraphStyle(
-            'LightTH', parent=styles['Normal'], fontName=font_name,
-            fontSize=9, textColor=colors.white, alignment=1
+            'TableHead', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8.5, leading=10, textColor=colors.white, alignment=1 
         )
 
-        # --- Τίτλος ---
+        # Στυλ Κελιών
+        td_norm_style = ParagraphStyle(
+            'TdNorm', parent=styles['Normal'], fontName=my_font,
+            fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
+        )
+        td_bold_style = ParagraphStyle(
+            'TdBold', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
+        )
+        td_hz_style = ParagraphStyle(
+            'TdHz', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8, leading=10, textColor=ACCENT_BLUE, alignment=1
+        )
+        td_dist_style = ParagraphStyle(
+            'TdDist', parent=styles['Normal'], fontName=my_font_bold,
+            fontSize=8, leading=10, textColor=ACCENT_GREEN, alignment=1
+        )
+
+        # --- Τίτλος Τεύχους ---
         elements.append(Paragraph("Αναφορά Στοιχείων Χάραξης", title_style))
-        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Υπολογισμός πολικών συντεταγμένων για εφαρμογή επί του εδάφους", subtitle_style))
+        elements.append(Spacer(1, 12))
 
-        # --- Στοιχεία Στάσης & Προσανατολισμού ---
-        st_info = f"<font color='#64748b'>Στάση (St):</font> <b>{station.get('name', '-')}</b> | <font color='#64748b'>X:</font> {station.get('x', '-')} | <font color='#64748b'>Y:</font> {station.get('y', '-')}"
-        bs_info = f"<font color='#64748b'>Προσανατολισμός (Bs):</font> <b>{backsight.get('name', '-')}</b> | <font color='#64748b'>X:</font> {backsight.get('x', '-')} | <font color='#64748b'>Y:</font> {backsight.get('y', '-')}"
-        
-        elements.append(Paragraph(st_info, text_style))
-        elements.append(Spacer(1, 3))
-        elements.append(Paragraph(bs_info, text_style))
+        # ========================================================
+        # 1. ΣΤΑΘΜΟΣ ΒΑΣΗΣ & ΠΡΟΣΑΝΑΤΟΛΙΣΜΟΣ
+        # ========================================================
+        elements.append(Paragraph("1. Στοιχεία Στάσης & Προσανατολισμού", h2_style))
+        elements.append(Spacer(1, 6))
+
+        def safe_fmt(val, decimals=3, suffix=""):
+            if val in [None, '', '-']: return "-"
+            try: return f"{float(val):.{decimals}f}{suffix}"
+            except: return str(val)
+
+        g0_str = safe_fmt(azimuth_bs, 4, " g")
+        mij_str = safe_fmt(mij, 5)
+
+        st_name = str(station.get('name', '-'))
+        st_x = safe_fmt(station.get('x'), 3, " m")
+        st_y = safe_fmt(station.get('y'), 3, " m")
+
+        bs_name = str(backsight.get('name', '-'))
+        bs_x = safe_fmt(backsight.get('x'), 3, " m")
+        bs_y = safe_fmt(backsight.get('y'), 3, " m")
+
+        def val_p(val, bold=True):
+            s = td_bold_style if bold else td_norm_style
+            return Paragraph(str(val), s)
+
+        # Structure summary box like an audit grid
+        summary_table_data = [
+            [Paragraph("Στοιχεία Στάσης & Προσανατολισμού", th_style), '', '', ''],
+            ["Στάση (St):", val_p(st_name), "Προσανατολισμός (Bs):", val_p(bs_name)],
+            ["X Στάσης:", val_p(st_x), "X Προσανατολισμού:", val_p(bs_x)],
+            ["Y Στάσης:", val_p(st_y), "Y Προσανατολισμού:", val_p(bs_y)],
+            ["Αζιμούθιο G₀:", val_p(g0_str), "Συντελεστής mᵢⱼ:", val_p(mij_str)]
+        ]
+
+        summary_table = Table(summary_table_data, colWidths=[130, 137, 130, 138])
+        summary_style = TableStyle([
+            ('FONTNAME', (0,0), (-1,-1), my_font),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('TEXTCOLOR', (0,0), (-1,-1), TEXT_MAIN),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            
+            ('SPAN', (0,0), (3,0)),
+            ('BACKGROUND', (0,0), (3,0), SUBHEADER_BG),
+
+            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
+            ('ALIGN', (1,1), (1,-1), 'CENTER'),
+            ('ALIGN', (3,1), (3,-1), 'CENTER'),
+
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ])
+        summary_table.setStyle(summary_style)
+        elements.append(summary_table)
         elements.append(Spacer(1, 15))
 
-        # --- Αποτελέσματα G0 & mij ---
-        g0_str = f"{float(azimuth_bs):.4f} g" if azimuth_bs else "---"
-        mij_str = f"{float(mij):.5f}" if mij else "---"
-        res_info = f"<font color='#64748b'>G:</font> <font color='#d97706'><b>{g0_str}</b></font> &nbsp;|&nbsp; <font color='#64748b'>mᵢⱼ:</font> <font color='#059669'><b>{mij_str}</b></font>"
-        elements.append(Paragraph(res_info, text_style))
-        elements.append(Spacer(1, 15))
+# ========================================================
+        # 2. ΠΙΝΑΚΑΣ ΣΤΟΙΧΕΙΩΝ ΧΑΡΑΞΗΣ
+        # ========================================================
+        elements.append(Paragraph("2. Πίνακας Στοιχείων Χάραξης Σημείων", h2_style))
+        elements.append(Spacer(1, 6))
 
-        # --- Πίνακας Χάραξης ---
+        # 1. Αφαίρεση της στήλης "α/α"
         t_headers = [
-            Paragraph("<b>α/α</b>", th_style),
-            Paragraph("<b>Σημείο</b>", th_style),
-            Paragraph("<b>X [m]</b>", th_style),
-            Paragraph("<b>Y [m]</b>", th_style),
-            Paragraph("<b>Hz [grad]</b>", th_style),
-            Paragraph("<b>D [m]</b>", th_style)
+            Paragraph("Σημείο", th_style),
+            Paragraph("Τετμημένη X [m]", th_style),
+            Paragraph("Τεταγμένη Y [m]", th_style),
+            Paragraph("Γωνία Hz [grad]", th_style),
+            Paragraph("Απόσταση D [m]", th_style)
         ]
         
         table_data = [t_headers]
-        for idx, pt in enumerate(points):
+        for pt in points: # Αφαιρέθηκε το enumerate
+            x_val = safe_fmt(pt.get('x'), 3)
+            y_val = safe_fmt(pt.get('y'), 3)
+            hz_val = safe_fmt(pt.get('hz_stake'), 4)
+            dist_val = safe_fmt(pt.get('dist_stake'), 3)
+
             table_data.append([
-                str(idx + 1),
-                str(pt.get('name', '')),
-                f"{float(pt.get('x', 0)):.3f}" if pt.get('x') else "-",
-                f"{float(pt.get('y', 0)):.3f}" if pt.get('y') else "-",
-                f"{float(pt.get('hz_stake', 0)):.4f}" if pt.get('hz_stake') else "-",
-                f"{float(pt.get('dist_stake', 0)):.3f}" if pt.get('dist_stake') else "-"
+                Paragraph(str(pt.get('name', '')), td_bold_style),
+                Paragraph(x_val, td_norm_style),  # 2. Κανονική γραμματοσειρά (όχι bold)
+                Paragraph(y_val, td_norm_style),  # 2. Κανονική γραμματοσειρά (όχι bold)
+                Paragraph(hz_val, td_bold_style), # 3. Μαύρο bold αντί για μπλε
+                Paragraph(dist_val, td_bold_style)# 3. Μαύρο bold αντί για πράσινο
             ])
             
-        t = Table(table_data, colWidths=[35, 80, 85, 85, 85, 85])
+        # Αναπροσαρμογή του πλάτους των στηλών για να καλύψουν το κενό του α/α (σύνολο ~535)
+        t = Table(table_data, colWidths=[95, 110, 110, 110, 110]) 
+        
         t_style_cmds = [
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), font_name),
-            ('FONTSIZE', (0,0), (-1,-1), 9),
-            ('TEXTCOLOR', (0,1), (3,-1), TEXT_MAIN),
-            ('TEXTCOLOR', (4,1), (4,-1), ACCENT_BLUE),
-            ('TEXTCOLOR', (5,1), (5,-1), ACCENT_GREEN),
             ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 6),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('LEFTPADDING', (0,0), (-1,-1), 2),
+            ('RIGHTPADDING', (0,0), (-1,-1), 2),
         ]
 
         for i in range(1, len(table_data)):
@@ -1798,40 +2034,57 @@ def export_stakeout_report():
 
         t.setStyle(TableStyle(t_style_cmds))
         elements.append(t)
+        elements.append(Spacer(1, 15))
 
-        # --- ΕΝΘΕΤΗ ΣΕΛΙΔΑ ΣΚΑΡΙΦΗΜΑΤΟΣ (ΟΜΟΙΟ ΠΛΑΤΟΣ ΜΕ A4) ---
+        # ========================================================
+        # 3. ΣΚΑΡΙΦΗΜΑ / ΔΙΑΓΡΑΜΜΑ ΧΑΡΑΞΗΣ
+        # ========================================================
         if plot_base64 and "," in plot_base64:
             try:
                 encoded_image = plot_base64.split(",")[1]
                 img_data = base64.b64decode(encoded_image)
                 img_stream = BytesIO(img_data)
                 
-                # Αλλαγή στο Plot Template & PageBreak
-                elements.append(NextPageTemplate('Plot_Insert'))
-                elements.append(PageBreak())
+                img_reader = ImageReader(img_stream)
+                orig_w, orig_h = img_reader.getSize()
                 
-                # Η εικόνα παίρνει ΑΚΡΙΒΩΣ τις νέες διαστάσεις (Πλάτος A4 x Προσαρμοσμένο Ύψος)
-                img = Image(img_stream, width=PLOT_PAGE_W, height=PLOT_PAGE_H)
-                
-                # Προσθέτουμε ΜΟΝΟ την εικόνα
-                elements.append(img)
-                
-            except Exception as img_err:
-                print(f"Σφάλμα εικόνας: {img_err}")
+                max_width = a4_w - 60
+                max_height = 380
 
-        doc.build(elements)
+                aspect = orig_w / float(orig_h)
+                if (max_width / max_height) < aspect:
+                    final_w = max_width
+                    final_h = max_width / aspect
+                else:
+                    final_h = max_height
+                    final_w = max_height * aspect
+
+                elements.append(PageBreak())
+                elements.append(Paragraph("3. Σκαρίφημα Χάραξης", h2_style))
+                elements.append(Spacer(1, 10))
+
+                plot_img = Image(img_stream, width=final_w, height=final_h)
+                plot_img.hAlign = 'CENTER'
+                
+                elements.append(plot_img)
+
+            except Exception as img_err:
+                print(f"Σφάλμα επεξεργασίας εικόνας διαγράμματος: {img_err}")
+
+        doc.build(elements, canvasmaker=lambda *args, **kwargs: StakeoutNumberedCanvas(*args, font_name=my_font, **kwargs))
         buffer.seek(0)
         
+        st_name_clean = station.get('name', 'St')
         return send_file(
             buffer,
             as_attachment=True,
-            download_name=f"Stakeout_Report_{station.get('name', 'St')}.pdf",
+            download_name=f"Stakeout_Report_{st_name_clean}.pdf",
             mimetype='application/pdf'
         )
 
     except Exception as e:
         import traceback
-        print(f"Σφάλμα:\n{traceback.format_exc()}")
+        print(f"Σφάλμα κατά τη δημιουργία Stakeout Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 # ==========================================
