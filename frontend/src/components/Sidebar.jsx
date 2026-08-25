@@ -74,7 +74,6 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         {isOpen && (
           <div className="transition-opacity duration-300">
             <h1 className="text-xl font-bold text-white tracking-tight leading-none">LASCA</h1>
-            <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] mt-1">Land Surveying Computations App</p>
           </div>
         )}
       </div>
