@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Target, Compass, Calculator, Ruler, Activity, Crosshair } from 'lucide-react';
+import { MapPin, Target, Compass, Calculator, Ruler, Activity, Crosshair, MapIcon} from 'lucide-react';
 
 const Header = ({ activeTab }) => {
   // Καθαρό configuration μόνο με τα απολύτως απαραίτητα (Τίτλος, Εικονίδιο, Χρώμα)
@@ -12,7 +12,7 @@ const Header = ({ activeTab }) => {
       case 'geom_leveling': return { icon: Compass, label: "Spirit Leveling", color: "purple" };
       case 'traverse': return { icon: MapPin, label: "Traverse", color: "amber" };
       case 'traverse_height': return { icon: MapPin, label: "Traverse Leveling", color: "orange" };
-      case 'tachymetry': return { icon: MapPin, label: "Tachymetry", color: "pink" };
+      case 'tachymetry': return { icon: MapIcon, label: "Tachymetry", color: "pink" };
       case 'stakeout': return { icon: Target, label: "Stakeout Layout", color: "emerald" };
       case 'basic_calc': return { icon: Calculator, label: "Basic Calculations", color: "blue" };
       default: return { icon: Activity, label: activeTab ? activeTab.replace('_', ' ').toUpperCase() : "MODULE", color: "slate" };

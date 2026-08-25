@@ -8,13 +8,19 @@ import {
   ChevronRight, 
   Loader2,
   X,
-  Settings
+  Settings,
+  Briefcase,
+  MapPin
 } from 'lucide-react';
 
 const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   const [activeTab, setActiveTab] = useState('create'); // 'create' ή 'open'
   const [projectName, setProjectName] = useState('');
   const [designer, setDesigner] = useState('');
+  
+  // --- ΝΕΑ STATES ---
+  const [employer, setEmployer] = useState('');
+  const [location, setLocation] = useState('');
   
   const [existingProjects, setExistingProjects] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
@@ -59,7 +65,9 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
       const response = await axios.post('http://127.0.0.1:5000/api/projects/load', {
         project_name: sanitizedName,
         settings: {
-          designer: designer.trim()
+          designer: designer.trim(),
+          employer: employer.trim(), // Αποθήκευση Εργοδότη
+          location: location.trim()  // Αποθήκευση Περιοχής
         }
       });
 
@@ -158,7 +166,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               {/* Όνομα Project */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
-                  Όνομα Έργου <span className="text-amber-500">*</span>
+                  Έργο <span className="text-amber-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -180,6 +188,34 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                   placeholder="π.χ. LASCA Developers"
                   value={designer}
                   onChange={(e) => setDesigner(e.target.value)}
+                  className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
+                />
+              </div>
+
+              {/* Εργοδότης */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
+                  <Briefcase size={10} /> Εργοδότης
+                </label>
+                <input
+                  type="text"
+                  placeholder="π.χ. Δήμος Θεσσαλονίκης"
+                  value={employer}
+                  onChange={(e) => setEmployer(e.target.value)}
+                  className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
+                />
+              </div>
+
+              {/* Περιοχή */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
+                  <MapPin size={10} /> Τοποθεσία
+                </label>
+                <input
+                  type="text"
+                  placeholder="π.χ. Κέντρο, Θεσσαλονίκη"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
                   className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
                 />
               </div>
