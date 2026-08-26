@@ -181,7 +181,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               {/* Μελετητής */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
-                  <User size={10} /> Μελετητής / Μηχανικός
+                  <User size={10} /> Μηχανικός
                 </label>
                 <input
                   type="text"

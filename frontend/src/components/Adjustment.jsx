@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
 
-const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics }) => {
+const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics, projectInfo }) => {
   
   const [isAdjusted, setIsAdjusted] = useState(adjMetrics.isAdjusted || false);
   const [plotImage, setPlotImage] = useState(adjMetrics.plotImage || null);
@@ -202,9 +202,11 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     
     try {
       const payload = {
-        measurements: displayObservations,
+        measurements: observations,
+        results: displayObservations,
         stats: adjMetrics.stats,
-        plot: plotImage
+        plot: plotImage,
+        projectInfo: projectInfo
       };
       
       const response = await axios.post('http://127.0.0.1:5000/api/adjustment/report', payload, {

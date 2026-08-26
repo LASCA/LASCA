@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import math
 import base64
 import ezdxf
@@ -254,13 +255,7 @@ def run_adjustment():
         print(f"Σφάλμα κατά την εκτέλεση της συνόρθωσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-import pandas as pd
-import numpy as np
-from io import BytesIO
-from flask import request, jsonify, send_file
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -328,18 +323,47 @@ def export_adjustment_report():
         results_list = data.get('results', [])
         stats = data.get('stats', [])
         
-        # Λήψη Στοιχείων Έργου (Project Info)
-        project_info = data.get('projectInfo', {})
-        proj_name = project_info.get('name', 'Μη διαθέσιμο')
-        proj_engineer = project_info.get('engineer', 'Μη διαθέσιμο')
-        proj_client = project_info.get('client', 'Μη διαθέσιμο')
-        proj_location = project_info.get('location', 'Μη διαθέσιμο')
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
         
-        # Εξαγωγή αποτελεσμάτων για τον 1ο Πίνακα
-        if not results_list:
-            results_list = [obs for obs in observations if obs.get('adj_hz') is not None]
+        # Συγκέντρωση όλων των πιθανών πηγών δεδομένων για αναζήτηση
+        sources_to_check = []
+        if isinstance(raw_proj, dict) and raw_proj:
+            sources_to_check.append(raw_proj)
+            if isinstance(raw_proj.get('settings'), dict):
+                sources_to_check.append(raw_proj.get('settings'))
+        sources_to_check.append(data)
 
-        # --- ΕΠΕΞΕΡΓΑΣΙΑ ΠΡΩΤΟΓΕΝΩΝ ΠΑΡΑΤΗΡΗΣΕΩΝ ---
+        def extract_field(keys):
+            """Αναζητά το πρώτο μη κενό πεδίο σε όλες τις πιθανές πηγές δεδομένων"""
+            for src in sources_to_check:
+                if isinstance(src, dict):
+                    for key in keys:
+                        val = src.get(key)
+                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                            return str(val).strip()
+            return 'Μη διαθέσιμο'
+
+        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
+        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
+        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
+        proj_location = extract_field(['location', 'place', 'address'])
+        
+        # Εξαγωγή αποτελεσμάτων για τον 1ο Πίνακα (με φιλτράρισμα διπλοτυπιών)
+        if not results_list:
+            seen_pairs = set()
+            filtered_results = []
+            for obs in observations:
+                if obs.get('adj_hz') is not None:
+                    st = str(obs.get('station', obs.get('From', ''))).strip()
+                    tg = str(obs.get('target', obs.get('To', ''))).strip()
+                    pair = (st, tg)
+                    if pair not in seen_pairs and st != '' and tg != '':
+                        seen_pairs.add(pair)
+                        filtered_results.append(obs)
+            results_list = filtered_results
+
+        # --- ΕΠΕΞΕΡΓΑΣΙΑ ΠΡΩΤΟΓΕΝΩΝ ΠΑΡΑΤΗΡΗΣΕΩΝ (Όλες οι Περίοδοι) ---
         raw_observations = []
         if observations:
             try:
@@ -390,7 +414,6 @@ def export_adjustment_report():
             except (ValueError, TypeError): return str(val)
 
         buffer = BytesIO()
-        # Το topMargin αυξήθηκε ελαφρώς για να χωράει η πιο πλούσια κεφαλίδα
         doc = SimpleDocTemplate(
             buffer, pagesize=A4, 
             leftMargin=30, rightMargin=30, topMargin=55, bottomMargin=45
@@ -408,7 +431,6 @@ def export_adjustment_report():
 
         styles = getSampleStyleSheet()
         
-        # ΑΥΞΗΘΗΚΑΝ ΤΑ ΜΕΓΕΘΗ ΓΡΑΜΜΑΤΟΣΕΙΡΑΣ ΣΤΟΥΣ ΤΙΤΛΟΥΣ
         title_style = ParagraphStyle(
             'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
             fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0
@@ -418,22 +440,20 @@ def export_adjustment_report():
         )
         header_style = ParagraphStyle('TableHead', fontName=my_font_bold, fontSize=8.5, textColor=colors.white, alignment=1)
         
-        # Στυλ για τις πληροφορίες του έργου
         info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
-        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1) # Στοίχιση στο κέντρο για την τελεία
+        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
         info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
 
         # ========================================================
-        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (3 Στήλες: Ετικέτα | : | Τιμή)
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ
         # ========================================================
         project_data = [
-            [Paragraph("Όνομα Έργου", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
-            [Paragraph("Μελετητής / Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
+            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
+            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
             [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
-            [Paragraph("Περιοχή Έργου", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
         ]
         
-        # Προσαρμογή πλάτους στηλών για απόλυτη στοίχιση του συμβόλου ":"
         info_table = Table(project_data, colWidths=[130, 15, 390])
         info_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -441,7 +461,7 @@ def export_adjustment_report():
         ]))
         
         elements.append(info_table)
-        elements.append(Spacer(1, 35)) # Μεγαλύτερο κενό πριν τον τίτλο
+        elements.append(Spacer(1, 35))
         
         # ========================================================
         # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
@@ -450,10 +470,10 @@ def export_adjustment_report():
         elements.append(Spacer(1, 20))
         
         # ========================================================
-        # Πίνακας 1: Μετρήσεις & Αποτελέσματα
+        # Πίνακας 1: Συνορθωμένες Διευθύνσεις (Μοναδικά Ζεύγη)
         # ========================================================
         elements.append(Paragraph("1. Συνορθωμένες Διευθύνσεις", h2_style))
-        elements.append(Spacer(1, 10)) # Ελαφρώς μεγαλύτερο κενό ανάμεσα σε τίτλο υποενότητας και πίνακα
+        elements.append(Spacer(1, 10))
         
         t1_headers = [
             Paragraph("Από", header_style),
@@ -492,10 +512,10 @@ def export_adjustment_report():
             
         t1.setStyle(TableStyle(t1_cmds))
         elements.append(t1)
-        elements.append(Spacer(1, 35)) # Αύξηση κενού ανάμεσα στους πίνακες/ενότητες
+        elements.append(Spacer(1, 35))
         
         # ========================================================
-        # Πίνακας 2: Στατιστικά Στάσεων
+        # Πίνακας 2: Στατιστική Ανάλυση
         # ========================================================
         elements.append(Paragraph("2. Στατιστική Ανάλυση", h2_style))
         elements.append(Spacer(1, 10))
@@ -536,10 +556,10 @@ def export_adjustment_report():
 
         t2.setStyle(TableStyle(t2_cmds))
         elements.append(t2)
-        elements.append(Spacer(1, 35)) # Αύξηση κενού
+        elements.append(Spacer(1, 35))
         
         # ========================================================
-        # Πίνακας 3: Πρωτογενείς Παρατηρήσεις Όλων των Περιόδων
+        # Πίνακας 3: Πρωτογενείς Παρατηρήσεις (Όλες οι Περίοδοι)
         # ========================================================
         elements.append(Paragraph("3. Πρωτογενείς Παρατηρήσεις", h2_style))
         elements.append(Spacer(1, 10))
@@ -588,7 +608,12 @@ def export_adjustment_report():
 
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        doc.build(elements, canvasmaker=lambda *args, **kwargs: AdjustmentNumberedCanvas(*args, font_name=my_font, timestamp_str=current_timestamp, **kwargs))
+        doc.build(
+            elements, 
+            canvasmaker=lambda *args, **kwargs: AdjustmentNumberedCanvas(
+                *args, font_name=my_font, timestamp_str=current_timestamp, **kwargs
+            )
+        )
         buffer.seek(0)
         
         return send_file(
@@ -602,6 +627,7 @@ def export_adjustment_report():
         import traceback
         print(f"Σφάλμα κατά τη δημιουργία Adjustment Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+    
 # ==========================================
 # 2. ENDPOINT ΓΙΑ ΟΔΕΥΣΗ (TRAVERSE)
 # ==========================================
@@ -732,12 +758,28 @@ def run_traverse():
         print(f"Σφάλμα κατά την εκτέλεση της όδευσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-# --- CUSTOM CANVAS ΓΙΑ ΕΠΑΓΓΕΛΜΑΤΙΚΟ HEADER / FOOTER & ΑΡΙΘΜΗΣΗ ΣΕΛΙΔΩΝ ---
+import base64
+from io import BytesIO
+from datetime import datetime
+from flask import request, jsonify, send_file
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.lib.utils import ImageReader
+
+# --- KOINO/GENERIC CANVAS ΓΙΑ ΟΛΑ ΤΑ REPORTS (HEADER, FOOTER & PAGES) ---
 class TopoNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', **kwargs):
+    def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
         self.font_name = font_name
+        self.timestamp_str = timestamp_str
+        self.header_title = header_title
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -753,21 +795,33 @@ class TopoNumberedCanvas(canvas.Canvas):
 
     def draw_page_decorations(self, page_count):
         self.saveState()
-        self.setFont(self.font_name, 8)
+        
+        # --- Πάνω Κεφαλίδα (Header) ---
+        self.setFont(self.font_name, 10)
         self.setFillColor(colors.HexColor('#475569'))
         
-        # Πάνω Κεφαλίδα (Header)
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(0.75)
-        self.line(30, A4[1] - 30, A4[0] - 30, A4[1] - 30)
-        self.drawString(30, A4[1] - 24, "ΑΝΑΦΟΡΑ ΥΠΟΛΟΓΙΣΜΟΥ & ΕΛΕΓΧΟΥ ΟΔΕΥΣΗΣ")
+        header_y = A4[1] - 30
+        self.drawString(30, header_y, self.header_title)
         
-        # Κάτω Υποσέλιδο (Footer)
-        self.line(30, 35, A4[0] - 30, 35)
-        self.drawString(30, 22, "Αυτοματοποιημένο Report LASCA | Τεύχος Υπολογισμών")
+        # Αρίθμηση σελίδας στην κεφαλίδα
         page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, 22, page_str)
+        self.drawRightString(A4[0] - 30, header_y, page_str)
+        
+        # Διαχωριστική Γραμμή Κεφαλίδας
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(1)
+        self.line(30, header_y - 8, A4[0] - 30, header_y - 8)
+        
+        # --- Κάτω Υποσέλιδο (Footer) ---
+        self.setFont(self.font_name, 8)
+        self.setLineWidth(0.75)
+        self.line(30, 35, A4[0] - 30, 35)
+        
+        # Αριστερά: Timestamp παραγωγής αναφοράς
+        self.drawString(30, 22, f"Ημερομηνία εξαγωγής: {self.timestamp_str}")
+        
         self.restoreState()
+
 
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
@@ -777,7 +831,31 @@ def export_traverse_report():
         metrics = data.get('metrics', {})
         plot_base64 = data.get('plot') 
 
-        # --- ΕΓΓΡΑΦΗ REGULAR & BOLD ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
+        
+        sources_to_check = []
+        if isinstance(raw_proj, dict) and raw_proj:
+            sources_to_check.append(raw_proj)
+            if isinstance(raw_proj.get('settings'), dict):
+                sources_to_check.append(raw_proj.get('settings'))
+        sources_to_check.append(data)
+
+        def extract_field(keys):
+            for src in sources_to_check:
+                if isinstance(src, dict):
+                    for key in keys:
+                        val = src.get(key)
+                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                            return str(val).strip()
+            return 'Μη διαθέσιμο'
+
+        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
+        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
+        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
+        proj_location = extract_field(['location', 'place', 'address'])
+
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
         
@@ -794,23 +872,22 @@ def export_traverse_report():
         buffer = BytesIO()
         a4_w, a4_h = A4
 
-        # Χρήση SimpleDocTemplate με σταθερά περιθώρια A4 Portrait
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
             leftMargin=30,
             rightMargin=30,
-            topMargin=45,
+            topMargin=55,
             bottomMargin=45
         )
 
         elements = []
         
         # --- Παλέτα Χρωμάτων ---
-        HEADER_BG = colors.HexColor('#0f172a')     # Dark Slate/Navy
-        SUBHEADER_BG = colors.HexColor('#1e293b')  # Dark Slate Blue
+        HEADER_BG = colors.HexColor('#0f172a')     
+        SUBHEADER_BG = colors.HexColor('#1e293b')  
         ROW_BG_1 = colors.HexColor('#ffffff')
-        ROW_BG_2 = colors.HexColor('#f8fafc')     # Light Gray zebra
+        ROW_BG_2 = colors.HexColor('#f8fafc')     
         GRID_COLOR = colors.HexColor('#cbd5e1')
         TEXT_MAIN = colors.HexColor('#0f172a')
         ACCENT_TITLE = colors.HexColor('#0284c7')
@@ -819,39 +896,59 @@ def export_traverse_report():
 
         title_style = ParagraphStyle(
             'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
-            fontSize=16, leading=20, textColor=ACCENT_TITLE, alignment=0
+            fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0
         )
-        subtitle_style = ParagraphStyle(
-            'TopoSubtitle', parent=styles['Normal'], fontName=my_font,
-            fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), alignment=0
+        h2_style = ParagraphStyle(
+            'TopoSecH', fontName=my_font_bold, fontSize=14, leading=14, textColor=HEADER_BG
         )
         th_style = ParagraphStyle(
             'TopoTH', parent=styles['Normal'], fontName=my_font_bold,
-            fontSize=8, leading=10, textColor=colors.white, alignment=1
+            fontSize=8.5, leading=10, textColor=colors.white, alignment=1
         )
         
-        # --- ΣΤΥΛ ΚΕΛΙΩΝ (Κεντραρισμένα) ---
-        # 1. Κανονική γραφή για Στάση, Γωνία, Απόσταση
+        info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
+        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
+        info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
+
         td_norm_style = ParagraphStyle(
             'TopoTDNorm', parent=styles['Normal'], fontName=my_font,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
-        # 2. Έντονη γραφή (Bold) αποκλειστικά για X και Y
         td_bold_style = ParagraphStyle(
             'TopoTDBold', parent=styles['Normal'], fontName=my_font_bold,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
 
-        # --- Τίτλος Τεύχους ---
-        elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
-        elements.append(Paragraph("Αναλυτικοί πίνακες συντεταγμένων, γωνιών, αποστάσεων & ελέγχου ανοχών", subtitle_style))
-        elements.append(Spacer(1, 15))
+        # ========================================================
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (Generic Info Header)
+        # ========================================================
+        project_data = [
+            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
+            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
+            [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
+            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+        ]
+        
+        info_table = Table(project_data, colWidths=[130, 15, 390])
+        info_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ]))
+        
+        elements.append(info_table)
+        elements.append(Spacer(1, 35))
 
         # ========================================================
-        # 1. ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ & ΣΥΝΤΕΤΑΓΜΕΝΩΝ (Topographical Format)
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
         # ========================================================
-        elements.append(Paragraph("1. Πίνακας Στάσεων & Συντεταγμένων", ParagraphStyle('SecH', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
-        elements.append(Spacer(1, 6))
+        elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
+        elements.append(Spacer(1, 20))
+
+        # ========================================================
+        # 1. ΠΙΝΑΚΑΣ ΣΤΑΣΕΩΝ & ΣΥΝΤΕΤΑΓΜΕΝΩΝ
+        # ========================================================
+        elements.append(Paragraph("1. Πίνακας Στάσεων & Συντεταγμένων", h2_style))
+        elements.append(Spacer(1, 10))
 
         t_headers = [
             Paragraph("Στάση", th_style),
@@ -869,22 +966,20 @@ def export_traverse_report():
             y_val  = f"{float(pt.get('y')):.3f}" if pt.get('y') not in [None, '', '-'] else "-"
 
             table_data.append([
-                Paragraph(str(pt.get('name', '-')), td_norm_style),  # Κανονικό
-                Paragraph(hz_val, td_norm_style),                   # Κανονικό
-                Paragraph(sd_val, td_norm_style),                   # Κανονικό
-                Paragraph(x_val, td_bold_style),                    # BOLD X
-                Paragraph(y_val, td_bold_style)                     # BOLD Y
+                Paragraph(str(pt.get('name', '-')), td_norm_style),
+                Paragraph(hz_val, td_norm_style),
+                Paragraph(sd_val, td_norm_style),
+                Paragraph(x_val, td_bold_style),
+                Paragraph(y_val, td_bold_style)
             ])
             
-        t = Table(table_data, colWidths=[55, 120, 90, 135, 135])
+        t = Table(table_data, colWidths=[65, 120, 100, 125, 125])
         t_style_cmds = [
             ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
             ('TOPPADDING', (0, 0), (-1, -1), 5),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
         ]
 
         for i in range(1, len(table_data)):
@@ -893,13 +988,13 @@ def export_traverse_report():
 
         t.setStyle(TableStyle(t_style_cmds))
         elements.append(t)
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 35))
 
         # ========================================================
-        # 2. ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΕΛΕΓΧΟΥ ΑΝΟΧΩΝ (Audit Grid)
+        # 2. ΠΙΝΑΚΑΣ ΣΤΑΤΙΣΤΙΚΩΝ ΚΑΙ ΕΛΕΓΧΟΥ ΑΝΟΧΩΝ
         # ========================================================
-        elements.append(Paragraph("2. Στοιχεία Επίλυσης & Έλεγχος Ανοχών", ParagraphStyle('SecH2', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
-        elements.append(Spacer(1, 6))
+        elements.append(Paragraph("2. Στοιχεία Επίλυσης & Έλεγχος Ανοχών", h2_style))
+        elements.append(Spacer(1, 10))
 
         def safe_fmt(val, decimals=3, suffix=""):
             if val in [None, '', '-']: return "-"
@@ -922,7 +1017,6 @@ def export_traverse_report():
 
         status_p = Paragraph(f"ΚΑΤΑΣΤΑΣΗ: {status_text}", ParagraphStyle('StatP', fontName=my_font_bold, fontSize=8.5, leading=10, textColor=status_color, alignment=1))
 
-        # Helper συνάρτηση για επιστροφή κεντραρισμένου & BOLD Paragraph στον 2ο πίνακα
         def val_p(val):
             return Paragraph(str(val), td_bold_style)
 
@@ -991,18 +1085,28 @@ def export_traverse_report():
                     final_w = max_height * aspect
 
                 elements.append(PageBreak())
-                elements.append(Paragraph("3. Σκαρίφημα & Διάγραμμα Όδευσης", ParagraphStyle('SecH3', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG)))
+                elements.append(Paragraph("3. Σκαρίφημα & Διάγραμμα Όδευσης", h2_style))
                 elements.append(Spacer(1, 10))
 
                 plot_img = Image(img_stream, width=final_w, height=final_h)
                 plot_img.hAlign = 'CENTER'
-                
                 elements.append(plot_img)
 
             except Exception as img_err:
                 print(f"Σφάλμα επεξεργασίας εικόνας διαγράμματος: {img_err}")
 
-        doc.build(elements, canvasmaker=lambda *args, **kwargs: TopoNumberedCanvas(*args, font_name=my_font, **kwargs))
+        current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        doc.build(
+            elements, 
+            canvasmaker=lambda *args, **kwargs: TopoNumberedCanvas(
+                *args, 
+                font_name=my_font, 
+                timestamp_str=current_timestamp, 
+                header_title="Αυτοματοποιημένη αναφορά LASCA",
+                **kwargs
+            )
+        )
         buffer.seek(0)
         
         return send_file(
