@@ -8,6 +8,7 @@ import traceback
 import data_proccessing as dpr  
 import vis_4_app as vis     
 
+from datetime import datetime
 from project_manager import TopoProject  
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -23,6 +24,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
+
 try:
     pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf')) # Βάλε το σωστό path εδώ
     font_name = 'ArialGreek'
@@ -254,14 +256,6 @@ def run_adjustment():
         import traceback
         print(f"Σφάλμα κατά την εκτέλεση της συνόρθωσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
-
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-from reportlab.pdfgen import canvas
-from datetime import datetime
 
 # ==========================================
 # 1B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (ADJUSTMENT - CUSTOM STYLING)
@@ -628,6 +622,8 @@ def export_adjustment_report():
         print(f"Σφάλμα κατά τη δημιουργία Adjustment Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
+
+
 # ==========================================
 # 2. ENDPOINT ΓΙΑ ΟΔΕΥΣΗ (TRAVERSE)
 # ==========================================
@@ -758,20 +754,9 @@ def run_traverse():
         print(f"Σφάλμα κατά την εκτέλεση της όδευσης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-import base64
-from io import BytesIO
-from datetime import datetime
-from flask import request, jsonify, send_file
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-from reportlab.lib.utils import ImageReader
-
+# ==========================================
+# 2B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - CUSTOM STYLING)
+# ==========================================
 # --- KOINO/GENERIC CANVAS ΓΙΑ ΟΛΑ ΤΑ REPORTS (HEADER, FOOTER & PAGES) ---
 class TopoNumberedCanvas(canvas.Canvas):
     def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
@@ -821,7 +806,6 @@ class TopoNumberedCanvas(canvas.Canvas):
         self.drawString(30, 22, f"Ημερομηνία εξαγωγής: {self.timestamp_str}")
         
         self.restoreState()
-
 
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
@@ -1020,13 +1004,15 @@ def export_traverse_report():
         def val_p(val):
             return Paragraph(str(val), td_bold_style)
 
+        # ΝΕΑ ΔΟΜΗ ΠΙΝΑΚΑ 2
         metrics_table_data = [
-            [Paragraph("Γενικά Στοιχεία & Γωνιακός Έλεγχος", th_style), '', '', ''],
-            ["Αριθμός Στάσεων (n):", val_p(metrics.get('n', '-')), "G (πρέπει):", val_p(safe_fmt(metrics.get('gTarget'), 4, " g"))],
-            ["Συνολικό Μήκος (L):", val_p(safe_fmt(metrics.get('totalLength'), 2, " m")), "G (είναι):", val_p(safe_fmt(metrics.get('gActual'), 4, " g"))],
+            [Paragraph("Γενικά Στοιχεία", th_style), '', '', ''],
+            ["Αριθμός Στάσεων (n):", val_p(metrics.get('n', '-')), "Συνολικό Μήκος (L):", val_p(safe_fmt(metrics.get('totalLength'), 2, " m"))],
+            
+            [Paragraph("Γωνιακός & Γραμμικός Έλεγχος", th_style), '', '', ''],
+            ["G (πρέπει):", val_p(safe_fmt(metrics.get('gTarget'), 4, " g")), "G (είναι):", val_p(safe_fmt(metrics.get('gActual'), 4, " g"))],
             ["Μέγιστη Γωνιακή Ανοχή (Wβmax):", val_p(wb_max), "Γωνιακό Σφάλμα (Wβ):", val_p(wb_act)],
             
-            [Paragraph("Γραμμικός Έλεγχος & Σφάλματα Κλεισίματος", th_style), '', '', ''],
             ["ΔX (πρέπει):", val_p(safe_fmt(metrics.get('dxTarget'), 3, " m")), "ΔY (πρέπει):", val_p(safe_fmt(metrics.get('dyTarget'), 3, " m"))],
             ["ΔX (είναι):", val_p(safe_fmt(metrics.get('dxActual'), 3, " m")), "ΔY (είναι):", val_p(safe_fmt(metrics.get('dyActual'), 3, " m"))],
             ["Σφάλμα δX:", val_p(safe_fmt(metrics.get('dx'), 3, " m")), "Σφάλμα δY:", val_p(safe_fmt(metrics.get('dy'), 3, " m"))],
@@ -1044,22 +1030,24 @@ def export_traverse_report():
             
             ('SPAN', (0, 0), (3, 0)),
             ('BACKGROUND', (0, 0), (3, 0), SUBHEADER_BG),
-            ('SPAN', (0, 4), (3, 4)),
-            ('BACKGROUND', (0, 4), (3, 4), SUBHEADER_BG),
+            ('SPAN', (0, 2), (3, 2)),
+            ('BACKGROUND', (0, 2), (3, 2), SUBHEADER_BG),
+            
             ('SPAN', (0, 9), (3, 9)),
             ('BACKGROUND', (0, 9), (3, 9), colors.HexColor('#f1f5f9')),
 
             ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
-            ('ALIGN', (1, 1), (1, 3), 'CENTER'),
-            ('ALIGN', (3, 1), (3, 3), 'CENTER'),
-            ('ALIGN', (1, 5), (1, 8), 'CENTER'),
-            ('ALIGN', (3, 5), (3, 8), 'CENTER'),
+            ('ALIGN', (1, 1), (1, 8), 'CENTER'),
+            ('ALIGN', (3, 1), (3, 8), 'CENTER'),
 
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ])
         metrics_table.setStyle(metrics_style)
         elements.append(metrics_table)
+        
+        # Προσθήκη κενού αντί για PageBreak
+        elements.append(Spacer(1, 35))
 
         # ========================================================
         # 3. ΣΚΑΡΙΦΗΜΑ / ΔΙΑΓΡΑΜΜΑ
@@ -1084,7 +1072,6 @@ def export_traverse_report():
                     final_h = max_height
                     final_w = max_height * aspect
 
-                elements.append(PageBreak())
                 elements.append(Paragraph("3. Σκαρίφημα & Διάγραμμα Όδευσης", h2_style))
                 elements.append(Spacer(1, 10))
 
@@ -2014,10 +2001,12 @@ def run_stakeout():
 
 # --- CUSTOM CANVAS ΓΙΑ STAKEOUT REPORT ---
 class StakeoutNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', **kwargs):
+    def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
         self.font_name = font_name
+        self.timestamp_str = timestamp_str
+        self.header_title = header_title
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -2033,20 +2022,31 @@ class StakeoutNumberedCanvas(canvas.Canvas):
 
     def draw_page_decorations(self, page_count):
         self.saveState()
-        self.setFont(self.font_name, 8)
+        
+        # --- Πάνω Κεφαλίδα (Header) ---
+        self.setFont(self.font_name, 10)
         self.setFillColor(colors.HexColor('#475569'))
         
-        # Πάνω Κεφαλίδα (Header)
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(0.75)
-        self.line(30, A4[1] - 30, A4[0] - 30, A4[1] - 30)
-        self.drawString(30, A4[1] - 24, "ΑΝΑΦΟΡΑ ΣΤΟΙΧΕΙΩΝ ΧΑΡΑΞΗΣ")
+        header_y = A4[1] - 30
+        self.drawString(30, header_y, self.header_title)
         
-        # Κάτω Υποσέλιδο (Footer)
-        self.line(30, 35, A4[0] - 30, 35)
-        self.drawString(30, 22, "LASCA GEODETIC SUITE | Τεύχος Υπολογισμών Χάραξης")
+        # Αρίθμηση σελίδας στην κεφαλίδα
         page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, 22, page_str)
+        self.drawRightString(A4[0] - 30, header_y, page_str)
+        
+        # Διαχωριστική Γραμμή Κεφαλίδας
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(1)
+        self.line(30, header_y - 8, A4[0] - 30, header_y - 8)
+        
+        # --- Κάτω Υποσέλιδο (Footer) ---
+        self.setFont(self.font_name, 8)
+        self.setLineWidth(0.75)
+        self.line(30, 35, A4[0] - 30, 35)
+        
+        # Αριστερά: Timestamp παραγωγής αναφοράς
+        self.drawString(30, 22, f"Ημερομηνία εξαγωγής: {self.timestamp_str}")
+        
         self.restoreState()
 
 
@@ -2060,6 +2060,30 @@ def export_stakeout_report():
         azimuth_bs = data.get('azimuthBs')
         mij = data.get('mij')
         plot_base64 = data.get('plot')
+
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
+        
+        sources_to_check = []
+        if isinstance(raw_proj, dict) and raw_proj:
+            sources_to_check.append(raw_proj)
+            if isinstance(raw_proj.get('settings'), dict):
+                sources_to_check.append(raw_proj.get('settings'))
+        sources_to_check.append(data)
+
+        def extract_field(keys):
+            for src in sources_to_check:
+                if isinstance(src, dict):
+                    for key in keys:
+                        val = src.get(key)
+                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                            return str(val).strip()
+            return 'Μη διαθέσιμο'
+
+        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
+        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
+        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
+        proj_location = extract_field(['location', 'place', 'address'])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ (Κανονική & Bold) ---
         font_path = "C:/Windows/Fonts/arial.ttf"
@@ -2077,13 +2101,13 @@ def export_stakeout_report():
         buffer = BytesIO()
         a4_w, a4_h = A4
 
-        # Χρήση SimpleDocTemplate με περιθώρια A4 (30pt αριστερά/δεξιά)
+        # Χρήση SimpleDocTemplate με περιθώρια A4
         doc = SimpleDocTemplate(
             buffer, 
             pagesize=A4, 
             leftMargin=30, 
             rightMargin=30, 
-            topMargin=45, 
+            topMargin=55, 
             bottomMargin=45
         )
         elements = []
@@ -2096,27 +2120,26 @@ def export_stakeout_report():
         GRID_COLOR = colors.HexColor('#cbd5e1')    
         TEXT_MAIN = colors.HexColor('#0f172a')     
         ACCENT_TITLE = colors.HexColor('#0284c7')  
-        ACCENT_BLUE = colors.HexColor('#0369a1')   # Έντονο μπλε/κυανό για Hz
-        ACCENT_GREEN = colors.HexColor('#15803d')  # Έντονο πράσινο για D (Απόσταση)
 
         styles = getSampleStyleSheet()
         
         # Στυλ Παραγράφων
         title_style = ParagraphStyle(
             'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
-            fontSize=16, leading=20, textColor=ACCENT_TITLE, alignment=0
-        )
-        subtitle_style = ParagraphStyle(
-            'TopoSubtitle', parent=styles['Normal'], fontName=my_font,
-            fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), alignment=0
+            fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0
         )
         h2_style = ParagraphStyle(
-            'TopoSecH', fontName=my_font_bold, fontSize=10, leading=12, textColor=HEADER_BG
+            'TopoSecH', fontName=my_font_bold, fontSize=14, leading=14, textColor=HEADER_BG
         )
         th_style = ParagraphStyle(
             'TableHead', parent=styles['Normal'], fontName=my_font_bold,
             fontSize=8.5, leading=10, textColor=colors.white, alignment=1 
         )
+
+        # Στυλ Πληροφοριών Έργου
+        info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
+        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
+        info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
 
         # Στυλ Κελιών
         td_norm_style = ParagraphStyle(
@@ -2127,25 +2150,37 @@ def export_stakeout_report():
             'TdBold', parent=styles['Normal'], fontName=my_font_bold,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
-        td_hz_style = ParagraphStyle(
-            'TdHz', parent=styles['Normal'], fontName=my_font_bold,
-            fontSize=8, leading=10, textColor=ACCENT_BLUE, alignment=1
-        )
-        td_dist_style = ParagraphStyle(
-            'TdDist', parent=styles['Normal'], fontName=my_font_bold,
-            fontSize=8, leading=10, textColor=ACCENT_GREEN, alignment=1
-        )
 
-        # --- Τίτλος Τεύχους ---
-        elements.append(Paragraph("Αναφορά Στοιχείων Χάραξης", title_style))
-        elements.append(Paragraph("Υπολογισμός πολικών συντεταγμένων για εφαρμογή επί του εδάφους", subtitle_style))
-        elements.append(Spacer(1, 12))
+        # ========================================================
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (Generic Info Header)
+        # ========================================================
+        project_data = [
+            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
+            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
+            [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
+            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+        ]
+        
+        info_table = Table(project_data, colWidths=[130, 15, 390])
+        info_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        elements.append(info_table)
+        elements.append(Spacer(1, 35))
+
+        # ========================================================
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
+        # ========================================================
+        elements.append(Paragraph("Τεύχος Υπολογισμού Χάραξης", title_style))
+        elements.append(Spacer(1, 20))
 
         # ========================================================
         # 1. ΣΤΑΘΜΟΣ ΒΑΣΗΣ & ΠΡΟΣΑΝΑΤΟΛΙΣΜΟΣ
         # ========================================================
         elements.append(Paragraph("1. Στοιχεία Στάσης & Προσανατολισμού", h2_style))
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 10))
 
         def safe_fmt(val, decimals=3, suffix=""):
             if val in [None, '', '-']: return "-"
@@ -2167,7 +2202,6 @@ def export_stakeout_report():
             s = td_bold_style if bold else td_norm_style
             return Paragraph(str(val), s)
 
-        # Structure summary box like an audit grid
         summary_table_data = [
             [Paragraph("Στοιχεία Στάσης & Προσανατολισμού", th_style), '', '', ''],
             ["Στάση (St):", val_p(st_name), "Προσανατολισμός (Bs):", val_p(bs_name)],
@@ -2195,15 +2229,14 @@ def export_stakeout_report():
         ])
         summary_table.setStyle(summary_style)
         elements.append(summary_table)
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 35))
 
-# ========================================================
+        # ========================================================
         # 2. ΠΙΝΑΚΑΣ ΣΤΟΙΧΕΙΩΝ ΧΑΡΑΞΗΣ
         # ========================================================
         elements.append(Paragraph("2. Πίνακας Στοιχείων Χάραξης Σημείων", h2_style))
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 10))
 
-        # 1. Αφαίρεση της στήλης "α/α"
         t_headers = [
             Paragraph("Σημείο", th_style),
             Paragraph("Τετμημένη X [m]", th_style),
@@ -2213,7 +2246,7 @@ def export_stakeout_report():
         ]
         
         table_data = [t_headers]
-        for pt in points: # Αφαιρέθηκε το enumerate
+        for pt in points:
             x_val = safe_fmt(pt.get('x'), 3)
             y_val = safe_fmt(pt.get('y'), 3)
             hz_val = safe_fmt(pt.get('hz_stake'), 4)
@@ -2221,13 +2254,12 @@ def export_stakeout_report():
 
             table_data.append([
                 Paragraph(str(pt.get('name', '')), td_bold_style),
-                Paragraph(x_val, td_norm_style),  # 2. Κανονική γραμματοσειρά (όχι bold)
-                Paragraph(y_val, td_norm_style),  # 2. Κανονική γραμματοσειρά (όχι bold)
-                Paragraph(hz_val, td_bold_style), # 3. Μαύρο bold αντί για μπλε
-                Paragraph(dist_val, td_bold_style)# 3. Μαύρο bold αντί για πράσινο
+                Paragraph(x_val, td_norm_style),
+                Paragraph(y_val, td_norm_style),
+                Paragraph(hz_val, td_bold_style),
+                Paragraph(dist_val, td_bold_style)
             ])
             
-        # Αναπροσαρμογή του πλάτους των στηλών για να καλύψουν το κενό του α/α (σύνολο ~535)
         t = Table(table_data, colWidths=[95, 110, 110, 110, 110]) 
         
         t_style_cmds = [
@@ -2246,7 +2278,7 @@ def export_stakeout_report():
 
         t.setStyle(TableStyle(t_style_cmds))
         elements.append(t)
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 35))
 
         # ========================================================
         # 3. ΣΚΑΡΙΦΗΜΑ / ΔΙΑΓΡΑΜΜΑ ΧΑΡΑΞΗΣ
@@ -2271,19 +2303,32 @@ def export_stakeout_report():
                     final_h = max_height
                     final_w = max_height * aspect
 
-                elements.append(PageBreak())
-                elements.append(Paragraph("3. Σκαρίφημα Χάραξης", h2_style))
-                elements.append(Spacer(1, 10))
-
                 plot_img = Image(img_stream, width=final_w, height=final_h)
                 plot_img.hAlign = 'CENTER'
-                
-                elements.append(plot_img)
+
+                # Χρήση KeepTogether για να μην αποκολλάται ο τίτλος από την εικόνα
+                sketch_block = [
+                    Paragraph("3. Σκαρίφημα Χάραξης", h2_style),
+                    Spacer(1, 10),
+                    plot_img
+                ]
+                elements.append(KeepTogether(sketch_block))
 
             except Exception as img_err:
                 print(f"Σφάλμα επεξεργασίας εικόνας διαγράμματος: {img_err}")
 
-        doc.build(elements, canvasmaker=lambda *args, **kwargs: StakeoutNumberedCanvas(*args, font_name=my_font, **kwargs))
+        current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        doc.build(
+            elements, 
+            canvasmaker=lambda *args, **kwargs: StakeoutNumberedCanvas(
+                *args, 
+                font_name=my_font, 
+                timestamp_str=current_timestamp, 
+                header_title="Αυτοματοποιημένη αναφορά LASCA",
+                **kwargs
+            )
+        )
         buffer.seek(0)
         
         st_name_clean = station.get('name', 'St')
