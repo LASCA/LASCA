@@ -6,15 +6,15 @@ const Header = ({ activeTab }) => {
   const getHeaderConfig = () => {
     switch(activeTab) {
       case 'dashboard': return { icon: Activity, label: "Project Setup", color: "blue" };
-      case 'goniometry': return { icon: Target, label: "Angle Measurements", color: "cyan" };
-      case 'adjustment': return { icon: Crosshair, label: "Station Adjustment", color: "emerald" };
-      case 'trig_leveling': return { icon: Ruler, label: "Trigonometric Leveling", color: "indigo" };
-      case 'geom_leveling': return { icon: Compass, label: "Spirit Leveling", color: "purple" };
-      case 'traverse': return { icon: MapPin, label: "Traverse", color: "amber" };
-      case 'traverse_height': return { icon: MapPin, label: "Traverse Leveling", color: "orange" };
-      case 'tachymetry': return { icon: MapIcon, label: "Tachymetry", color: "pink" };
-      case 'stakeout': return { icon: Target, label: "Stakeout Layout", color: "emerald" };
-      case 'basic_calc': return { icon: Calculator, label: "Basic Calculations", color: "blue" };
+      case 'goniometry': return { icon: Target, label: "Γωνιομετρήσεις", color: "cyan" };
+      case 'adjustment': return { icon: Crosshair, label: "Συνόρθωση Σταθμού", color: "emerald" };
+      case 'trig_leveling': return { icon: Ruler, label: "Τριγωνομετρική Υψομετρία", color: "indigo" };
+      case 'geom_leveling': return { icon: Compass, label: "Γεωμετρική Χωροστάθμηση", color: "purple" };
+      case 'traverse': return { icon: MapPin, label: "Όδευση", color: "amber" };
+      case 'traverse_height': return { icon: MapPin, label: "Υψομετρία Όδευσης", color: "orange" };
+      case 'tachymetry': return { icon: MapIcon, label: "Ταχυμετρία", color: "pink" };
+      case 'stakeout': return { icon: Target, label: "Χάραξη", color: "emerald" };
+      case 'basic_calc': return { icon: Calculator, label: "Βασικοί Υπολογισμοί", color: "blue" };
       default: return { icon: Activity, label: activeTab ? activeTab.replace('_', ' ').toUpperCase() : "MODULE", color: "slate" };
     }
   };
