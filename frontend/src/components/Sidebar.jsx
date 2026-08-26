@@ -1,12 +1,24 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, Compass, Map as MapIcon, ChevronRight, ChevronLeft, Settings, Layers, ChevronDown, Calculator } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Target, 
+  Compass, 
+  Map as MapIcon, 
+  ChevronRight, 
+  ChevronLeft, 
+  ChevronDown, 
+  Settings, 
+  Layers, 
+  Calculator, 
+  Crosshair 
+} from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
-  // State για να ελέγχουμε ποια dropdown είναι ανοιχτά
+  // State για τον έλεγχο των dropdown μενού
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
   const [isTraverseMenuOpen, setIsTraverseMenuOpen] = useState(false);
 
-  // Ανανεωμένη δομή μενού
+  // Δομή μενού
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     
@@ -24,7 +36,6 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
     
     { id: 'basic_calc', label: 'Βασικοί Υπολογισμοί', icon: <Calculator size={20} /> },
     
-    // Νέα μορφή της Όδευσης με υποκαρτέλες
     { 
       id: 'traverse_menu', 
       label: 'Όδευση', 
@@ -41,10 +52,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 
   const handleItemClick = (item) => {
     if (item.subItems) {
-      // Αν το sidebar είναι κλειστό, το ανοίγουμε αυτόματα
       if (!isOpen) setIsOpen(true);
       
-      // Ανοιγοκλείνουμε το αντίστοιχο dropdown
       if (item.id === 'station_measurements') {
         setIsStationMenuOpen(!isStationMenuOpen);
       } else if (item.id === 'traverse_menu') {
@@ -58,16 +67,27 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   return (
     <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative`}>
       
-      {/* Κουμπί Toggle για άνοιγμα/κλείσιμο */}
+      {/* Τοπογραφικό Toggle Button - Total Station Reticle Style */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`absolute -right-3 top-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-1 border-2 border-slate-950 z-[100] transition-transform duration-300 shadow-lg ${!isOpen ? 'rotate-0' : ''}`}
+        className="absolute -right-3.5 top-[22px] bg-[#090d16] hover:bg-slate-800 text-cyan-500 hover:text-cyan-400 rounded-lg w-7 h-7 border border-cyan-500/40 hover:border-cyan-400 z-[100] transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:shadow-[0_0_15px_rgba(6,182,212,0.45)] flex items-center justify-center group"
+        title={isOpen ? "Σύμπτυξη Sidebar" : "Επέκταση Sidebar"}
       >
-        {isOpen ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+        <div className="relative flex items-center justify-center w-full h-full">
+          {/* Περιστρεφόμενο Σταυρόνημα στο background */}
+          <Crosshair size={18} className="absolute opacity-60 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500 text-cyan-400" />
+          
+          {/* Βέλος Κατεύθυνσης */}
+          {isOpen ? (
+            <ChevronLeft size={11} className="relative z-10 text-slate-100 group-hover:-translate-x-0.5 transition-transform stroke-[3]" />
+          ) : (
+            <ChevronRight size={11} className="relative z-10 text-slate-100 group-hover:translate-x-0.5 transition-transform stroke-[3]" />
+          )}
+        </div>
       </button>
 
-      {/* Header Sidebar */}
-      <div className={`h-20 px-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800/80 overflow-hidden`}>
+      {/* Header Sidebar - Ευθυγραμμισμένο ακριβώς στα 72px */}
+      <div className={`h-[72px] px-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800 overflow-hidden shrink-0`}>
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
           <Compass size={24} />
         </div>
@@ -78,14 +98,12 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
+      {/* Navigation Menu */}
+      <nav className="flex-1 p-4 space-y-2 mt-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {menuItems.map((item) => {
-          // Ελέγχουμε αν κάποιο από τα subItems είναι το activeTab για να κρατήσουμε το parent "αναμμένο"
           const hasActiveSubItem = item.subItems?.some(sub => sub.id === activeTab);
           const isParentActive = activeTab === item.id || hasActiveSubItem;
 
-          // Ελέγχουμε αν το συγκεκριμένο dropdown είναι ανοιχτό
           const isThisMenuOpen = 
             (item.id === 'station_measurements' && isStationMenuOpen) || 
             (item.id === 'traverse_menu' && isTraverseMenuOpen);
@@ -105,7 +123,6 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
                   {isOpen && <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>}
                 </div>
                 
-                {/* Εικονίδιο για Dropdown ή απλό βέλος */}
                 {isOpen && item.subItems && (
                   <ChevronDown 
                     size={16} 
@@ -115,7 +132,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
                 {isOpen && !item.subItems && activeTab === item.id && <ChevronRight size={16} className="opacity-50" />}
               </button>
 
-              {/* Sub-Items (Dropdown) */}
+              {/* Dropdown Υπο-κατηγορίες */}
               {item.subItems && isThisMenuOpen && isOpen && (
                 <div className="flex flex-col gap-1 pl-11 pr-2 py-1 mt-1 animate-in slide-in-from-top-2 fade-in duration-200">
                   {item.subItems.map((subItem) => (
@@ -139,7 +156,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       </nav>
 
       {/* Footer Sidebar */}
-      <div className="p-4 border-t border-slate-800 bg-slate-900/50 overflow-hidden">
+      <div className="p-4 border-t border-slate-800 bg-slate-900/50 overflow-hidden shrink-0">
         <button className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-3 text-slate-500 hover:text-white transition-colors`}>
           <Settings size={20} className="shrink-0" />
           {isOpen && <span className="font-medium text-sm whitespace-nowrap">Ρυθμίσεις</span>}
