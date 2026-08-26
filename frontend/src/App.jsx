@@ -348,6 +348,12 @@ function App() {
                 setObservations={setObservations} 
                 adjMetrics={adjMetrics}
                 setAdjMetrics={setAdjMetrics}
+                projectInfo={{
+                  projectName: currentProject,
+                  designer: globalSettings.designer,
+                  employer: globalSettings.employer, // <--- Διορθώθηκε εδώ 
+                  location: globalSettings.location  // <--- Διορθώθηκε εδώ 
+                }}
               />
             )}
             

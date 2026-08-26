@@ -318,7 +318,8 @@ def export_adjustment_report():
         stats = data.get('stats', [])
         
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
-        raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
+        # Αντικατάστησε τη γραμμή raw_proj με αυτήν:
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
         
         # Συγκέντρωση όλων των πιθανών πηγών δεδομένων για αναζήτηση
         sources_to_check = []
