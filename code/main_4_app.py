@@ -1108,13 +1108,8 @@ def export_traverse_report():
         import traceback
         print(f"Σφάλμα κατά τη δημιουργία Traverse Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-    
-import math
-import io
-from flask import request, jsonify, send_file
-import ezdxf
-from ezdxf.enums import TextEntityAlignment
 
+    
 @app.route('/api/traverse/export-dxf', methods=['POST'])
 def export_traverse_dxf():
     try:
@@ -1123,6 +1118,8 @@ def export_traverse_dxf():
         # Υποστήριξη είτε 'results' είτε 'points' για συμβατότητα
         results = data.get('results') or data.get('points', [])
         measurements = data.get('measurements', [])
+        
+        # 1. Λήψη κλίμακας από το request (αν δεν υπάρχει, default '1:1000')
         scale = data.get('scale', '1:1000')
 
         # Helper για ανάκτηση τιμών από dict ή object
@@ -1185,6 +1182,8 @@ def export_traverse_dxf():
         # ==========================================
         # 1. ΥΠΟΛΟΓΙΣΜΟΣ ΒΗΜΑΤΟΣ ΚΑΝΝΑΒΟΥ ΒΑΣΕΙ ΚΛΙΜΑΚΑΣ
         # ==========================================
+        
+        # 2. Εξαγωγή του αριθμού της κλίμακας (π.χ. '1:500' -> 500)
         try:
             scale_num = int(str(scale).split(':')[-1])
         except (ValueError, AttributeError):
@@ -1389,9 +1388,8 @@ def export_traverse_dxf():
             curr_bar_x += step
             val += step
 
-        msp.add_text(f"ΚΛΙΜΑΚΑ: 1:{scale_num}", dxfattribs={'style': 'GreekStyle', 'height': 1.2, 'layer': 'DECORATIONS'}).set_placement((sx, sy - 2))
-        msp.add_text("Σ.Α.: ΕΓΣΑ '87", dxfattribs={'style': 'GreekStyle', 'height': 1.2, 'layer': 'DECORATIONS'}).set_placement((sx, sy - 3.5))
-
+        # Αφαιρέθηκε και η γραμμή της κλίμακας
+        
         # ==========================================
         # 6. ΕΞΑΓΩΓΗ
         # ==========================================
