@@ -304,7 +304,7 @@ class AdjustmentNumberedCanvas(canvas.Canvas):
         self.setLineWidth(0.75)
         self.line(30, 35, A4[0] - 30, 35)
         
-        # Αριστερά: Σταθερό κείμενο και Timestamp παραγωγής (μιας και έφυγε η αρίθμηση σελίδας)
+        # Αριστερά: Σταθερό κείμενο και Timestamp παραγωγής
         self.drawString(30, 22, f"{self.timestamp_str}")
         
         self.restoreState()
@@ -318,7 +318,6 @@ def export_adjustment_report():
         stats = data.get('stats', [])
         
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
-        # Αντικατάστησε τη γραμμή raw_proj με αυτήν:
         raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
         
         # Συγκέντρωση όλων των πιθανών πηγών δεδομένων για αναζήτηση
@@ -435,31 +434,58 @@ def export_adjustment_report():
         )
         header_style = ParagraphStyle('TableHead', fontName=my_font_bold, fontSize=8.5, textColor=colors.white, alignment=1)
         
-        info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
-        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
-        info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
+        # Νέα Styles για το Modern Dashboard Box
+        modern_label_style = ParagraphStyle(
+            'ModernLabel', 
+            fontName=my_font_bold, 
+            fontSize=7.5, 
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=2,
+            textTransform='uppercase'
+        )
+        
+        modern_value_style = ParagraphStyle(
+            'ModernValue', 
+            fontName=my_font_bold, 
+            fontSize=11, 
+            textColor=TEXT_MAIN,
+            spaceAfter=8
+        )
 
         # ========================================================
-        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (MODERN DASHBOARD STYLE)
         # ========================================================
+        def make_info_cell(label, value):
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style)
+            ]
+
         project_data = [
-            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
-            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
-            [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
-            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
+            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
         
-        info_table = Table(project_data, colWidths=[130, 15, 390])
+        # Πλάτος Στήλης (A4 = 595.27, Margin = 30+30 = 60, Σύνολο = 535.27 / 2)
+        col_width = (A4[0] - 60) / 2
+        info_table = Table(project_data, colWidths=[col_width, col_width])
+        
         info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE), # Ίδιο χρώμα με τον τίτλο για συνοχή
+            ('TOPPADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 15),
+            ('RIGHTPADDING', (0,0), (-1,-1), 15),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ]))
         
         elements.append(info_table)
-        elements.append(Spacer(1, 35))
-        
+        elements.append(Spacer(1, 25))
+
         # ========================================================
-        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ (Μεταφέρθηκε κάτω από τις πληροφορίες)
         # ========================================================
         elements.append(Paragraph("Αναφορά Συνόρθωσης Σταθμού", title_style))
         elements.append(Spacer(1, 20))
@@ -623,7 +649,6 @@ def export_adjustment_report():
         print(f"Σφάλμα κατά τη δημιουργία Adjustment Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
-
 
 # ==========================================
 # 2. ENDPOINT ΓΙΑ ΟΔΕΥΣΗ (TRAVERSE)
@@ -891,10 +916,6 @@ def export_traverse_report():
             fontSize=8.5, leading=10, textColor=colors.white, alignment=1
         )
         
-        info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
-        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
-        info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
-
         td_norm_style = ParagraphStyle(
             'TopoTDNorm', parent=styles['Normal'], fontName=my_font,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
@@ -904,27 +925,57 @@ def export_traverse_report():
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
 
+        # Νέα Styles για το Modern Dashboard Box
+        modern_label_style = ParagraphStyle(
+            'ModernLabel', 
+            fontName=my_font_bold, 
+            fontSize=7.5, 
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=2,
+            textTransform='uppercase'
+        )
+        
+        modern_value_style = ParagraphStyle(
+            'ModernValue', 
+            fontName=my_font_bold, 
+            fontSize=11, 
+            textColor=TEXT_MAIN,
+            spaceAfter=8
+        )
+
         # ========================================================
-        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (Generic Info Header)
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (MODERN DASHBOARD STYLE)
         # ========================================================
+        def make_info_cell(label, value):
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style)
+            ]
+
         project_data = [
-            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
-            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
-            [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
-            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
+            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
         
-        info_table = Table(project_data, colWidths=[130, 15, 390])
+        col_width = (A4[0] - 60) / 2
+        info_table = Table(project_data, colWidths=[col_width, col_width])
+        
         info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
+            ('TOPPADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 15),
+            ('RIGHTPADDING', (0,0), (-1,-1), 15),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ]))
         
         elements.append(info_table)
-        elements.append(Spacer(1, 35))
+        elements.append(Spacer(1, 25))
 
         # ========================================================
-        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ (Μεταφέρθηκε κάτω από τις πληροφορίες)
         # ========================================================
         elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
         elements.append(Spacer(1, 20))
@@ -1005,7 +1056,6 @@ def export_traverse_report():
         def val_p(val):
             return Paragraph(str(val), td_bold_style)
 
-        # ΝΕΑ ΔΟΜΗ ΠΙΝΑΚΑ 2
         metrics_table_data = [
             [Paragraph("Γενικά Στοιχεία", th_style), '', '', ''],
             ["Αριθμός Στάσεων (n):", val_p(metrics.get('n', '-')), "Συνολικό Μήκος (L):", val_p(safe_fmt(metrics.get('totalLength'), 2, " m"))],
@@ -1046,8 +1096,6 @@ def export_traverse_report():
         ])
         metrics_table.setStyle(metrics_style)
         elements.append(metrics_table)
-        
-        # Προσθήκη κενού αντί για PageBreak
         elements.append(Spacer(1, 35))
 
         # ========================================================
@@ -2042,7 +2090,9 @@ def run_stakeout():
         print(f"Σφάλμα κατά τον υπολογισμό χάραξης:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-# --- CUSTOM CANVAS ΓΙΑ STAKEOUT REPORT ---
+# ==========================================
+# 2C. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (STAKEOUT - CUSTOM STYLING)
+# ==========================================
 class StakeoutNumberedCanvas(canvas.Canvas):
     def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
         super().__init__(*args, **kwargs)
@@ -2104,7 +2154,7 @@ def export_stakeout_report():
         mij = data.get('mij')
         plot_base64 = data.get('plot')
 
-        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣТОΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
         raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
         
         sources_to_check = []
@@ -2128,7 +2178,7 @@ def export_stakeout_report():
         proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
         proj_location = extract_field(['location', 'place', 'address'])
 
-        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ (Κανονική & Bold) ---
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
         try:
@@ -2144,7 +2194,6 @@ def export_stakeout_report():
         buffer = BytesIO()
         a4_w, a4_h = A4
 
-        # Χρήση SimpleDocTemplate με περιθώρια A4
         doc = SimpleDocTemplate(
             buffer, 
             pagesize=A4, 
@@ -2155,9 +2204,9 @@ def export_stakeout_report():
         )
         elements = []
         
-        # --- Κοινή Παλέτα Χρωμάτων ---
-        HEADER_BG = colors.HexColor('#0f172a')     # Dark Slate/Navy
-        SUBHEADER_BG = colors.HexColor('#1e293b')  # Dark Slate Blue
+        # --- Παλέτα Χρωμάτων ---
+        HEADER_BG = colors.HexColor('#0f172a')     
+        SUBHEADER_BG = colors.HexColor('#1e293b')  
         ROW_BG_1 = colors.HexColor('#ffffff')      
         ROW_BG_2 = colors.HexColor('#f8fafc')      
         GRID_COLOR = colors.HexColor('#cbd5e1')    
@@ -2166,7 +2215,6 @@ def export_stakeout_report():
 
         styles = getSampleStyleSheet()
         
-        # Στυλ Παραγράφων
         title_style = ParagraphStyle(
             'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
             fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0
@@ -2179,12 +2227,6 @@ def export_stakeout_report():
             fontSize=8.5, leading=10, textColor=colors.white, alignment=1 
         )
 
-        # Στυλ Πληροφοριών Έργου
-        info_label_style = ParagraphStyle('InfoLabel', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN)
-        info_colon_style = ParagraphStyle('InfoColon', fontName=my_font_bold, fontSize=10, textColor=TEXT_MAIN, alignment=1)
-        info_value_style = ParagraphStyle('InfoValue', fontName=my_font, fontSize=10, textColor=TEXT_MAIN)
-
-        # Στυλ Κελιών
         td_norm_style = ParagraphStyle(
             'TdNorm', parent=styles['Normal'], fontName=my_font,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
@@ -2194,27 +2236,57 @@ def export_stakeout_report():
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
 
+        # Νέα Styles για το Modern Dashboard Box
+        modern_label_style = ParagraphStyle(
+            'ModernLabel', 
+            fontName=my_font_bold, 
+            fontSize=7.5, 
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=2,
+            textTransform='uppercase'
+        )
+        
+        modern_value_style = ParagraphStyle(
+            'ModernValue', 
+            fontName=my_font_bold, 
+            fontSize=11, 
+            textColor=TEXT_MAIN,
+            spaceAfter=8
+        )
+
         # ========================================================
-        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (Generic Info Header)
+        # ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (MODERN DASHBOARD STYLE)
         # ========================================================
+        def make_info_cell(label, value):
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style)
+            ]
+
         project_data = [
-            [Paragraph("Έργο", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_name, info_value_style)],
-            [Paragraph("Μηχανικός", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_engineer, info_value_style)],
-            [Paragraph("Εργοδότης", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_client, info_value_style)],
-            [Paragraph("Τοποθεσία", info_label_style), Paragraph(":", info_colon_style), Paragraph(proj_location, info_value_style)]
+            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
+            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
         
-        info_table = Table(project_data, colWidths=[130, 15, 390])
+        col_width = (A4[0] - 60) / 2
+        info_table = Table(project_data, colWidths=[col_width, col_width])
+        
         info_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
+            ('TOPPADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 15),
+            ('RIGHTPADDING', (0,0), (-1,-1), 15),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ]))
         
         elements.append(info_table)
-        elements.append(Spacer(1, 35))
+        elements.append(Spacer(1, 25))
 
         # ========================================================
-        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ (Μεταφέρθηκε κάτω από τις πληροφορίες)
         # ========================================================
         elements.append(Paragraph("Τεύχος Υπολογισμού Χάραξης", title_style))
         elements.append(Spacer(1, 20))
@@ -2349,7 +2421,6 @@ def export_stakeout_report():
                 plot_img = Image(img_stream, width=final_w, height=final_h)
                 plot_img.hAlign = 'CENTER'
 
-                # Χρήση KeepTogether για να μην αποκολλάται ο τίτλος από την εικόνα
                 sketch_block = [
                     Paragraph("3. Σκαρίφημα Χάραξης", h2_style),
                     Spacer(1, 10),
