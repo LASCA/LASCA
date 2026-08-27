@@ -39,6 +39,13 @@ class TopoProject:
             
         if not self.json_file.exists():
             self._create_initial_json(initial_settings or {})
+        elif initial_settings:
+            state = self.load_state()
+            saved_settings = state.setdefault("settings", {})
+            for key in ("scale", "terrain", "klass", "designer", "employer", "location"):
+                if key in initial_settings:
+                    saved_settings[key] = initial_settings[key]
+            self.save_state(state)
             
         return self.load_state()
 
@@ -52,7 +59,9 @@ class TopoProject:
                 "scale": settings.get("scale", "1:1000"),
                 "terrain": settings.get("terrain", "Ομαλό"),
                 "klass": settings.get("klass", "Πρωτεύουσα"),
-                "designer": settings.get("designer", "")
+                "designer": settings.get("designer", ""),
+                "employer": settings.get("employer", ""),
+                "location": settings.get("location", "")
             },
             "traverse_data": [],  # Εδώ αποθηκεύεται ο πίνακας [ {name, hz, sd, x, y, h}, ... ]
             "metrics": {},        # Εδώ αποθηκεύονται τα αποτελέσματα των ελέγχων (dx, dy, w, κλπ)

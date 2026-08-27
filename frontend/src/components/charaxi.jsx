@@ -3,7 +3,7 @@ import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cp
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-const Charaxi = ({ stakeoutData, setStakeoutData }) => {
+const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const { station, backsight, points, mij } = stakeoutData;
   const [loading, setLoading] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -135,7 +135,10 @@ const Charaxi = ({ stakeoutData, setStakeoutData }) => {
       const response = await fetch('http://localhost:5000/api/projects/stakeout/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(stakeoutData)
+        body: JSON.stringify({
+          ...stakeoutData,
+          projectInfo
+        })
       });
 
       if (!response.ok) {

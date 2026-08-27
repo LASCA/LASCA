@@ -66,7 +66,7 @@ const CustomDropdown = ({ label, value, onChange, options }) => {
   );
 };
 
-const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSettings }) => {
+const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSettings, projectInfo }) => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -303,7 +303,8 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         body: JSON.stringify({ 
           points: data,
           metrics: metrics,
-          plot: finalPlotImage
+          plot: finalPlotImage,
+          projectInfo: projectInfo || projectSettings
         })
       });
       

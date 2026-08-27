@@ -363,7 +363,10 @@ function App() {
                 setData={setTraverseData}        
                 metrics={traverseMetrics} 
                 setMetrics={setTraverseMetrics}   
-                projectSettings={currentProject} 
+                projectSettings={{
+                  name: currentProject,
+                  settings: globalSettings
+                }}
               />
             )}
 
@@ -399,6 +402,12 @@ function App() {
               <Charaxi 
                 stakeoutData={stakeoutData}
                 setStakeoutData={setStakeoutData}
+                projectInfo={{
+                  projectName: currentProject,
+                  designer: globalSettings.designer,
+                  employer: globalSettings.employer,
+                  location: globalSettings.location
+                }}
               />
             )}
 
