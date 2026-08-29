@@ -32,6 +32,19 @@ except:
     print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
     font_name = 'Helvetica' # Fallback αν δεν βρει το αρχείο
 
+from pathlib import Path
+
+# Βρίσκει αυτόματα τον φάκελο στον οποίο βρίσκεται το τρέχον αρχείο .py
+BASE_DIR = Path(__file__).resolve().parent
+
+# Κατασκευάζει το μονοπάτι προς το logo μέσα στο backend
+LOGO_PATH = BASE_DIR / "assets" / "LASCA-logo-red-blue-1024.png"
+
+# Έλεγχος αν υπάρχει το αρχείο πριν τη χρήση
+if not LOGO_PATH.exists():
+    print(f"Warning: Logo not found at {LOGO_PATH}")
+
+
 app = Flask(__name__)
 CORS(app) 
 
@@ -262,11 +275,12 @@ def run_adjustment():
 # ==========================================
 # --- CUSTOM CANVAS ΓΙΑ ADJUSTMENT REPORT ---
 class AdjustmentNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', timestamp_str='', **kwargs):
+    def __init__(self, *args, font_name='Helvetica', timestamp_str='', logo_path=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
         self.font_name = font_name
         self.timestamp_str = timestamp_str
+        self.logo_path = logo_path
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -284,11 +298,27 @@ class AdjustmentNumberedCanvas(canvas.Canvas):
         self.saveState()
         
         # --- Πάνω Κεφαλίδα (Header) ---
+        header_y = A4[1] - 30
+        
+        # 1. Τοποθέτηση του Λογότυπου (αν έχει δοθεί)
+        logo_width = 32
+        logo_height = 32
+        logo_y = header_y - 10 # Κατεβάζουμε λίγο το y για να στοιχηθεί ωραία με το κείμενο
+        
+        if self.logo_path:
+            try:
+                # Το mask='auto' διαβάζει τη διαφάνεια των PNG
+                self.drawImage(self.logo_path, 30, logo_y, width=logo_width, height=logo_height, mask='auto')
+            except Exception as e:
+                print(f"Δεν ήταν δυνατή η φόρτωση του λογότυπου: {e}")
+        
+        # 2. Τοποθέτηση του Κειμένου
         self.setFont(self.font_name, 10) # Μεγαλύτερη γραμματοσειρά
         self.setFillColor(colors.HexColor('#475569'))
         
-        header_y = A4[1] - 30
-        self.drawString(30, header_y, "Αυτοματοποιημένη αναφορά LASCA")
+        # Υπολογισμός θέσης κειμένου: Αν υπάρχει logo πάει πιο δεξιά, αλλιώς μένει στο x=30
+        text_x = 30 + logo_width + 10 if self.logo_path else 30
+        self.drawString(text_x, header_y, "Αυτοματοποιημένη αναφορά LASCA")
         
         # Αριθμός σελίδας μεταφέρθηκε στην κεφαλίδα
         page_str = f"Σελίδα {self._pageNumber} από {page_count}"
@@ -297,7 +327,8 @@ class AdjustmentNumberedCanvas(canvas.Canvas):
         # Διαχωριστική Γραμμή Κεφαλίδας
         self.setStrokeColor(colors.HexColor('#cbd5e1'))
         self.setLineWidth(1)
-        self.line(30, header_y - 8, A4[0] - 30, header_y - 8)
+        # Κατέβασα τη γραμμή στο -12 (από -8) για να χωράει το εικονίδιο χωρίς να την ακουμπάει
+        self.line(30, header_y - 12, A4[0] - 30, header_y - 12)
         
         # --- Κάτω Υποσέλιδο (Footer) ---
         self.setFont(self.font_name, 8)
@@ -632,7 +663,11 @@ def export_adjustment_report():
         doc.build(
             elements, 
             canvasmaker=lambda *args, **kwargs: AdjustmentNumberedCanvas(
-                *args, font_name=my_font, timestamp_str=current_timestamp, **kwargs
+                *args, 
+                font_name=my_font, 
+                timestamp_str=current_timestamp, 
+                logo_path=str(LOGO_PATH), 
+                **kwargs
             )
         )
         buffer.seek(0)

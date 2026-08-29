@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import io
+import io, os
 import base64
 import matplotlib
 import numpy as np
@@ -12,14 +12,25 @@ from matplotlib.patches import Arc
 import os
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from PIL import Image
-
+from pathlib import Path
 matplotlib.use('Agg') # ΚΡΙΣΙΜΟ: Λέει στη matplotlib να μην προσπαθήσει να ανοίξει GUI
+
 
 try:
     from adjustText import adjust_text
     HAS_ADJUST_TEXT = True
 except ImportError:
     HAS_ADJUST_TEXT = False
+
+# Βρίσκει αυτόματα τον φάκελο στον οποίο βρίσκεται το τρέχον αρχείο .py
+BASE_DIR = Path(__file__).resolve().parent
+
+# Κατασκευάζει το μονοπάτι προς το logo μέσα στο backend
+NORTH_PATH = BASE_DIR / "assets" / "north-arrow-svgrepo-com.png"
+
+# Έλεγχος αν υπάρχει το αρχείο πριν τη χρήση
+if not NORTH_PATH.exists():
+    print(f"Warning: Logo not found at {NORTH_PATH}")
 
 def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     # 1. Επεξεργασία του DataFrame
@@ -320,15 +331,6 @@ def plot_traverse_base64(results: list, measurements: list = None, scale: str = 
     
     return f"data:image/png;base64,{plot_url}"
 
-import io
-import os
-import base64
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Arc
-from matplotlib.ticker import MultipleLocator
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-from PIL import Image
 
 def plot_traverse_base64_2(results: list, measurements: list = None, scale: str = '1:1000') -> str:
     def get_val(obj, *keys):
@@ -552,7 +554,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     ax.set_ylim(ymin, ymax)
 
     # --- 5. ΠΡΟΣΘΗΚΗ ΒΕΛΟΥΣ ΒΟΡΡΑ ---
-    icon_path = r'C:\Users\akara\OneDrive\Desktop\survey_project\north-arrow-svgrepo-com.png' 
+    icon_path = str(NORTH_PATH) 
 
     if os.path.exists(icon_path):
         try:
