@@ -73,19 +73,21 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   return (
     <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative`}>
       
-      {/* Τοπογραφικό Toggle Button - Total Station Reticle Style */}
+      {/* Τοπογραφικό Toggle Button - Total Station Reticle Style (Blended Version) */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="absolute -right-3.5 top-[22px] bg-[#090d16] hover:bg-slate-800 text-cyan-500 hover:text-cyan-400 rounded-lg w-7 h-7 border border-cyan-500/40 hover:border-cyan-400 z-[100] transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:shadow-[0_0_15px_rgba(6,182,212,0.45)] flex items-center justify-center group"
+        className="absolute -right-3.5 top-[22px] bg-slate-900 hover:bg-slate-800 rounded-lg w-7 h-7 border border-slate-700 hover:border-blue-500/50 z-[100] transition-all duration-300 shadow-sm hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] flex items-center justify-center group"
         title={isOpen ? "Σύμπτυξη Sidebar" : "Επέκταση Sidebar"}
       >
         <div className="relative flex items-center justify-center w-full h-full">
-          <Crosshair size={18} className="absolute opacity-60 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500 text-cyan-400" />
+          {/* Περιστρεφόμενο Σταυρόνημα στο background */}
+          <Crosshair size={18} className="absolute opacity-40 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500 text-slate-400 group-hover:text-blue-400" />
           
+          {/* Βέλος Κατεύθυνσης */}
           {isOpen ? (
-            <ChevronLeft size={11} className="relative z-10 text-slate-100 group-hover:-translate-x-0.5 transition-transform stroke-[3]" />
+            <ChevronLeft size={11} className="relative z-10 text-slate-300 group-hover:text-white group-hover:-translate-x-0.5 transition-all stroke-[3]" />
           ) : (
-            <ChevronRight size={11} className="relative z-10 text-slate-100 group-hover:translate-x-0.5 transition-transform stroke-[3]" />
+            <ChevronRight size={11} className="relative z-10 text-slate-300 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[3]" />
           )}
         </div>
       </button>
