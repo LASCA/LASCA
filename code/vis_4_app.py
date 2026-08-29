@@ -332,6 +332,16 @@ def plot_traverse_base64(results: list, measurements: list = None, scale: str = 
     return f"data:image/png;base64,{plot_url}"
 
 
+import io
+import base64
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
+from matplotlib.ticker import MultipleLocator
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from PIL import Image
+
 def plot_traverse_base64_2(results: list, measurements: list = None, scale: str = '1:1000') -> str:
     def get_val(obj, *keys):
         for k in keys:
@@ -403,7 +413,7 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
                             dist_str = str(val).strip()
                             break
 
-        # 2. Αν δεν υπάρχει μέτρηση (π.χ. πλευρά εξάρτησης Σ7-Σ6), υπολογίζουμε τη γεωμετρική απόσταση
+        # 2. Αν δεν υπάρχει μέτρηση, υπολογίζουμε τη γεωμετρική απόσταση
         if not dist_str or dist_str == "" or dist_str == "-":
             geom_dist = np.sqrt((X[i+1]-X[i])**2 + (Y[i+1]-Y[i])**2)
             dist_str = f"{geom_dist:.3f}"
@@ -418,14 +428,14 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
         if angle > 90: angle -= 180
         if angle < -90: angle += 180
         
-        # Γκρι χρώμα για τις πλευρές εξάρτησης (πρώτη & τελευταία), Λευκό για τις μετρημένες
         txt_color = 'gray' if (i == 0 or i == n-2) else "#FFFFFF"
         
         ax.annotate(dist_str, (mid_x, mid_y), 
-                    xytext=(0, 5), textcoords='offset points',
+                    xytext=(0, 4), textcoords='offset points',
                     color=txt_color, fontsize=6.0, fontweight='bold',
                     ha='center', va='bottom', rotation=angle, 
-                    rotation_mode='anchor')
+                    rotation_mode='anchor',
+                    bbox=dict(facecolor='#121212', edgecolor='none', pad=0.1, alpha=0.6))
 
     # --- 2. ΣΧΕΔΙΑΣΗ ΓΩΝΙΩΝ ΘΛΑΣΗΣ ---
     ANGLE_COLOR = '#90A4AE'
@@ -463,13 +473,11 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
             angle1 = np.degrees(np.arctan2(dy1, dx1)) % 360
             angle2 = np.degrees(np.arctan2(dy2, dx2)) % 360
             
-            diff = (angle2 - angle1) % 360
-            if diff > 180:
-                theta1, theta2 = angle2, angle1
-                bisector = angle2 - (360 - diff) / 2
-            else:
-                theta1, theta2 = angle1, angle2
-                bisector = angle1 + diff / 2
+            theta1 = angle2
+            theta2 = angle1
+            
+            ccw_diff = (angle1 - angle2) % 360
+            bisector = (angle2 + ccw_diff / 2) % 360
                 
             bisector_rad = np.radians(bisector)
             r = min(d1, d2) * 0.14
@@ -478,14 +486,14 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
                       color=ANGLE_COLOR, linestyle='--', linewidth=0.9, zorder=4)
             ax.add_patch(arc)
             
-            txt_x = X[i] + (r * 1.8) * np.cos(bisector_rad)
-            txt_y = Y[i] + (r * 1.8) * np.sin(bisector_rad)
+            txt_x = X[i] + (r * 2.3) * np.cos(bisector_rad)
+            txt_y = Y[i] + (r * 2.3) * np.sin(bisector_rad)
             
             ax.text(txt_x, txt_y, hz_text, color=ANGLE_COLOR, fontsize=5.5, 
                     fontweight='normal', ha='center', va='center',
-                    bbox=dict(facecolor='#121212', edgecolor='none', pad=0.2, alpha=0.5))
+                    bbox=dict(facecolor='#121212', edgecolor='none', pad=0.3, alpha=0.85))
 
-    # --- 3. ΣΧΕΔΙΑΣΗ ΣΗΜΕΙΩΝ (ΚΟΜΒΟΙ) ---
+    # --- 3. ΣΧΕΔΙΑΣΗ ΣΗΜΕΙΩΝ (ΚΟΜΒΟΙ) ΚΑΙ ΔΥΝΑΜΙΚΑ ΟΝΟΜΑΤΑ ---
     if orient_indices:
         ax.scatter([X[i] for i in orient_indices], [Y[i] for i in orient_indices], 
                    marker='^', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.5, zorder=7)
@@ -496,9 +504,42 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
         ax.scatter([X[i] for i in station_indices], [Y[i] for i in station_indices], 
                    marker='o', s=80, facecolors='none', edgecolors='#00FFFF', linewidths=1.2, zorder=6)
 
+    def get_text_align(angle_deg):
+        a = angle_deg % 360
+        if 45 <= a < 135: return 'center', 'bottom'
+        elif 135 <= a < 225: return 'right', 'center'
+        elif 225 <= a < 315: return 'center', 'top'
+        else: return 'left', 'center'
+
+    # Φίλτρο αποφυγής διπλών εγγραφών στα ονόματα σημείων
+    seen_names = set()
     for i, txt in enumerate(names):
-        ax.annotate(str(txt), (X[i], Y[i]), xytext=(6, 6), textcoords='offset points',
-                    fontsize=9.5, fontweight='bold', color="#FFFEFE")
+        if txt in seen_names:
+            continue
+        seen_names.add(txt)
+
+        if i == 0:
+            ang = np.degrees(np.arctan2(Y[0]-Y[1], X[0]-X[1])) % 360
+        elif i == n - 1:
+            ang = np.degrees(np.arctan2(Y[-1]-Y[-2], X[-1]-X[-2])) % 360
+        else:
+            dx1, dy1 = X[i-1] - X[i], Y[i-1] - Y[i]
+            dx2, dy2 = X[i+1] - X[i], Y[i+1] - Y[i]
+            angle1 = np.degrees(np.arctan2(dy1, dx1)) % 360
+            angle2 = np.degrees(np.arctan2(dy2, dx2)) % 360
+            ccw_diff = (angle1 - angle2) % 360
+            bisector = (angle2 + ccw_diff / 2) % 360
+            ang = (bisector + 180) % 360 
+
+        ang_rad = np.radians(ang)
+        ha, va = get_text_align(ang)
+        
+        ox = 9 * np.cos(ang_rad)
+        oy = 9 * np.sin(ang_rad)
+
+        ax.annotate(str(txt), (X[i], Y[i]), xytext=(ox, oy), textcoords='offset points',
+                    fontsize=9.5, fontweight='bold', color="#FFFEFE", ha=ha, va=va,
+                    bbox=dict(facecolor='#121212', edgecolor='none', pad=0.1, alpha=0.5))
 
     # --- 4. ΣΧΕΔΙΑΣΗ ΓΡΑΜΜΩΝ ---
     if n >= 4:
@@ -582,8 +623,6 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     x_range = xmax - xmin
     y_range = ymax - ymin
 
-    # Δυναμικός υπολογισμός μήκους μπάρας (~20% του συνολικού πλάτους του plot)
-    # ώστε να μην επικαλύπτονται τα κείμενα ποτέ, ανεξαρτήτως μεγέθους οδεύσεως.
     target_len = x_range * 0.20
     
     if target_len <= 15:
@@ -599,7 +638,6 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     elif target_len <= 750:
         bar_len, step = 500, 100
     else:
-        # Αν το σχέδιο είναι τεράστιο, στρογγυλοποιούμε σε εκατοντάδες
         bar_len = round(target_len / 100) * 100
         step = bar_len / 4
 
@@ -607,25 +645,17 @@ def plot_traverse_base64_2(results: list, measurements: list = None, scale: str 
     bar_y = ymin + (y_range * 0.09)
     tick_h = y_range * 0.012
 
-    # Σχεδίαση της κύριας οριζόντιας γραμμής
     ax.plot([bar_x, bar_x + bar_len], [bar_y, bar_y], color='white', linewidth=2, zorder=10)
 
     txt_y = bar_y + tick_h * 1.5
     current_x = bar_x
     val = 0
 
-    # Προσθέτουμε ένα ελάχιστο tolerance (step * 0.1) στο όριο για να αποφύγουμε 
-    # προβλήματα ακρίβειας (float precision) της Python στο while loop
     while val <= bar_len + (step * 0.1): 
-        # Σχεδίαση κάθετης υποδιαίρεσης
         ax.plot([current_x, current_x], [bar_y, bar_y + tick_h], color='white', linewidth=1.5, zorder=10)
-        
-        # Καθαρισμός δεκαδικών (πχ το 5.0 γίνεται 5) για πιο καθαρό σχέδιο
         label_val = int(val) if float(val).is_integer() else val
         label = f"{label_val}" if val < bar_len else f"{label_val}m"
-        
         ax.text(current_x, txt_y, label, color='white', fontsize=7, ha='center', va='bottom', zorder=10)
-        
         current_x += step
         val += step
 
