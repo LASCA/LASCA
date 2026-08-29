@@ -15,8 +15,6 @@ import Leveling from './components/leveling';
 import BasicCalculations from './components/Basic_Calc';
 import TrigonometricHeight from './components/trig_leveling';
 
-// Αν θέλεις εικόνα/λογότυπο, κάνε import εδώ (π.χ. import myLogo from './assets/logo.png';)
-
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -65,10 +63,37 @@ function App() {
   // "Κλειδαριά" για το Auto-Save
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
+  // --- ΚΑΘΑΡΙΣΜΟΣ STATE (RESET ALL DATA) ---
+  const resetAllData = () => {
+    setGlobalSettings({});
+    setObservations([]);
+    setAdjMetrics({});
+    setTraverseData([]);
+    setTraverseMetrics({});
+    setTachymetryData({ measurements: [], stations: [], results: [] });
+    setStakeoutData({
+      station: { name: 'St1', x: '', y: '' },
+      backsight: { name: 'BS1', x: '', y: '' },
+      azimuthBs: '---',
+      points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
+    });
+    setGoniometryData([]);
+    setLevelingObservations([]);
+    setLevelingStations([]);
+    setLevelingForward([{ id: 1, point: 'BM1', backsight: '', foresight: '', dh: '', elevation: '' }]);
+    setLevelingBackward([{ id: 1, point: 'BM2', backsight: '', foresight: '', dh: '', elevation: '' }]);
+    setLevelingMetrics({});
+    setTrigHeightData([]);
+  };
+
   // --- 0. ΦΟΡΤΩΣΗ ΤΟΥ PROJECT ΑΠΟ ΤΟ .JSON ΣΤΟΝ ΔΙΣΚΟ ---
   useEffect(() => {
     if (currentProject) {
       console.log(`⏳ Φόρτωση του project "${currentProject}" από το αρχείο JSON του Backend...`);
+      
+      // 🔒 Κλειδώνουμε ΑΜΕΣΩΣ το auto-save & μηδενίζουμε τα παλιά data
+      setIsDataLoaded(false);
+      resetAllData();
       
       fetch('http://localhost:5000/api/projects/load', {
         method: 'POST',
@@ -98,19 +123,18 @@ function App() {
           setLevelingForward(backendData.levelingForward || []);
           setLevelingBackward(backendData.levelingBackward || []);
           setLevelingMetrics(backendData.levelingMetrics || {});
-
-          // Φόρτωση Τριγωνομετρικής Υψομετρίας
           setTrigHeightData(backendData.trigHeightData || []);
 
           console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
-          setIsDataLoaded(true);
         }
+        setIsDataLoaded(true);
       })
       .catch(err => {
         console.error("❌ Αποτυχία σύνδεσης με τον server κατά την εκκίνηση:", err);
         setIsDataLoaded(true);
       });
     } else {
+      resetAllData();
       setIsDataLoaded(true);
     }
   }, [currentProject]);
@@ -135,8 +159,6 @@ function App() {
       levelingForward: levelingForward,
       levelingBackward: levelingBackward,
       levelingMetrics: levelingMetrics,
-      
-      // Αποθήκευση Τριγωνομετρικής Υψομετρίας
       trigHeightData: trigHeightData
     };
 
@@ -177,13 +199,11 @@ function App() {
     levelingForward,  
     levelingBackward, 
     levelingMetrics,
-    trigHeightData // Παρακολούθηση για την Τριγωνομετρική
+    trigHeightData
   ]);
 
-
-// --- 2. GLOBAL TOOLTIP LOGIC (ΑΠΟΛΥΤΟ ΠΡΩΤΟ ΠΛΑΝΟ) ---
+  // --- 2. GLOBAL TOOLTIP LOGIC ---
   useEffect(() => {
-    // Δημιουργία ενός μοναδικού στοιχείου απευθείας στο body (εκτός των scrollbars)
     const tooltipEl = document.createElement('div');
     tooltipEl.className = 'global-custom-tooltip';
     document.body.appendChild(tooltipEl);
@@ -198,13 +218,11 @@ function App() {
       target.setAttribute('data-tooltip', text);
       target.removeAttribute('title'); 
 
-      // Τοποθέτηση του tooltip
       const rect = target.getBoundingClientRect();
       tooltipEl.textContent = text;
       
-      // Βρίσκουμε το κέντρο του κουμπιού
       const x = rect.left + (rect.width / 2);
-      const y = rect.bottom + 8; // 8px κάτω από το κουμπί
+      const y = rect.bottom + 8;
 
       tooltipEl.style.left = `${x}px`;
       tooltipEl.style.top = `${y}px`;
@@ -220,7 +238,6 @@ function App() {
       }
     };
 
-    // ΝΕΑ ΠΡΟΣΘΗΚΗ: Εξαφάνιση του tooltip σε ΚΑΘΕ κλικ
     const handleClick = () => {
       tooltipEl.style.opacity = '0';
       tooltipEl.style.visibility = 'hidden';
@@ -228,14 +245,13 @@ function App() {
 
     document.addEventListener('mouseover', handleMouseOver);
     document.addEventListener('mouseout', handleMouseOut);
-    document.addEventListener('click', handleClick); // <-- Προσθήκη event listener
+    document.addEventListener('click', handleClick);
 
     return () => {
       document.removeEventListener('mouseover', handleMouseOver);
       document.removeEventListener('mouseout', handleMouseOut);
-      document.removeEventListener('click', handleClick); // <-- Καθαρισμός event listener
+      document.removeEventListener('click', handleClick);
       
-      // Καθαρισμός όταν κλείνει το component
       if (document.body.contains(tooltipEl)) {
         document.body.removeChild(tooltipEl);
       }
@@ -244,6 +260,9 @@ function App() {
   
   // --- 3. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
   const handleProjectLoaded = (projectData) => {
+    setIsDataLoaded(false); // 🔒 Προστασία Auto-Save
+    resetAllData();         // Καθαρισμός παλιών δεδομένων
+
     const pName = projectData.project_name;
     setCurrentProject(pName);
     setGlobalSettings(projectData.settings || {});
@@ -266,8 +285,6 @@ function App() {
     setLevelingForward(projectData.levelingForward || []);
     setLevelingBackward(projectData.levelingBackward || []);
     setLevelingMetrics(projectData.levelingMetrics || {});
-    
-    // Φόρτωση Τριγωνομετρικής
     setTrigHeightData(projectData.trigHeightData || []);
 
     setIsDataLoaded(true);
@@ -292,8 +309,6 @@ function App() {
       <div className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         
         <div className="absolute top-4 right-6 z-50 flex items-center gap-3">
-          {/* <img src={myLogo} alt="Λογότυπο" className="h-8 w-auto mr-2" /> */}
-          
           {currentProject && (
             <span className="text-[10px] font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 rounded-lg shadow-sm">
               Project: {currentProject}
@@ -315,7 +330,6 @@ function App() {
             
             {activeTab === 'dashboard' && (
               <Dashboard
-                // Ενημέρωση Δεδομένων από το Dashboard
                 setObservations={setObservations}
                 setTraverseData={setTraverseData}
                 setTachymetryData={setTachymetryData}
@@ -326,10 +340,10 @@ function App() {
                 setTrigLevelingData={setTrigHeightData}
                 onOpenProjectManager={() => setIsProjectModalOpen(true)}
                 
-                // Πέρασμα Δεδομένων για τον Χάρτη και τα Στατιστικά
-                projectSettings={{ name: currentProject,
-                                   settings: globalSettings
-                 }}
+                projectSettings={{ 
+                  name: currentProject,
+                  settings: globalSettings
+                }}
                 traverseData={traverseData}
                 traverseMetrics={traverseMetrics}
                 tachymetryData={tachymetryData}
@@ -351,8 +365,8 @@ function App() {
                 projectInfo={{
                   projectName: currentProject,
                   designer: globalSettings.designer,
-                  employer: globalSettings.employer, // <--- Διορθώθηκε εδώ 
-                  location: globalSettings.location  // <--- Διορθώθηκε εδώ 
+                  employer: globalSettings.employer,
+                  location: globalSettings.location
                 }}
               />
             )}
@@ -380,7 +394,6 @@ function App() {
               />
             )}
 
-            {/* --- ΚΑΡΤΕΛΑ: ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ --- */}
             {activeTab === 'trig_leveling' && (
               <TrigonometricHeight 
                 data={trigHeightData}

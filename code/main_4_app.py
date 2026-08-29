@@ -1192,7 +1192,6 @@ def export_traverse_report():
         print(f"Σφάλμα κατά τη δημιουργία Traverse Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-    
 @app.route('/api/traverse/export-dxf', methods=['POST'])
 def export_traverse_dxf():
     try:
