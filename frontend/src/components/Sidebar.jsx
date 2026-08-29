@@ -87,10 +87,17 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       </button>
 
       {/* Header Sidebar - Ευθυγραμμισμένο ακριβώς στα 72px */}
-      <div className={`h-[72px] px-6 flex items-center ${isOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800 overflow-hidden shrink-0`}>
-        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
-          <Compass size={24} />
-        </div>
+      {/* Header Sidebar - Ευθυγραμμισμένο ακριβώς στα 72px */}
+      {/* ΜΕΤΑ: Το νέο Header σου */}
+      <div className={`h-[72px] flex items-center ${isOpen ? 'px-6 gap-3' : 'px-0 justify-center'} border-b border-slate-800 overflow-hidden shrink-0`}>
+        
+        {/* Το εικονίδιο μεγαλώνει (w-14) όταν το μενού κλείνει και έχει ομαλό animation */}
+        <img 
+          src="/LASCA-logo-red-blue-1024.png" 
+          alt="" 
+          className={`${isOpen ? 'w-14 h-14' : 'w-14 h-14'} shrink-0 object-contain transition-all duration-300`}
+        />
+
         {isOpen && (
           <div className="transition-opacity duration-300">
             <h1 className="text-xl font-bold text-white tracking-tight leading-none">LASCA</h1>

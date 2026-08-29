@@ -6,6 +6,23 @@ const Goniometry = ({ rows = [], setRows }) => {
   const [showResults, setShowResults] = useState(false);
   const [showZenithResults, setShowZenithResults] = useState(false);
 
+  // Αρχικοποίηση κενών γραμμών αν δεν υπάρχουν δεδομένα (όπως στο Adjustment)
+  useEffect(() => {
+    if (rows && rows.length === 0 && setRows) {
+      const initialRows = Array.from({ length: 3 }).map((_, index) => ({
+        id: Date.now() + index, 
+        from: "", 
+        to: "", 
+        period: "", 
+        faceI: "", 
+        faceII: "", 
+        ZfaceI: "", 
+        ZfaceII: ""
+      }));
+      setRows(initialRows);
+    }
+  }, []);
+
   const formatDecimals = (val, decimals = 4) => {
     if (val === "" || val === null || val === undefined) return "";
     const num = parseFloat(String(val).replace(',', '.'));
@@ -120,7 +137,7 @@ const Goniometry = ({ rows = [], setRows }) => {
       id: Date.now(), 
       from: "", 
       to: "", 
-      period: "1", 
+      period: "", 
       faceI: "", 
       faceII: "", 
       ZfaceI: "", 
@@ -305,6 +322,7 @@ const Goniometry = ({ rows = [], setRows }) => {
                           value={row.period || ""} 
                           onChange={(e) => handleInputChange(row.id, 'period', e.target.value)} 
                           onKeyDown={(e) => handleKeyDown(e, index, 'period')}
+                          placeholder="-"
                         />
                       </td>
                       <td className="px-1 py-2">
@@ -465,6 +483,7 @@ const Goniometry = ({ rows = [], setRows }) => {
                           value={row.period || ""} 
                           onChange={(e) => handleInputChange(row.id, 'period', e.target.value)} 
                           onKeyDown={(e) => handleZenithKeyDown(e, index, 'period')}
+                          placeholder="-"
                         />
                       </td>
                       <td className="px-2 py-2">
