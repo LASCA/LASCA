@@ -15,10 +15,15 @@ import Leveling from './components/leveling';
 import BasicCalculations from './components/Basic_Calc';
 import TrigonometricHeight from './components/trig_leveling';
 import LascaLoader from './components/animations/LascaLoader';
+import LascaIntro from './components/animations/LascaIntro'; // <-- ΠΡΟΣΘΗΚΗ ΤΟΥ INTRO
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // --- APP BOOT STATES (ΓΙΑ ΤΟ LASCA INTRO) ---
+  const [isAppBooting, setIsAppBooting] = useState(true);
+  const [showIntroElement, setShowIntroElement] = useState(true);
 
   // --- PROJECT MANAGEMENT STATES ---
   const [currentProject, setCurrentProject] = useState(() => {
@@ -67,6 +72,26 @@ function App() {
   // "Κλειδαριά" για το Auto-Save
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
+
+  // --- 00. ΕΛΕΓΧΟΣ ΤΟΥ APP BOOT INTRO ---
+  useEffect(() => {
+    // Ξεκινάμε να σβήνουμε (fade out) το Intro μετά από 4.2 δευτερόλεπτα
+    const fadeTimer = setTimeout(() => {
+      setIsAppBooting(false);
+    }, 4200);
+
+    // Το αφαιρούμε τελείως από το DOM μετά από 5 δευτερόλεπτα
+    const removeTimer = setTimeout(() => {
+      setShowIntroElement(false);
+    }, 5000);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
+    };
+  }, []);
+
+
   // --- ΚΑΘΑΡΙΣΜΟΣ STATE (RESET ALL DATA) ---
   const resetAllData = () => {
     setGlobalSettings({});
@@ -90,7 +115,7 @@ function App() {
     setTrigHeightData([]);
   };
 
-  // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (BOOT ΑΦΑΡΜΟΓΗΣ - ΧΩΡΙΣ LASCA LOADER) ---
+  // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ) ---
   useEffect(() => {
     if (currentProject) {
       console.log(`⏳ Αρχική φόρτωση του project "${currentProject}"...`);
@@ -304,6 +329,18 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
+
+      {/* --- 🎬 INITIAL APP BOOT (LASCA INTRO) --- */}
+      {showIntroElement && (
+        <div 
+          className={`absolute inset-0 z-[99999] bg-slate-950 flex flex-col items-center justify-center transition-opacity duration-1000 ease-in-out ${
+            isAppBooting ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* Μπορείς να παίξεις με το speed={1} ή {1.2} για να το κάνεις πιο γρήγορο/αργό */}
+          <LascaIntro size={240} speed={1.1} />
+        </div>
+      )}
 
       {/* --- LascaLoader Overlay (Εμφανίζεται ΜΟΝΟ κατά την Αλλαγή/Δημιουργία Project) --- */}
       {isProjectSwitching && (

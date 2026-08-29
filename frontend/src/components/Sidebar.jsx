@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
-  Target, 
-  Compass, 
-  Map as MapIcon, 
+  Telescope,       // Αντί για Target, μοιάζει πιο πολύ με γεωδαιτικό σταθμό
+  DraftingCompass, // Για τις Γωνιομετρήσεις (αντί για TbAngle)
+  GitBranch,       // Για τη Συνόρθωση (αντί για BiNetworkChart)
+  TriangleRight,   // Για την Τριγωνομετρική
+  Ruler,           // Για τη Γεωμετρική Χωροστάθμηση
+  Calculator,      // Για τους Βασικούς Υπολογισμούς
+  Route,           // Για την Όδευση
+  Axis3d,          // Για την Οριζοντιογραφία (X,Y)
+  TrendingUp,      // Για την Υψομετρία (H)
+  Spline,          // Για την Ταχυμετρία
+  Flag,            // Για τη Χάραξη
+  Crosshair,
   ChevronRight, 
   ChevronLeft, 
   ChevronDown, 
-  Settings, 
-  Layers, 
-  Calculator, 
-  Crosshair 
+  Settings
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
@@ -18,19 +24,19 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
   const [isTraverseMenuOpen, setIsTraverseMenuOpen] = useState(false);
 
-  // Δομή μενού
+  // Δομή μενού ΠΛΗΡΩΣ ΕΝΗΜΕΡΩΜΕΝΗ
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     
     { 
       id: 'station_measurements', 
       label: 'Μετρήσεις Σταθμού', 
-      icon: <Target size={20} />,
+      icon: <Telescope size={20} />,
       subItems: [
-        { id: 'goniometry', label: 'Γωνιομετρήσεις' },
-        { id: 'adjustment', label: 'Συνόρθωση Σταθμού' },
-        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομετρία' },
-        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση' }
+        { id: 'goniometry', label: 'Γωνιομετρήσεις', icon: <DraftingCompass size={16} /> },
+        { id: 'adjustment', label: 'Συνόρθωση Σταθμού', icon: <GitBranch size={16} /> },
+        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομετρία', icon: <TriangleRight size={16} /> },
+        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση', icon: <Ruler size={16} /> }
       ]
     },
     
@@ -39,15 +45,15 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
     { 
       id: 'traverse_menu', 
       label: 'Όδευση', 
-      icon: <Compass size={20} />,
+      icon: <Route size={20} />,
       subItems: [
-        { id: 'traverse', label: 'Οριζοντιογραφία (X,Y)' },
-        { id: 'traverse_height', label: 'Υψομετρία (H)' }
+        { id: 'traverse', label: 'Οριζοντιογραφία (X,Y)', icon: <Axis3d size={16} /> },
+        { id: 'traverse_height', label: 'Υψομετρία (H)', icon: <TrendingUp size={16} /> }
       ]
     },
     
-    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <MapIcon size={20} /> },
-    { id: 'stakeout', label: 'Χάραξη', icon: <Layers size={20} /> },
+    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <Spline size={20} /> },
+    { id: 'stakeout', label: 'Χάραξη', icon: <Flag size={20} /> },
   ];
 
   const handleItemClick = (item) => {
@@ -74,10 +80,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         title={isOpen ? "Σύμπτυξη Sidebar" : "Επέκταση Sidebar"}
       >
         <div className="relative flex items-center justify-center w-full h-full">
-          {/* Περιστρεφόμενο Σταυρόνημα στο background */}
           <Crosshair size={18} className="absolute opacity-60 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500 text-cyan-400" />
           
-          {/* Βέλος Κατεύθυνσης */}
           {isOpen ? (
             <ChevronLeft size={11} className="relative z-10 text-slate-100 group-hover:-translate-x-0.5 transition-transform stroke-[3]" />
           ) : (
@@ -86,12 +90,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         </div>
       </button>
 
-      {/* Header Sidebar - Ευθυγραμμισμένο ακριβώς στα 72px */}
-      {/* Header Sidebar - Ευθυγραμμισμένο ακριβώς στα 72px */}
-      {/* ΜΕΤΑ: Το νέο Header σου */}
+      {/* Header Sidebar */}
       <div className={`h-[72px] flex items-center ${isOpen ? 'px-6 gap-3' : 'px-0 justify-center'} border-b border-slate-800 overflow-hidden shrink-0`}>
-        
-        {/* Το εικονίδιο μεγαλώνει (w-14) όταν το μενού κλείνει και έχει ομαλό animation */}
         <img 
           src="/LASCA-logo-red-blue-1024.png" 
           alt="" 
@@ -141,17 +141,20 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 
               {/* Dropdown Υπο-κατηγορίες */}
               {item.subItems && isThisMenuOpen && isOpen && (
-                <div className="flex flex-col gap-1 pl-11 pr-2 py-1 mt-1 animate-in slide-in-from-top-2 fade-in duration-200">
+                <div className="flex flex-col gap-1 pl-10 pr-2 py-1 mt-1 animate-in slide-in-from-top-2 fade-in duration-200">
                   {item.subItems.map((subItem) => (
                     <button
                       key={subItem.id}
                       onClick={() => setActiveTab(subItem.id)}
-                      className={`text-left text-sm py-2 px-3 rounded-lg transition-colors ${
+                      className={`w-full flex items-center gap-2.5 text-left text-sm py-2 px-3 rounded-lg transition-colors ${
                         activeTab === subItem.id
                           ? 'bg-blue-600/20 text-blue-300 font-medium'
                           : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                       }`}
                     >
+                      <span className={`${activeTab === subItem.id ? 'text-blue-400' : 'opacity-60'}`}>
+                        {subItem.icon}
+                      </span>
                       {subItem.label}
                     </button>
                   ))}

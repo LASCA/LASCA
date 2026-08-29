@@ -1,23 +1,48 @@
 import React from 'react';
-import { MapPin, Target, Compass, Calculator, Ruler, Activity, Crosshair, MapIcon} from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  DraftingCompass, 
+  GitBranch, 
+  TriangleRight, 
+  Ruler, 
+  Axis3d, 
+  TrendingUp, 
+  Spline, 
+  Flag, 
+  Calculator,
+  Activity // Το κρατάμε για το default case
+} from 'lucide-react';
 
 const Header = ({ activeTab }) => {
   // Καθαρό configuration μόνο με τα απολύτως απαραίτητα (Τίτλος, Εικονίδιο, Χρώμα)
   const getHeaderConfig = () => {
     switch(activeTab) {
-      case 'dashboard': return { icon: Activity, label: "Project Setup", color: "blue" };
-      case 'goniometry': return { icon: Target, label: "Γωνιομετρήσεις", color: "cyan" };
-      case 'adjustment': return { icon: Crosshair, label: "Συνόρθωση Σταθμού", color: "emerald" };
-      case 'trig_leveling': return { icon: Ruler, label: "Τριγωνομετρική Υψομετρία", color: "indigo" };
-      case 'geom_leveling': return { icon: Compass, label: "Γεωμετρική Χωροστάθμηση", color: "purple" };
-      case 'traverse': return { icon: MapPin, label: "Όδευση", color: "amber" };
-      case 'traverse_height': return { icon: MapPin, label: "Υψομετρία Όδευσης", color: "orange" };
-      case 'tachymetry': return { icon: MapIcon, label: "Ταχυμετρία", color: "pink" };
-      case 'stakeout': return { icon: Target, label: "Χάραξη", color: "emerald" };
-      case 'basic_calc': return { icon: Calculator, label: "Βασικοί Υπολογισμοί", color: "blue" };
-      default: return { icon: Activity, label: activeTab ? activeTab.replace('_', ' ').toUpperCase() : "MODULE", color: "slate" };
+      case 'dashboard': 
+        return { icon: LayoutDashboard, label: "Project Setup", color: "blue" };
+      case 'goniometry': 
+        return { icon: DraftingCompass, label: "Γωνιομετρήσεις", color: "cyan" };
+      case 'adjustment': 
+        return { icon: GitBranch, label: "Συνόρθωση Σταθμού", color: "emerald" };
+      case 'trig_leveling': 
+        return { icon: TriangleRight, label: "Τριγωνομετρική Υψομετρία", color: "indigo" };
+      case 'geom_leveling': 
+        return { icon: Ruler, label: "Γεωμετρική Χωροστάθμηση", color: "purple" };
+      case 'traverse': 
+        return { icon: Axis3d, label: "Οριζοντιογραφία Όδευσης", color: "amber" };
+      case 'traverse_height': 
+        return { icon: TrendingUp, label: "Υψομετρία Όδευσης", color: "orange" };
+      case 'tachymetry': 
+        return { icon: Spline, label: "Ταχυμετρία", color: "pink" };
+      case 'stakeout': 
+        return { icon: Flag, label: "Χάραξη", color: "emerald" };
+      case 'basic_calc': 
+        return { icon: Calculator, label: "Βασικοί Υπολογισμοί", color: "blue" };
+      default: 
+        return { icon: Activity, label: activeTab ? activeTab.replace('_', ' ').toUpperCase() : "MODULE", color: "slate" };
     }
   };
+
+  // ... (Ο υπόλοιπος κώδικας του component παραμένει ίδιος)
 
   const config = getHeaderConfig();
   const Icon = config.icon;
