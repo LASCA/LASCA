@@ -27,6 +27,9 @@ function App() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
 
+  // --- LOADER STATE (ΜΟΝΟ ΓΙΑ ΑΛΛΑΓΗ/ΔΗΜΙΟΥΡΓΙΑ PROJECT) ---
+  const [isProjectSwitching, setIsProjectSwitching] = useState(false);
+
   // --- DATA STATES ---
   const [observations, setObservations] = useState([]);
   const [adjMetrics, setAdjMetrics] = useState({}); 
@@ -58,7 +61,7 @@ function App() {
   ]);
   const [levelingMetrics, setLevelingMetrics] = useState({});
 
-  // --- ΝΕΟ STATE ΓΙΑ ΤΗΝ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ ---
+  // ΤΡΙΓΩΝΟΜΕΤΡΙΚΗ ΥΨΟΜΕΤΡΙΑ
   const [trigHeightData, setTrigHeightData] = useState([]);
 
   // "Κλειδαριά" για το Auto-Save
@@ -87,12 +90,11 @@ function App() {
     setTrigHeightData([]);
   };
 
-  // --- 0. ΦΟΡΤΩΣΗ ΤΟΥ PROJECT ΑΠΟ ΤΟ .JSON ΣΤΟΝ ΔΙΣΚΟ ---
+  // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (BOOT ΑΦΑΡΜΟΓΗΣ - ΧΩΡΙΣ LASCA LOADER) ---
   useEffect(() => {
     if (currentProject) {
-      console.log(`⏳ Φόρτωση του project "${currentProject}" από το αρχείο JSON του Backend...`);
+      console.log(`⏳ Αρχική φόρτωση του project "${currentProject}"...`);
       
-      // 🔒 Κλειδώνουμε ΑΜΕΣΩΣ το auto-save & μηδενίζουμε τα παλιά data
       setIsDataLoaded(false);
       resetAllData();
       
@@ -126,12 +128,12 @@ function App() {
           setLevelingMetrics(backendData.levelingMetrics || {});
           setTrigHeightData(backendData.trigHeightData || []);
 
-          console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς από το Backend JSON!");
+          console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς!");
         }
         setIsDataLoaded(true);
       })
       .catch(err => {
-        console.error("❌ Αποτυχία σύνδεσης με τον server κατά την εκκίνηση:", err);
+        console.error("❌ Αποτυχία σύνδεσης με τον server:", err);
         setIsDataLoaded(true);
       });
     } else {
@@ -167,7 +169,6 @@ function App() {
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
     localStorage.setItem('current_active_project', currentProject);
 
-    // LIVE ΣΥΓΧΡΟΝΙΣΜΟΣ ΜΕ ΤΟ BACKEND
     fetch('http://localhost:5000/api/projects/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -259,10 +260,11 @@ function App() {
     };
   }, []);
   
-  // --- 3. ΟΤΑΝ ΦΟΡΤΩΝΕΙ ΕΝΑ PROJECT ΑΠΟ ΤΟ MODAL ---
+  // --- 3. ΔΗΜΙΟΥΡΓΙΑ / ΕΝΑΛΛΑΓΗ PROJECT (ΕΔΩ ΕΜΦΑΝΙΖΕΤΑΙ ΤΟ LASCA LOADER) ---
   const handleProjectLoaded = (projectData) => {
-    setIsDataLoaded(false); // 🔒 Προστασία Auto-Save
-    resetAllData();         // Καθαρισμός παλιών δεδομένων
+    setIsProjectSwitching(true); // 🚀 Ενεργοποίηση LascaLoader MONO για εναλλαγή/δημιουργία
+    setIsDataLoaded(false); 
+    resetAllData();
 
     const pName = projectData.project_name;
     setCurrentProject(pName);
@@ -288,8 +290,13 @@ function App() {
     setLevelingMetrics(projectData.levelingMetrics || {});
     setTrigHeightData(projectData.trigHeightData || []);
 
-    setIsDataLoaded(true);
     setIsProjectModalOpen(false);
+
+    // Τεχνητή καθυστέρηση (1.5 δευτερόλεπτο) για την εμφάνιση του animation
+    setTimeout(() => {
+      setIsDataLoaded(true);
+      setIsProjectSwitching(false); // 🏁 Απόκρυψη LascaLoader
+    }, 1500);
   };
 
   return (
@@ -298,16 +305,15 @@ function App() {
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
 
-      {/* --- Οθόνη Φόρτωσης (LascaLoader Overlay) --- */}
-      {(!isDataLoaded && currentProject) && (
+      {/* --- LascaLoader Overlay (Εμφανίζεται ΜΟΝΟ κατά την Αλλαγή/Δημιουργία Project) --- */}
+      {isProjectSwitching && (
         <div className="absolute inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300">
           <LascaLoader variant="cycle" size={160} glow={true} breathe={true} />
           <p className="mt-6 text-emerald-400 font-mono text-sm tracking-widest animate-pulse">
-            ΦΟΡΤΩΣΗ ΔΕΔΟΜΕΝΩΝ...
+            ΦΟΡΤΩΣΗ PROJECT...
           </p>
         </div>
       )}
-      {/* -------------------------------------------- */}
 
       <ProjectManager 
         isOpen={isProjectModalOpen} 
