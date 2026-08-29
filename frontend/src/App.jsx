@@ -14,6 +14,7 @@ import Goniometry from './components/gwniometriseis';
 import Leveling from './components/leveling';
 import BasicCalculations from './components/Basic_Calc';
 import TrigonometricHeight from './components/trig_leveling';
+import LascaLoader from './components/animations/LascaLoader';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -296,6 +297,17 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
+
+      {/* --- Οθόνη Φόρτωσης (LascaLoader Overlay) --- */}
+      {(!isDataLoaded && currentProject) && (
+        <div className="absolute inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300">
+          <LascaLoader variant="cycle" size={160} glow={true} breathe={true} />
+          <p className="mt-6 text-emerald-400 font-mono text-sm tracking-widest animate-pulse">
+            ΦΟΡΤΩΣΗ ΔΕΔΟΜΕΝΩΝ...
+          </p>
+        </div>
+      )}
+      {/* -------------------------------------------- */}
 
       <ProjectManager 
         isOpen={isProjectModalOpen} 
