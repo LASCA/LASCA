@@ -150,6 +150,36 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     setObservations(updated);
   };
 
+  const saveBlobFile = async (blob, defaultFileName) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const runAdjustment = async () => {
     setIsLoading(true);
     try {
@@ -157,6 +187,10 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       if (validObservations.length === 0) { alert("Συμπληρώστε τουλάχιστον μία έγκυρη μέτρηση."); setIsLoading(false); return; }
 
       const response = await axios.post(`${API_BASE_URL}/api/adjustment`, { measurements: observations });
+
+      if (response.data && response.data.error) {
+        throw new Error(response.data.error);
+      }
 
       if (response.data && response.data.results) {
         const resultsFromPython = response.data.results;
@@ -176,8 +210,9 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         }
       }
     } catch (error) {
+      const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία σύνδεσης με το backend.';
       console.error("Σφάλμα στη συνόρθωση:", error);
-      alert("Αποτυχία σύνδεσης με το backend.");
+      alert(backendMessage);
     } finally {
       setIsLoading(false);
     }
@@ -185,10 +220,13 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
 
   const handleDownload = () => {
     if (!plotImage) return;
-    const link = document.createElement('a');
-    link.href = `data:image/png;base64,${plotImage}`;
-    link.download = 'Network_Preview_Plot.png';
-    link.click();
+    fetch(`data:image/png;base64,${plotImage}`)
+      .then(res => res.blob())
+      .then(blob => saveBlobFile(blob, 'Network_Preview_Plot.png'))
+      .catch(err => {
+        console.error('Σφάλμα λήψης γραφήματος:', err);
+        alert('Αποτυχία λήψης γραφήματος.');
+      });
   };
 
   const handleBackToEdit = () => {
@@ -211,22 +249,19 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       };
       
       const response = await axios.post(`${API_BASE_URL}/api/adjustment/report`, payload, {
-        responseType: 'blob' 
+        responseType: 'blob'
       });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'Adjustment_Report.pdf');
-      document.body.appendChild(link);
-      link.click();
-      
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
+
+      if (response.data && response.data.type === 'application/json') {
+        const errorJson = JSON.parse(await response.data.text());
+        throw new Error(errorJson.error || 'Αποτυχία δημιουργίας PDF Report.');
+      }
+
+      await saveBlobFile(response.data, 'Adjustment_Report.pdf');
     } catch (error) {
-      console.error("Σφάλμα κατά την εξαγωγή του Report:", error);
-      alert("Αποτυχία δημιουργίας PDF Report.");
+      const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία δημιουργίας PDF Report.';
+      console.error('Σφάλμα κατά την εξαγωγή του Report:', error);
+      alert(backendMessage);
     } finally {
       setIsLoading(false);
     }

@@ -174,6 +174,36 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     return isNaN(num) ? val : num.toFixed(decimals);
   };
 
+  const saveBlobFile = async (blob, defaultFileName) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.dxf', '.png'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to download link:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultFileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleRunTraverse = async () => {
     setIsLoading(true);
     try {
@@ -181,7 +211,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       
       const currentScaleFactor = parseFloat(scaleFactor) || 1.0;
       
-      // ΕΦΑΡΜΟΓΗ ΣΥΝΤΕΛΕΣΤΗ ΣΤΙΣ ΑΠΟΣΤΑΣΕΙΣ ΑΝ ΔΕΝ ΕΙΝΑΙ "ΧΩΡΙΣ"
       const processedMeasurements = data.map(row => {
         if (scaleMode !== "Χωρίς" && row.sd && !isNaN(parseFloat(row.sd))) {
           const originalSd = parseFloat(row.sd);
@@ -196,11 +225,14 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         scale: scale,
         terrain: terrain,
         klass: klass,
-        scale_factor: 1.0, 
+        scale_factor: 1.0,
         project_name: projectNamePayload
       });
 
       if (response.data) {
+        if (response.data.error) {
+          throw new Error(response.data.error);
+        }
         if (response.data.results && setData) {
           const finalResults = response.data.results.map((resRow, i) => ({
              ...resRow,
@@ -225,8 +257,10 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         }, 100);
       }
     } catch (error) {
-      console.error("Σφάλμα κατά την Όδευση:", error);
-      alert("Αποτυχία υπολογισμού όδευσης.");
+      const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία υπολογισμού όδευσης.';
+      console.error('Σφάλμα κατά την Όδευση:', error);
+      alert(backendMessage);
+      toast.error(backendMessage);
     } finally {
       setIsLoading(false);
     }
@@ -234,62 +268,55 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
   const handleDownload = () => {
     if (!plotImage) return;
-    const a = document.createElement('a');
-    a.href = plotImage;
-    a.download = 'traverse_plot.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const imageData = plotImage.startsWith('data:') ? plotImage : `data:image/png;base64,${plotImage}`;
+    fetch(imageData)
+      .then(res => res.blob())
+      .then(blob => saveBlobFile(blob, 'traverse_plot.png'))
+      .catch(err => {
+        console.error('Σφάλμα λήψης εικόνας:', err);
+        alert('Αποτυχία λήψης γραφήματος.');
+      });
   };
 
   const handleDownloadDXF = async () => {
     if (!data || data.length === 0) {
-      toast.error("Δεν υπάρχουν δεδομένα για εξαγωγή.");
+      toast.error('Δεν υπάρχουν δεδομένα για εξαγωγή.');
       return;
     }
 
-    const toastId = toast.loading("Δημιουργία DXF...");
+    const toastId = toast.loading('Δημιουργία DXF...');
     try {
       const response = await fetch(`${API_BASE_URL}/api/traverse/export-dxf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ points: data })
       });
-      
-      if (!response.ok) throw new Error("Αποτυχία δημιουργίας DXF");
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Traverse_Diagram.dxf';
-      document.body.appendChild(a);
-      a.click();
-      
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Το αρχείο DXF κατέβηκε επιτυχώς!", { id: toastId });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας DXF');
+      }
+
+      const blob = await response.blob();
+      await saveBlobFile(blob, 'Traverse_Diagram.dxf');
+      toast.success('Το αρχείο DXF κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
-      toast.error("Σφάλμα κατά τη λήψη του DXF.", { id: toastId });
-      console.error(error);
+      console.error('Σφάλμα κατά τη λήψη του DXF:', error);
+      toast.error(error.message || 'Σφάλμα κατά τη λήψη του DXF.', { id: toastId });
     }
   };
 
-  // ΕΞΑΓΩΓΗ PDF REPORT ΜΕ ΣΤΑΤΙΣΤΙΚΑ ΚΑΙ ΔΙΑΓΡΑΜΜΑ
   const handleDownloadReport = async () => {
     if (!data || data.length === 0) {
-      toast.error("Δεν υπάρχουν δεδομένα για εξαγωγή.");
+      toast.error('Δεν υπάρχουν δεδομένα για εξαγωγή.');
       return;
     }
 
-    const toastId = toast.loading("Δημιουργία PDF Report...");
+    const toastId = toast.loading('Δημιουργία PDF Report...');
 
     try {
       let finalPlotImage = plotImage;
 
-      // Αν δεν υπάρχει έτοιμη εικόνα από το backend, αποτυπώνουμε το UI container μέσω html2canvas
       if (!finalPlotImage && chartRef.current) {
         const canvas = await html2canvas(chartRef.current, {
           backgroundColor: '#121212',
@@ -301,32 +328,25 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       const response = await fetch(`${API_BASE_URL}/api/traverse/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           points: data,
           metrics: metrics,
           plot: finalPlotImage,
           projectInfo: projectInfo || projectSettings
         })
       });
-      
-      if (!response.ok) throw new Error("Αποτυχία δημιουργίας Report");
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Traverse_Report.pdf';
-      document.body.appendChild(a);
-      a.click();
-      
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Το Report κατέβηκε επιτυχώς!", { id: toastId });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας Report');
+      }
+
+      const blob = await response.blob();
+      await saveBlobFile(blob, 'Traverse_Report.pdf');
+      toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
-      toast.error("Σφάλμα κατά τη δημιουργία του Report.", { id: toastId });
-      console.error(error);
+      console.error('Σφάλμα κατά τη δημιουργία του Report:', error);
+      toast.error(error.message || 'Σφάλμα κατά τη δημιουργία του Report.', { id: toastId });
     }
   };
 

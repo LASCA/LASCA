@@ -1,7 +1,14 @@
 import sys
+import io
+
+if sys.stdout and hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if sys.stderr and hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 import os
 import threading
-import webbrowser
+import webview
 import pandas as pd
 import numpy as np
 import math
@@ -109,7 +116,7 @@ def list_projects():
         projects = [d.name for d in WORKSPACE_DIR.iterdir() if d.is_dir()]
         return jsonify(projects)
     except Exception as e:
-        print(f"❌ Σφάλμα κατά τη λίστα των projects: {str(e)}")
+        print(f"ERROR: Σφάλμα κατά τη λίστα των projects: {str(e)}")
         return jsonify({"error": "Αποτυχία ανάγνωσης φακέλων εργασίας"}), 500
 
 @app.route('/api/projects/load', methods=['POST'])
@@ -127,7 +134,7 @@ def load_project():
         
         return jsonify(project_state)
     except Exception as e:
-        print(f"❌ Σφάλμα κατά τη φόρτωση του project: {str(e)}")
+        print(f"ERROR: Σφάλμα κατά τη φόρτωση του project: {str(e)}")
         return jsonify({"error": "Αποτυχία αρχικοποίησης/φόρτωσης project"}), 500
 
 @app.route('/api/projects/save', methods=['POST'])
@@ -145,7 +152,7 @@ def save_project():
         
         return jsonify({"status": "success", "message": f"Το project '{project_name}' αποθηκεύτηκε!"})
     except Exception as e:
-        print(f"❌ Σφάλμα κατά την αποθήκευση του project: {str(e)}")
+        print(f"ERROR: Σφάλμα κατά την αποθήκευση του project: {str(e)}")
         return jsonify({"error": "Αποτυχία αποθήκευσης δεδομένων"}), 500
 
 # ==========================================
@@ -796,7 +803,7 @@ def run_traverse():
         
         # Χρήση της έξυπνης συνάρτησης
         project_name = get_active_project_name()
-        print(f"🔍 [DEBUG TRAVERSE] Το backend διάβασε project_name = '{project_name}'")
+        print(f"DEBUG TRAVERSE: Το backend διάβασε project_name = '{project_name}'")
         
         project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -804,9 +811,9 @@ def run_traverse():
         try:
             with open(project_dir / "latest_traverse.json", "w", encoding="utf-8") as f:
                 json.dump(calculated_stations_export, f, ensure_ascii=False, indent=4)
-            print(f"✅ ΓΕΦΥΡΑ: Οι στάσεις αποθηκεύτηκαν στο: '{project_dir / 'latest_traverse.json'}'")
+            print(f"SUCCESS: Οι στάσεις αποθηκεύτηκαν στο: '{project_dir / 'latest_traverse.json'}'")
         except Exception as e:
-            print(f"⚠️ Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης: {e}")
+            print(f"WARNING: Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης: {e}")
 
         plot_base64 = None
         try:
@@ -1603,7 +1610,7 @@ def run_traverse_height():
                         with open(json_path, 'w', encoding='utf-8') as f:
                             json.dump(traverse_data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            print(f"⚠️ [DEBUG] Σφάλμα αποθήκευσης ZS: {e}")
+            print(f"DEBUG WARNING: Σφάλμα αποθήκευσης ZS: {e}")
 
         return jsonify({
             "status": "success",
@@ -1613,7 +1620,7 @@ def run_traverse_height():
         })
 
     except Exception as e:
-        print(f"💥 [DEBUG ERROR] {traceback.format_exc()}")
+        print(f"DEBUG ERROR: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 ## ==========================================
@@ -1671,7 +1678,7 @@ def run_traverse_spirit_level():
                         with open(json_path, 'w', encoding='utf-8') as f:
                             json.dump(traverse_data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            print(f"⚠️ [DEBUG] Σφάλμα αποθήκευσης ZS από Χωροστάθμιση: {e}")
+            print(f"DEBUG WARNING: Σφάλμα αποθήκευσης ZS από Χωροστάθμιση: {e}")
 
         # 3. Προσθήκη status και επιστροφή της πλήρους δομής (forward_results, backward_results, metrics, legs)
    
@@ -1687,7 +1694,7 @@ def run_traverse_spirit_level():
         return jsonify(result)
 
     except Exception as e:
-        print(f"💥 [DEBUG ERROR] {traceback.format_exc()}")
+        print(f"DEBUG ERROR: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
@@ -1732,7 +1739,7 @@ def run_tachymetry():
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
     # 2η Προσπάθεια (Fallback): Ανάγνωση από το project_state.json
     elif project_state_file.exists():
@@ -1749,7 +1756,7 @@ def run_tachymetry():
                             "ZS": 0.0
                         })
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
 
     # Συγχώνευση των στάσεων στο df_st
     if traverse_stations:
@@ -1764,9 +1771,9 @@ def run_tachymetry():
             df_st = pd.concat([df_st, df_trav], ignore_index=True)
             df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
             
-            print(f"✅ ΓΕΦΥΡΑ ΤΑΧΥΜΕΤΡΙΑΣ: Φορτώθηκαν στάσεις από το project '{project_name}'! Σύνολο: {len(df_st)}")
+            print(f"SUCCESS: Φορτώθηκαν στάσεις από το project '{project_name}'! Σύνολο: {len(df_st)}")
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+            print(f"WARNING: Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
 
     try:
         # 4. Εκτέλεση υπολογισμού Ταχυμετρίας
@@ -1786,7 +1793,7 @@ def run_tachymetry():
         try:
             plot_base64 = vis.plot_tachymetry_base64(calculated_points, st_lookup_vis)
         except Exception as plot_err:
-            print(f"❌ Σφάλμα κατά τη δημιουργία του σκαριφήματος ταχυμετρίας: {plot_err}")
+            print(f"ERROR: Σφάλμα κατά τη δημιουργία του σκαριφήματος ταχυμετρίας: {plot_err}")
 
         return jsonify({
             "results": calculated_points,
@@ -1835,7 +1842,7 @@ def export_tachymetry_txt():
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
     elif project_state_file.exists():
         try:
@@ -1851,7 +1858,7 @@ def export_tachymetry_txt():
                             "ZS": 0.0
                         })
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
 
     # Συγχώνευση των στάσεων
     if traverse_stations:
@@ -1865,7 +1872,7 @@ def export_tachymetry_txt():
             df_st = pd.concat([df_st, df_trav], ignore_index=True)
             df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+            print(f"WARNING: Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
 
     # 3. Εντοπισμός στηλών Στάσης & Προσανατολισμού
     st_col = None
@@ -1912,7 +1919,7 @@ def export_tachymetry_txt():
                                 'z': float(rec.get('Z', 0.0))
                             })
             except Exception as err:
-                print(f"⚠️ Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
+                print(f"WARNING: Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
 
 # 4. Δημιουργία δομημένου περιεχομένου .txt
     lines = []
@@ -1977,7 +1984,7 @@ def export_tachymetry_dxf():
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
     elif project_state_file.exists():
         try:
@@ -1993,7 +2000,7 @@ def export_tachymetry_dxf():
                             "ZS": 0.0
                         })
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
 
     # Συγχώνευση των στάσεων
     if traverse_stations:
@@ -2007,7 +2014,7 @@ def export_tachymetry_dxf():
             df_st = pd.concat([df_st, df_trav], ignore_index=True)
             df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
         except Exception as e:
-            print(f"⚠️ Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+            print(f"WARNING: Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
 
     # 3. Εντοπισμός στηλών Στάσης & Προσανατολισμού (ΟΛΟ ΙΔΙΟ ΜΕ TXT)
     st_col = None
@@ -2054,7 +2061,7 @@ def export_tachymetry_dxf():
                                 'z': float(rec.get('Z', 0.0))
                             })
             except Exception as err:
-                print(f"⚠️ Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
+                print(f"WARNING: Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
 
     # 4. ΔΗΜΙΟΥΡΓΙΑ ΤΟΥ DXF (ΝΕΟΣ ΚΩΔΙΚΑΣ)
     try:
@@ -2093,7 +2100,7 @@ def export_tachymetry_dxf():
         })
 
     except Exception as e:
-        print(f"⚠️ Σφάλμα κατά τη δημιουργία του DXF: {e}")
+        print(f"WARNING: Σφάλμα κατά τη δημιουργία του DXF: {e}")
         return jsonify({"error": "Αποτυχία δημιουργίας αρχείου DXF"}), 500
 
 # ==========================================
@@ -2687,7 +2694,7 @@ def run_leveling():
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(response_data, f, ensure_ascii=False, indent=4)
             
-        print(f"✅ ΓΕΦΥΡΑ: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
+        print(f"SUCCESS: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
 
         # 4. Επιστροφή στο React
         return jsonify({
@@ -2739,8 +2746,11 @@ def run_trig_leveling():
 if __name__ == '__main__':
     port = 5000
 
-    def open_browser():
-        webbrowser.open_new(f'http://127.0.0.1:{port}')
+    def run_server():
+        app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
 
-    threading.Timer(1.0, open_browser).start()
-    app.run(host='127.0.0.1', port=port, debug=False)
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
+
+    webview.create_window('LASCA', f'http://127.0.0.1:{port}', width=1280, height=800, resizable=True)
+    webview.start(debug=True)

@@ -104,7 +104,7 @@ class TopoProject:
         return {}
 
 if __name__ == "__main__":
-    print("🚀 Ξεκινάει το Test του Project Manager...\n")
+    print("Starting Project Manager test...\n")
 
     # Αντί για os.getcwd(), παίρνουμε τον σωστό φάκελο του συστήματος
     workspace = get_safe_workspace_dir("Test_Workspace")
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         "klass": "Πρωτεύουσα",
         "designer": "Άκης"
     })
-    print(f"📁 Το project δημιουργήθηκε με ασφάλεια στο: {test_proj.project_dir}\n")
+    print(f"Project created successfully at: {test_proj.project_dir}\n")
     
     state = test_proj.load_state()
     print("📄 Αρχική κατάσταση JSON:")
@@ -128,4 +128,4 @@ if __name__ == "__main__":
     state["traverse_data"] = [{"name": "Σ1", "hz": "100.0000", "sd": "50.123"}]
     
     test_proj.save_state(state)
-    print("✅ Το JSON ενημερώθηκε επιτυχώς με τις νέες αλλαγές!")
+    print("JSON updated successfully with the new changes!")

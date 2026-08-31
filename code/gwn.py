@@ -3,17 +3,17 @@ import os
 
 def load_specific_sheet(file_path, sheet_name):
     if not os.path.exists(file_path):
-        print(f"❌ Σφάλμα: Το αρχείο '{file_path}' δεν βρέθηκε!")
+        print(f"ERROR: Το αρχείο '{file_path}' δεν βρέθηκε!")
         return None
 
     try:
-        print(f"⏳ Φόρτωση του φύλλου '{sheet_name}' από το αρχείο '{file_path}'...")
+        print(f"Loading sheet '{sheet_name}' from file '{file_path}'...")
         df = pd.read_excel(file_path, sheet_name=sheet_name)
-        print(f"✅ Το φύλλο '{sheet_name}' φορτώθηκε με επιτυχία!")
+        print(f"SUCCESS: Το φύλλο '{sheet_name}' φορτώθηκε με επιτυχία!")
         print("-" * 50)
         return df
     except Exception as e:
-        print(f"❌ Προέκυψε σφάλμα κατά την ανάγνωση: {e}")
+        print(f"ERROR: Προέκυψε σφάλμα κατά την ανάγνωση: {e}")
         return None
     
 def calc_gwn(dataframe):
@@ -63,5 +63,5 @@ if __name__ == "__main__":
         df_results = calc_gwn(df_goniometry)
         
         # Εμφάνιση των αποτελεσμάτων για έλεγχο
-        print("\n📊 Αποτελέσματα Υπολογισμών:")
+        print("\nRESULTS: Αποτελέσματα Υπολογισμών:")
         print(df_results[['Period', 'From', 'To', 'Face I', 'Face II', 'mesos_oros', 'anigmeni_timi','genikos_mesos', 'v_m', 'v_prime', 'v_ji', 'vv'  ]].to_string(index=False))

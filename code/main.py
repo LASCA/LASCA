@@ -19,7 +19,7 @@ def run_app_logic(excel_path):
     #     results['adjustment'] = adj_df
     #     print(results)
     #     # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΣΥΝΟΡΘΩΣΗΣ ---
-    #     print("📊 Εμφάνιση Lollipop Chart για σφάλματα διευθύνσεων...")
+    #     print("Display Lollipop Chart for alignment errors...")
     #     vis.plot_std_dev_lollipop_df(adj_df)
     #     plt.show() # Αναγκάζει το παράθυρο να εμφανιστεί
 
@@ -48,17 +48,17 @@ def run_app_logic(excel_path):
         results['traverse'] = trav_res
         
         # 3. Εμφάνιση Μετρικών στο Τερματικό (όπως τα είχες)
-        print("\n📈 --- ΜΕΤΡΙΚΑ & ΣΦΑΛΜΑΤΑ ΟΔΕΥΣΗΣ ---")
+        print("\n--- TRAVERSE METRICS & ERRORS ---")
         for k, v in trav_meta["metrics"].items():
             if k == "is_closed":
-                print(f"{k:12} = {' ΚΛΕΙΝΕΙ' if v else ' ΔΕΝ ΚΛΕΙΝΕΙ'}")
+                print(f"{k:12} = {' CLOSED' if v else ' OPEN'}")
             elif isinstance(v, float):
                 print(f"{k:12} = {v:.5f}")
             else:
                 print(f"{k:12} = {v}")
 
         # 4. Εμφάνιση Γραφήματος Όδευσης
-        print("📊 Εμφάνιση σχεδίου όδευσης...")
+        print("Displaying traverse plot...")
         vis.traverse_plot(trav_res)
 
 # #3. Module: Ταχυμετρία
@@ -85,17 +85,17 @@ def run_app_logic(excel_path):
 #             # Εκτύπωση όλων των σημείων με στοίχιση
 #             print(df_tax[cols_to_print].to_string(index=False, justify='center'))
 #         else:
-#             print("⚠️ Το DataFrame είναι άδειο!")
+#         print("WARNING: The DataFrame is empty!")
             
 #         print("-" * 75)
-#         print(f"✅ Συνολικά σημεία λεπτομέρειας: {len(df_tax)}")
+#         print(f"Total detail points: {len(df_tax)}")
 #         print("="*75 + "\n")
     
 #         # --- ΕΜΦΑΝΙΣΗ ΓΡΑΦΗΜΑΤΟΣ ΤΑΧΥΜΕΤΡΙΑΣ ---
-#         print(f"📊 Εμφάνιση χάρτη σημείων για τη στάση {st_name}...")
+#         print(f"Displaying survey map for station {st_name}...")
 #         vis.plot_survey_points(df_tax, coords[0], coords[1], station_name=st_name)
 #     else:
-#         print("⚠️ ΠΡΟΣΟΧΗ: Δεν βρέθηκαν τα φύλλα 'Station' και 'Measurements' για την Ταχυμετρία!")
+#         print("WARNING: Missing 'Station' and 'Measurements' sheets for tachymetry!")
 
 # 4. Module: Τριγωνομετρική Υψομετρία
     if 'trig_leveling' in xls.sheet_names:
@@ -111,7 +111,7 @@ def run_app_logic(excel_path):
         results['trig_leveling'] = df_trig_res
         
         # 4. Εμφάνιση του DataFrame στο τερματικό για έλεγχο
-        print("\n📊 --- ΑΠΟΤΕΛΕΣΜΑΤΑ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ ---")
+        print("\n--- TRIGONOMETRIC LEVELING RESULTS ---")
         # Εμφανίζουμε τις σημαντικές στήλες για να μην γεμίσει η οθόνη
         print(df_trig_res[['From', 'To', 'dh', 'dh_mean']])
     return results
@@ -125,8 +125,8 @@ if __name__ == "__main__":
     master_file = cs.DATA_DIR / "test.xlsx" 
     
     if not master_file.exists():
-        print(f"❌ Το αρχείο {master_file} δεν βρέθηκε!")
+        print(f"ERROR: Το αρχείο {master_file} δεν βρέθηκε!")
     else:
-        print("🚀 --- TopoApp Backend (Master Routine) Started ---")
+        print("--- TopoApp Backend (Master Routine) Started ---")
         final_data = run_app_logic(master_file)
-        print("\n🎉 Όλες οι διεργασίες ολοκληρώθηκαν.")
+        print("\nAll processes completed.")

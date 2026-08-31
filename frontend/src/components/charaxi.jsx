@@ -123,6 +123,36 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
     }
   };
 
+  const saveBlobFile = async (blob, defaultFileName) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, using fallback download flow:', error);
+      } else {
+        console.info('Save dialog was canceled by user.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleGenerateReport = async () => {
     if (!isCalculated || !stakeoutData.plot) {
       toast.error("Παρακαλώ υπολογίστε πρώτα τη χάραξη!");
@@ -144,22 +174,15 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Αποτυχία δημιουργίας report");
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας report');
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Stakeout_Report_${station.name || 'Station'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success("Το Report κατέβηκε επιτυχώς!", { id: loadingToast });
+      await saveBlobFile(blob, `Stakeout_Report_${station.name || 'Station'}.pdf`);
+      toast.success('Το Report κατέβηκε επιτυχώς!', { id: loadingToast });
     } catch (err) {
-      toast.error(err.message || "Αποτυχία λήψης του Report.", { id: loadingToast });
+      console.error('Σφάλμα κατά τη δημιουργία του report:', err);
+      toast.error(err.message || 'Αποτυχία λήψης του Report.', { id: loadingToast });
     } finally {
       setLoadingReport(false);
     }

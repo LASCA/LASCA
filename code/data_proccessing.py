@@ -219,7 +219,7 @@ def tachymetry(data_meas, data_st=None, target_station=None, target_orientation=
 
         # Έλεγχος ύπαρξης στο φύλλο Σταθμών
         if st_id not in st_lookup or bs_id not in st_lookup:
-            print(f"⚠️ Προειδοποίηση: Η στάση '{st_id}' ή ο προσανατολισμός '{bs_id}' δεν βρέθηκε. Αγνόηση.")
+            print(f"WARNING: Η στάση '{st_id}' ή ο προσανατολισμός '{bs_id}' δεν βρέθηκε. Αγνόηση.")
             continue
 
         # Ανάκτηση των συντεταγμένων
@@ -1273,7 +1273,7 @@ def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
             
             if search_key in bwd_legs_map:
                 dh_bwd = bwd_legs_map[search_key]
-                print(f"   ✅ Exact Match found! dh_bwd = {dh_bwd}")
+                print(f"   Exact Match found! dh_bwd = {dh_bwd}")
             elif len(backward_data) >= len(forward_data):
                 # Fallback βάσει θέσης αν τα ονόματα διαφέρουν
                 bwd_idx_from = len(backward_data) - i
@@ -1281,10 +1281,10 @@ def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
                 bs_bwd = to_float(backward_data[bwd_idx_to].get('backsight'))
                 fs_bwd = to_float(backward_data[bwd_idx_from].get('foresight'))
                 dh_bwd = bs_bwd - fs_bwd
-                print(f"   ⚠️ NO EXACT MATCH. Using index fallback! dh_bwd = {dh_bwd}")
+                print(f"   WARNING: NO EXACT MATCH. Using index fallback! dh_bwd = {dh_bwd}")
             else:
                 dh_bwd = 0.0
-                print("   ❌ NO MATCH AND FALLBACK FAILED. dh_bwd set to 0.0")
+                print("   ERROR: NO MATCH AND FALLBACK FAILED. dh_bwd set to 0.0")
 
             # Τελικό ΔΗ (Μέσος όρος): ΔΗ_final = (ΔΗ_fwd - ΔΗ_bwd) / 2
             dh_final = (dh_fwd - dh_bwd) / 2.0
