@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from './config';
 import { Toaster } from 'react-hot-toast';
 import { FolderKanban } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -15,7 +16,7 @@ import Leveling from './components/leveling';
 import BasicCalculations from './components/Basic_Calc';
 import TrigonometricHeight from './components/trig_leveling';
 import LascaLoader from './components/animations/LascaLoader';
-import LascaIntro from './components/animations/LascaIntro'; // <-- ΠΡΟΣΘΗΚΗ ΤΟΥ INTRO
+import LascaIntro from './components/animations/LascaIntro';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -75,12 +76,10 @@ function App() {
 
   // --- 00. ΕΛΕΓΧΟΣ ΤΟΥ APP BOOT INTRO ---
   useEffect(() => {
-    // Ξεκινάμε να σβήνουμε (fade out) το Intro μετά από 4.2 δευτερόλεπτα
     const fadeTimer = setTimeout(() => {
       setIsAppBooting(false);
     }, 4200);
 
-    // Το αφαιρούμε τελείως από το DOM μετά από 5 δευτερόλεπτα
     const removeTimer = setTimeout(() => {
       setShowIntroElement(false);
     }, 5000);
@@ -123,7 +122,8 @@ function App() {
       setIsDataLoaded(false);
       resetAllData();
       
-      fetch('http://localhost:5000/api/projects/load', {
+      // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
+      fetch(`${API_BASE_URL}/api/projects/load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_name: currentProject })
@@ -194,7 +194,8 @@ function App() {
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
     localStorage.setItem('current_active_project', currentProject);
 
-    fetch('http://localhost:5000/api/projects/save', {
+    // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
+    fetch(`${API_BASE_URL}/api/projects/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -287,7 +288,7 @@ function App() {
   
   // --- 3. ΔΗΜΙΟΥΡΓΙΑ / ΕΝΑΛΛΑΓΗ PROJECT (ΕΔΩ ΕΜΦΑΝΙΖΕΤΑΙ ΤΟ LASCA LOADER) ---
   const handleProjectLoaded = (projectData) => {
-    setIsProjectSwitching(true); // 🚀 Ενεργοποίηση LascaLoader MONO για εναλλαγή/δημιουργία
+    setIsProjectSwitching(true);
     setIsDataLoaded(false); 
     resetAllData();
 
@@ -317,10 +318,9 @@ function App() {
 
     setIsProjectModalOpen(false);
 
-    // Τεχνητή καθυστέρηση (1.5 δευτερόλεπτο) για την εμφάνιση του animation
     setTimeout(() => {
       setIsDataLoaded(true);
-      setIsProjectSwitching(false); // 🏁 Απόκρυψη LascaLoader
+      setIsProjectSwitching(false);
     }, 1500);
   };
 
@@ -337,12 +337,11 @@ function App() {
             isAppBooting ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {/* Μπορείς να παίξεις με το speed={1} ή {1.2} για να το κάνεις πιο γρήγορο/αργό */}
           <LascaIntro size={240} speed={1.1} />
         </div>
       )}
 
-      {/* --- LascaLoader Overlay (Εμφανίζεται ΜΟΝΟ κατά την Αλλαγή/Δημιουργία Project) --- */}
+      {/* --- LascaLoader Overlay --- */}
       {isProjectSwitching && (
         <div className="absolute inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300">
           <LascaLoader variant="cycle" size={160} glow={true} breathe={true} />

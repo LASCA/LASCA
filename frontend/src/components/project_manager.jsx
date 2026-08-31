@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { 
   FolderPlus, 
@@ -38,7 +39,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     setIsLoadingList(true);
     setError('');
     try {
-      const response = await axios.get('http://127.0.0.1:5000/api/projects/list');
+      const response = await axios.get(`${API_BASE_URL}/api/projects/list`);
       setExistingProjects(response.data || []);
     } catch (err) {
       console.error("Σφάλμα φόρτωσης λίστας projects:", err);
@@ -62,7 +63,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     const sanitizedName = projectName.trim().replace(/[^a-zA-Z0-9_α-ωΑ-Ωά-ώΉΉίϊΐόόύϋΰώώ\s-]/g, '');
 
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/projects/load', {
+      const response = await axios.post(`${API_BASE_URL}/api/projects/load`, {
         project_name: sanitizedName,
         settings: {
           designer: designer.trim(),
@@ -86,7 +87,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     setIsSubmitting(true);
     setError('');
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/projects/load', {
+      const response = await axios.post(`${API_BASE_URL}/api/projects/load`, {
         project_name: name
       });
       onProjectLoaded(response.data);

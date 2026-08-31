@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { Ruler, PlusCircle, Trash2, Play, Cpu, Activity, Info, ArrowLeft } from 'lucide-react';
 
@@ -196,7 +197,7 @@ const TraverseLeveling = ({
   const handleRunLeveling = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/traverse_spirit_leveling', {
+      const response = await axios.post(`${API_BASE_URL}/api/traverse_spirit_leveling`, {
         forward: localForward,
         backward: localBackward,
         known_point: "Σ6",

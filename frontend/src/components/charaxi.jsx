@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play, ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -89,7 +90,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/projects/stakeout', {
+      const response = await fetch(`${API_BASE_URL}/api/projects/stakeout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -132,7 +133,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
     const loadingToast = toast.loading("Δημιουργία Report (PDF)...");
 
     try {
-      const response = await fetch('http://localhost:5000/api/projects/stakeout/report', {
+      const response = await fetch(`${API_BASE_URL}/api/projects/stakeout/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

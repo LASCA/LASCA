@@ -1,17 +1,19 @@
+import sys
+import os
+import threading
+import webbrowser
 import pandas as pd
 import numpy as np
 import math
 import base64
 import ezdxf
-import os, json, io, traceback
-import traceback
-import data_proccessing as dpr  
-import vis_4_app as vis     
+import json, io, traceback
+import data_proccessing as dpr
+import vis_4_app as vis
 
 from datetime import datetime
-from project_manager import TopoProject  
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
+from project_manager import TopoProject
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
 from io import BytesIO
@@ -26,27 +28,35 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 
 try:
-    pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf')) # Βάλε το σωστό path εδώ
+    pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf'))
     font_name = 'ArialGreek'
 except:
     print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
-    font_name = 'Helvetica' # Fallback αν δεν βρει το αρχείο
+    font_name = 'Helvetica'
 
-from pathlib import Path
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys._MEIPASS)
+    STATIC_FOLDER = BASE_DIR / 'frontend' / 'dist'
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+    STATIC_FOLDER = BASE_DIR.parent / 'frontend' / 'dist'
 
-# Βρίσκει αυτόματα τον φάκελο στον οποίο βρίσκεται το τρέχον αρχείο .py
-BASE_DIR = Path(__file__).resolve().parent
+STATIC_FOLDER = STATIC_FOLDER.resolve()
 
-# Κατασκευάζει το μονοπάτι προς το logo μέσα στο backend
 LOGO_PATH = BASE_DIR / "assets" / "LASCA-logo-red-blue-1024.png"
 
-# Έλεγχος αν υπάρχει το αρχείο πριν τη χρήση
 if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
+app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
 
-app = Flask(__name__)
-CORS(app) 
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.errorhandler(404)
+def not_found(e):
+    return send_from_directory(app.static_folder, 'index.html')
 
 def get_active_project_name():
     """ Ψάχνει το όνομα του ενεργού project σε όλα τα πιθανά σημεία του request """
@@ -77,8 +87,8 @@ def get_active_project_name():
         
     return None
 
-# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects
-WORKSPACE_DIR = Path(os.getcwd()) / "Topo_Workspace"
+# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects - ΑΣΦΑΛΗΣ ΠΡΟΣΕΓΓΙΣΗ ΜΕ BASE_DIR
+WORKSPACE_DIR = BASE_DIR / "Topo_Workspace"
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -2727,4 +2737,10 @@ def run_trig_leveling():
         return jsonify({"error": str(e)}), 500
     
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = 5000
+
+    def open_browser():
+        webbrowser.open_new(f'http://127.0.0.1:{port}')
+
+    threading.Timer(1.0, open_browser).start()
+    app.run(host='127.0.0.1', port=port, debug=False)

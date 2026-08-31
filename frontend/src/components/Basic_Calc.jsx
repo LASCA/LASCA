@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { 
   Calculator, MapPin, Target, Navigation, Repeat, 
   Play, RotateCcw, Plus, Minus,
@@ -123,7 +124,7 @@ const BasicCalculations = () => {
     if (!prob1Data.xa || !prob1Data.ya || !prob1Data.d || !prob1Data.gab) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
     setLoadings(prev => ({ ...prev, prob1: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob1', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/prob1`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xa: parseFloat(prob1Data.xa), ya: parseFloat(prob1Data.ya), d: parseFloat(prob1Data.d), gab: parseFloat(prob1Data.gab) }),
       });
@@ -140,7 +141,7 @@ const BasicCalculations = () => {
     if (!prob2Data.xa || !prob2Data.ya || !prob2Data.xb || !prob2Data.yb) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
     setLoadings(prev => ({ ...prev, prob2: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob2', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/prob2`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xa: parseFloat(prob2Data.xa), ya: parseFloat(prob2Data.ya), xb: parseFloat(prob2Data.xb), yb: parseFloat(prob2Data.yb) }),
       });
@@ -158,7 +159,7 @@ const BasicCalculations = () => {
     if (!prob3Data.gprev || validAngles.length === 0) { toast.error('Παρακαλώ συμπληρώστε την G_prev και τουλάχιστον μία γωνία!'); return; }
     setLoadings(prev => ({ ...prev, prob3: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/prob3', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/prob3`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gprev: parseFloat(prob3Data.gprev), b_angles: validAngles.map(b => parseFloat(b)) }),
       });
@@ -175,7 +176,7 @@ const BasicCalculations = () => {
     if (!scaleData.input1) { toast.error('Παρακαλώ συμπληρώστε το πεδίο!'); return; }
     setLoadings(prev => ({ ...prev, scale: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/scale', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/scale`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input1: parseFloat(scaleData.input1) }),
       });
@@ -192,7 +193,7 @@ const BasicCalculations = () => {
     if (!intersectData.xa || !intersectData.ya || !intersectData.xb || !intersectData.yb || !intersectData.a || !intersectData.b) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
     setLoadings(prev => ({ ...prev, intersect: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/intersect', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/intersect`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xa: parseFloat(intersectData.xa), ya: parseFloat(intersectData.ya), xb: parseFloat(intersectData.xb), yb: parseFloat(intersectData.yb), a: parseFloat(intersectData.a), b: parseFloat(intersectData.b) }),
       });
@@ -218,7 +219,7 @@ const BasicCalculations = () => {
     
     setLoadings(prev => ({ ...prev, resect: true }));
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/basic_calc/resect', {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/resect`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         // Αποστολή μόνο των 9 συντεταγμένων/γωνιών

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { 
@@ -211,7 +212,7 @@ const Tachymetry = ({
     try {
       const processedMeasurements = getProcessedMeasurements();
 
-      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry', {
+      const response = await axios.post(`${API_BASE_URL}/api/tachymetry`, {
         project_name: projectSettings, 
         measurements: processedMeasurements,    
         stations: stationsData,
@@ -264,7 +265,7 @@ const Tachymetry = ({
     try {
       const processedMeasurements = getProcessedMeasurements();
 
-      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry/export', {
+      const response = await axios.post(`${API_BASE_URL}/api/tachymetry/export`, {
         project_name: projectSettings,
         measurements: processedMeasurements,
         stations: stationsData
@@ -304,7 +305,7 @@ const Tachymetry = ({
     try {
       const processedMeasurements = getProcessedMeasurements();
 
-      const response = await axios.post('http://127.0.0.1:5000/api/tachymetry/export_dxf', {
+      const response = await axios.post(`${API_BASE_URL}/api/tachymetry/export_dxf`, {
         project_name: projectSettings,
         measurements: processedMeasurements,
         stations: stationsData

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { 
   Database, Activity, Target, Ruler, Play, Cpu, Info, Trash2, PlusCircle 
@@ -98,7 +99,7 @@ const Leveling = ({
   const handleRunLeveling = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/leveling', {
+      const response = await axios.post(`${API_BASE_URL}/api/leveling`, {
         forward: forwardData,
         backward: backwardData
       }, {

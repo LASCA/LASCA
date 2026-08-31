@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { Target, Database, PlusCircle, Trash2, Play, Cpu, ArrowLeft, Settings2, AlertTriangle, CheckCircle } from 'lucide-react';
 
@@ -73,7 +74,7 @@ const TraverseTrigLevel = ({
         tolDH: parseFloat(tolDH) || 0.020
       };
 
-      const response = await axios.post('http://127.0.0.1:5000/api/traverse_height', payload);
+      const response = await axios.post(`${API_BASE_URL}/api/traverse_height`, payload);
 
       if (response.data && response.data.status === "success") {
         if (response.data.stations && setStations) {

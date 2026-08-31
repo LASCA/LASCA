@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
 
@@ -155,7 +156,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       const validObservations = observations.filter(obs => String(obs.station || "").trim() !== "" && String(obs.target || "").trim() !== "");
       if (validObservations.length === 0) { alert("Συμπληρώστε τουλάχιστον μία έγκυρη μέτρηση."); setIsLoading(false); return; }
 
-      const response = await axios.post('http://127.0.0.1:5000/api/adjustment', { measurements: observations });
+      const response = await axios.post(`${API_BASE_URL}/api/adjustment`, { measurements: observations });
 
       if (response.data && response.data.results) {
         const resultsFromPython = response.data.results;
@@ -209,7 +210,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         projectInfo: projectInfo
       };
       
-      const response = await axios.post('http://127.0.0.1:5000/api/adjustment/report', payload, {
+      const response = await axios.post(`${API_BASE_URL}/api/adjustment/report`, payload, {
         responseType: 'blob' 
       });
       

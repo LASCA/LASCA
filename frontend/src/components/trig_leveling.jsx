@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Calculator, Database, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
@@ -138,7 +139,7 @@ const TrigonometricHeight = ({
         project_name: projectNamePayload
       };
 
-      const response = await axios.post('http://127.0.0.1:5000/api/trig_leveling', payload);
+      const response = await axios.post(`${API_BASE_URL}/api/trig_leveling`, payload);
 
       if (response.data && response.data.results) {
         const calculatedData = response.data.results.map((row, index) => ({

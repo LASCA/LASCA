@@ -3,10 +3,31 @@ from pathlib import Path
 from datetime import datetime
 import os
 
+def get_safe_workspace_dir(app_folder="Topo_Workspace"):
+    """
+    Βρίσκει τον ασφαλή φάκελο του λειτουργικού συστήματος για αποθήκευση δεδομένων.
+    Στα Windows είναι το %APPDATA% (π.χ. C:\\Users\\User\\AppData\\Roaming\\Topo_Workspace)
+    """
+    if os.name == 'nt':  # Για Windows
+        base = os.environ.get('APPDATA', os.path.expanduser('~'))
+    else:  # Για Mac/Linux
+        base = os.path.join(os.path.expanduser('~'), '.local', 'share')
+    
+    workspace_path = Path(base) / app_folder
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    return workspace_path
+
 class TopoProject:
-    def __init__(self, workspace_dir: str, project_name: str):
+    def __init__(self, workspace_dir, project_name: str):
         self.project_name = project_name
-        self.project_dir = Path(workspace_dir) / project_name
+        
+        # Αν δεν δοθεί φάκελος ή δοθεί κενός, παίρνει τον ασφαλή φάκελο
+        if not workspace_dir:
+            self.workspace_dir = get_safe_workspace_dir()
+        else:
+            self.workspace_dir = Path(workspace_dir)
+            
+        self.project_dir = self.workspace_dir / project_name
         
         # Κεντρικοί Φάκελοι δομής
         self.data_dir = self.project_dir / "data"
@@ -63,9 +84,9 @@ class TopoProject:
                 "employer": settings.get("employer", ""),
                 "location": settings.get("location", "")
             },
-            "traverse_data": [],  # Εδώ αποθηκεύεται ο πίνακας [ {name, hz, sd, x, y, h}, ... ]
-            "metrics": {},        # Εδώ αποθηκεύονται τα αποτελέσματα των ελέγχων (dx, dy, w, κλπ)
-            "plot_image": None    # Εδώ αποθηκεύεται το base64 string του plot για άμεση εμφάνιση
+            "traverse_data": [],
+            "metrics": {},
+            "plot_image": None
         }
         self.save_state(initial_data)
 
@@ -85,32 +106,26 @@ class TopoProject:
 if __name__ == "__main__":
     print("🚀 Ξεκινάει το Test του Project Manager...\n")
 
-    # 1. Ορίζουμε πού θα σώζονται τα projects
-    current_folder = os.getcwd()
-    workspace = Path(current_folder) / "Test_Workspace"
+    # Αντί για os.getcwd(), παίρνουμε τον σωστό φάκελο του συστήματος
+    workspace = get_safe_workspace_dir("Test_Workspace")
     
-    # 2. Φτιάχνουμε ένα εικονικό project
     test_proj = TopoProject(workspace_dir=str(workspace), project_name="Odos_Ermou")
     
-    # 3. Τρέχουμε τη δημιουργία φακέλων
     test_proj.setup_project_structure({
         "scale": "1:1000",
         "terrain": "Ομαλό",
         "klass": "Πρωτεύουσα",
         "designer": "Άκης"
     })
-    print(f"📁 Το project δημιουργήθηκε στο: {test_proj.project_dir}\n")
+    print(f"📁 Το project δημιουργήθηκε με ασφάλεια στο: {test_proj.project_dir}\n")
     
-    # 4. Διαβάζουμε την αρχική κατάσταση
     state = test_proj.load_state()
     print("📄 Αρχική κατάσταση JSON:")
     print(json.dumps(state, indent=4, ensure_ascii=False))
     
-    # 5. Ενημερώνουμε δοκιμαστικά μερικές ρυθμίσεις
     print("\n✍️ Ενημερώνουμε τις ρυθμίσεις του Project...")
     state["settings"]["scale"] = "1:500"
     state["traverse_data"] = [{"name": "Σ1", "hz": "100.0000", "sd": "50.123"}]
     
-    # 6. Το αποθηκεύουμε
     test_proj.save_state(state)
     print("✅ Το JSON ενημερώθηκε επιτυχώς με τις νέες αλλαγές!")

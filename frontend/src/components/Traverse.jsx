@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -190,7 +191,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         return row;
       });
 
-      const response = await axios.post('http://127.0.0.1:5000/api/traverse', {
+      const response = await axios.post(`${API_BASE_URL}/api/traverse`, {
         measurements: processedMeasurements,
         scale: scale,
         terrain: terrain,
@@ -249,7 +250,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
     const toastId = toast.loading("Δημιουργία DXF...");
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/traverse/export-dxf', {
+      const response = await fetch(`${API_BASE_URL}/api/traverse/export-dxf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ points: data })
@@ -297,7 +298,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         finalPlotImage = canvas.toDataURL('image/png');
       }
 
-      const response = await fetch('http://127.0.0.1:5000/api/traverse/report', {
+      const response = await fetch(`${API_BASE_URL}/api/traverse/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
