@@ -15,11 +15,10 @@ import {
 } from 'lucide-react';
 
 const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
-  const [activeTab, setActiveTab] = useState('create'); // 'create' ή 'open'
+  const [activeTab, setActiveTab] = useState('create');
   const [projectName, setProjectName] = useState('');
   const [designer, setDesigner] = useState('');
   
-  // --- ΝΕΑ STATES ---
   const [employer, setEmployer] = useState('');
   const [location, setLocation] = useState('');
   
@@ -28,7 +27,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Φόρτωση των υπαρχόντων projects όταν ο χρήστης πάει στην καρτέλα "Άνοιγμα"
   useEffect(() => {
     if (activeTab === 'open' && isOpen) {
       fetchExistingProjects();
@@ -59,7 +57,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     setIsSubmitting(true);
     setError('');
 
-    // Καθαρισμός του ονόματος από κενά/ειδικούς χαρακτήρες για ασφάλεια στα Windows/Linux folders
     const sanitizedName = projectName.trim().replace(/[^a-zA-Z0-9_α-ωΑ-Ωά-ώΉΉίϊΐόόύϋΰώώ\s-]/g, '');
 
     try {
@@ -67,12 +64,11 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
         project_name: sanitizedName,
         settings: {
           designer: designer.trim(),
-          employer: employer.trim(), // Αποθήκευση Εργοδότη
-          location: location.trim()  // Αποθήκευση Περιοχής
+          employer: employer.trim(),
+          location: location.trim()
         }
       });
 
-      // Επιστρέφει ολόκληρο το state στο κεντρικό App component
       onProjectLoaded(response.data);
       onClose();
     } catch (err) {
@@ -105,10 +101,8 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
       
-      {/* Κεντρικό Παράθυρο */}
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Κουμπί Κλεισίματος (εμφανίζεται μόνο αν υπάρχει ήδη ενεργό project) */}
         {currentProject && (
           <button 
             onClick={onClose}
@@ -118,7 +112,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
           </button>
         )}
 
-        {/* Header με Tabs */}
         <div className="bg-[#0f172a]/80 p-4 border-b border-slate-800 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <Settings className="text-amber-500" size={16} />
@@ -151,7 +144,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
           </div>
         </div>
 
-        {/* Κυρίως Περιεχόμενο (Scrollable αν χρειαστεί) */}
         <div className="p-6 overflow-y-auto max-h-[450px] custom-scrollbar flex-1">
           
           {error && (
@@ -160,7 +152,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
             </div>
           )}
 
-          {/* TAB 1: ΔΗΜΙΟΥΡΓΙΑ */}
           {activeTab === 'create' && (
             <form onSubmit={handleCreateProject} className="flex flex-col gap-4">
               
@@ -182,7 +173,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               {/* Μελετητής */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
-                  <User size={10} /> Μηχανικός
+                  <User size={10} /> Μελετητής
                 </label>
                 <input
                   type="text"
@@ -193,21 +184,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                 />
               </div>
 
-              {/* Εργοδότης */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
-                  <Briefcase size={10} /> Εργοδότης
-                </label>
-                <input
-                  type="text"
-                  placeholder="π.χ. Δήμος Θεσσαλονίκης"
-                  value={employer}
-                  onChange={(e) => setEmployer(e.target.value)}
-                  className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
-                />
-              </div>
-
-              {/* Περιοχή */}
+              {/* Τοποθεσία */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   <MapPin size={10} /> Τοποθεσία
@@ -221,7 +198,20 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                 />
               </div>
 
-              {/* Κουμπί Υποβολής */}
+              {/* Εργοδότης */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
+                  <Briefcase size={10} /> Εργοδότης
+                </label>
+                <input
+                  type="text"
+                  placeholder="π.χ. ΤΑΤΜ"
+                  value={employer}
+                  onChange={(e) => setEmployer(e.target.value)}
+                  className="bg-slate-950/50 border border-slate-800 text-sm text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-sans"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -239,7 +229,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
             </form>
           )}
 
-          {/* TAB 2: ΑΝΟΙΓΜΑ */}
           {activeTab === 'open' && (
             <div className="flex flex-col gap-2">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase mb-1 flex items-center gap-1">
@@ -283,9 +272,8 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
 
         </div>
         
-        {/* Footer */}
         <div className="bg-[#0f172a]/30 px-6 py-3 border-t border-slate-800/50 flex justify-between items-center">
-          <span className="text-[8.5px] text-slate-600 font-bold uppercase tracking-widest">Lasca Topo Platform</span>
+          <span className="text-[8.5px] text-slate-600 font-bold uppercase tracking-widest"></span>
           {currentProject && (
             <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/5 px-2 py-0.5 rounded-md border border-emerald-500/10">
               Ενεργό: {currentProject}

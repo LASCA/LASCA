@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
+// 1. Κρατάμε ΜΟΝΟ τα UI εικονίδια από το lucide-react
 import { 
-  LayoutDashboard, 
-  Telescope, 
-  DraftingCompass, 
-  GitBranch, 
-  TriangleRight, 
-  Ruler, 
-  Calculator, 
-  Route, 
-  Axis3d, 
-  TrendingUp, 
-  Spline, 
-  Flag, 
   Crosshair,
   ChevronRight, 
   ChevronLeft, 
@@ -20,6 +9,22 @@ import {
   Info 
 } from 'lucide-react';
 
+// 2. Κάνουμε import τα νέα custom εικονίδια του φίλου σου
+import {
+  DashboardIcon,
+  MetriseisStathmouIcon,
+  GoniometriseisIcon,
+  SynorthosiStathmouIcon,
+  TrigonometrikiYpsometriaIcon,
+  GeometrikiChorostathmisiIcon,
+  VasikoiYpologismoiIcon,
+  OdefsiIcon,
+  OrizontiografiaXYIcon,
+  YpsometriaHIcon,
+  TachymetriaIcon,
+  CharaxiIcon
+} from './icons'; 
+
 import About from './about'; 
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
@@ -27,32 +32,35 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const [isTraverseMenuOpen, setIsTraverseMenuOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
 
+  // 3. Ενημερώνουμε το menuItems περνώντας color="currentColor" 
+  // για να δουλεύουν σωστά τα hover χρώματα του Tailwind
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon size={20} color="currentColor" /> },
     { 
       id: 'station_measurements', 
       label: 'Μετρήσεις Σταθμού', 
-      icon: <Telescope size={20} />,
+      icon: <MetriseisStathmouIcon size={20} color="currentColor" />,
       subItems: [
-        { id: 'goniometry', label: 'Γωνιομετρήσεις', icon: <DraftingCompass size={16} /> },
-        { id: 'adjustment', label: 'Συνόρθωση Σταθμού', icon: <GitBranch size={16} /> },
-        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομετρία', icon: <TriangleRight size={16} /> },
-        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση', icon: <Ruler size={16} /> }
+        { id: 'goniometry', label: 'Γωνιομετρήσεις', icon: <GoniometriseisIcon size={16} color="currentColor" /> },
+        { id: 'adjustment', label: 'Συνόρθωση Σταθμού', icon: <SynorthosiStathmouIcon size={16} color="currentColor" /> },
+        { id: 'trig_leveling', label: 'Τριγωνομετρική Υψομετρία', icon: <TrigonometrikiYpsometriaIcon size={16} color="currentColor" /> },
+        { id: 'geom_leveling', label: 'Γεωμετρική Χωροστάθμηση', icon: <GeometrikiChorostathmisiIcon size={16} color="currentColor" /> }
       ]
     },
-    { id: 'basic_calc', label: 'Βασικοί Υπολογισμοί', icon: <Calculator size={20} /> },
+    { id: 'basic_calc', label: 'Βασικοί Υπολογισμοί', icon: <VasikoiYpologismoiIcon size={20} color="currentColor" /> },
     { 
       id: 'traverse_menu', 
       label: 'Όδευση', 
-      icon: <Route size={20} />,
+      icon: <OdefsiIcon size={20} color="currentColor" />,
       subItems: [
-        { id: 'traverse', label: 'Οριζοντιογραφία (X,Y)', icon: <Axis3d size={16} /> },
-        { id: 'traverse_height', label: 'Υψομετρία (H)', icon: <TrendingUp size={16} /> }
+        { id: 'traverse', label: 'Οριζοντιογραφία (X,Y)', icon: <OrizontiografiaXYIcon size={16} color="currentColor" /> },
+        { id: 'traverse_height', label: 'Υψομετρία (H)', icon: <YpsometriaHIcon size={16} color="currentColor" /> }
       ]
     },
-    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <Spline size={20} /> },
-    { id: 'stakeout', label: 'Χάραξη', icon: <Flag size={20} /> },
+    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <TachymetriaIcon size={20} color="currentColor" /> },
+    { id: 'stakeout', label: 'Χάραξη', icon: <CharaxiIcon size={20} color="currentColor" /> },
   ];
+
 
   const handleItemClick = (item) => {
     if (item.subItems) {
@@ -90,15 +98,17 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         </button>
 
         {/* Header Sidebar */}
-        <div className={`h-[72px] flex items-center ${isOpen ? 'px-6 gap-3' : 'px-0 justify-center'} border-b border-slate-800/80 overflow-hidden shrink-0`}>
+        <div className={`h-[72px] flex items-center ${isOpen ? 'px-4 gap-2.5' : 'px-0 justify-center'} border-b border-slate-800/80 overflow-hidden shrink-0`}>
           <img 
             src="/LASCA-logo-red-blue-1024.png" 
             alt="LASCA Logo" 
-            className="w-14 h-14 shrink-0 object-contain transition-transform duration-300 hover:scale-105"
+            className="w-13 h-13 shrink-0 object-contain transition-transform duration-300 hover:scale-105"
           />
           {isOpen && (
             <div className="transition-opacity duration-300 animate-in fade-in">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent tracking-tight leading-none">LASCA</h1>
+              <h1 className="text-2xl font-bold text-white tracking-widest leading-none">
+                LASCA
+              </h1>
             </div>
           )}
         </div>

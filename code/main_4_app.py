@@ -33,6 +33,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from functools import partial 
 
 try:
     pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf'))
@@ -56,6 +57,98 @@ if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+
+class UniversalNumberedCanvas(canvas.Canvas):
+    """
+    Universal canvas για ReportLab με υποστήριξη 2 περασμάτων (Page X of Y),
+    δυναμικό τίτλο αναφοράς, λογότυπο και υποσέλιδο.
+    """
+    def __init__(self, *args, 
+                 doc_title="Αυτοματοποιημένη Αναφορά LASCA", 
+                 font_name='Helvetica', 
+                 font_bold_name='Helvetica-Bold',  # Νέα παράμετρος για Bold font
+                 timestamp_str='', 
+                 logo_path=None, 
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+        self.doc_title = doc_title
+        self.font_name = font_name
+        self.font_bold_name = font_bold_name
+        self.timestamp_str = timestamp_str
+        self.logo_path = logo_path
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, page_count):
+        self.saveState()
+        
+        # --- Πάνω Κεφαλίδα (Header) ---
+        header_y = A4[1] - 30
+        logo_width, logo_height = 32, 32
+        logo_y = header_y - 10
+        
+        if self.logo_path:
+            try:
+                self.drawImage(self.logo_path, 30, logo_y, width=logo_width, height=logo_height, mask='auto')
+            except Exception as e:
+                print(f"Δεν ήταν δυνατή η φόρτωση του λογότυπου: {e}")
+        
+        self.setFillColor(colors.HexColor('#475569'))
+        text_x = (30 + logo_width + 10) if self.logo_path else 30
+        
+        # --- ΣΧΕΔΙΑΣΗ ΤΙΤΛΟΥ ΜΕ BOLD "LASCA" ---
+        if "LASCA" in self.doc_title:
+            prefix = self.doc_title.replace("LASCA", "").rstrip() + " "
+            
+            # 1. Σχεδίαση του πρώτου μέρους (Regular)
+            self.setFont(self.font_name, 10)
+            self.drawString(text_x, header_y, prefix)
+            
+            # 2. Υπολογισμός πλάτους κειμένου
+            prefix_width = self.stringWidth(prefix, self.font_name, 10)
+            
+            # 3. Σχεδίαση του "LASCA" (Bold)
+            self.setFont(self.font_bold_name, 10)
+            self.drawString(text_x + prefix_width, header_y, "LASCA")
+        else:
+            self.setFont(self.font_name, 10)
+            self.drawString(text_x, header_y, self.doc_title)
+        
+        # Αριθμός Σελίδας
+        self.setFont(self.font_name, 10)
+        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
+        self.drawRightString(A4[0] - 30, header_y, page_str)
+        
+        # Διαχωριστική γραμμή
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(1)
+        self.line(30, header_y - 12, A4[0] - 30, header_y - 12)
+        
+        # --- Κάτω Υποσέλιδο (Footer) ---
+        self.setFont(self.font_name, 8)
+        self.setLineWidth(0.75)
+        self.line(30, 35, A4[0] - 30, 35)
+        
+        if self.timestamp_str:
+            self.drawString(30, 22, f"{self.timestamp_str}")
+        
+        self.restoreState()
+
 
 @app.route('/')
 def serve_index():
@@ -290,72 +383,6 @@ def run_adjustment():
 # ==========================================
 # 1B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (ADJUSTMENT - CUSTOM STYLING)
 # ==========================================
-# --- CUSTOM CANVAS ΓΙΑ ADJUSTMENT REPORT ---
-class AdjustmentNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', timestamp_str='', logo_path=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-        self.font_name = font_name
-        self.timestamp_str = timestamp_str
-        self.logo_path = logo_path
-
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            super().showPage()
-        super().save()
-
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        
-        # --- Πάνω Κεφαλίδα (Header) ---
-        header_y = A4[1] - 30
-        
-        # 1. Τοποθέτηση του Λογότυπου (αν έχει δοθεί)
-        logo_width = 32
-        logo_height = 32
-        logo_y = header_y - 10 # Κατεβάζουμε λίγο το y για να στοιχηθεί ωραία με το κείμενο
-        
-        if self.logo_path:
-            try:
-                # Το mask='auto' διαβάζει τη διαφάνεια των PNG
-                self.drawImage(self.logo_path, 30, logo_y, width=logo_width, height=logo_height, mask='auto')
-            except Exception as e:
-                print(f"Δεν ήταν δυνατή η φόρτωση του λογότυπου: {e}")
-        
-        # 2. Τοποθέτηση του Κειμένου
-        self.setFont(self.font_name, 10) # Μεγαλύτερη γραμματοσειρά
-        self.setFillColor(colors.HexColor('#475569'))
-        
-        # Υπολογισμός θέσης κειμένου: Αν υπάρχει logo πάει πιο δεξιά, αλλιώς μένει στο x=30
-        text_x = 30 + logo_width + 10 if self.logo_path else 30
-        self.drawString(text_x, header_y, "Αυτοματοποιημένη αναφορά LASCA")
-        
-        # Αριθμός σελίδας μεταφέρθηκε στην κεφαλίδα
-        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, header_y, page_str)
-        
-        # Διαχωριστική Γραμμή Κεφαλίδας
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(1)
-        # Κατέβασα τη γραμμή στο -12 (από -8) για να χωράει το εικονίδιο χωρίς να την ακουμπάει
-        self.line(30, header_y - 12, A4[0] - 30, header_y - 12)
-        
-        # --- Κάτω Υποσέλιδο (Footer) ---
-        self.setFont(self.font_name, 8)
-        self.setLineWidth(0.75)
-        self.line(30, 35, A4[0] - 30, 35)
-        
-        # Αριστερά: Σταθερό κείμενο και Timestamp παραγωγής
-        self.drawString(30, 22, f"{self.timestamp_str}")
-        
-        self.restoreState()
 
 @app.route('/api/adjustment/report', methods=['POST'])
 def export_adjustment_report():
@@ -675,16 +702,18 @@ def export_adjustment_report():
         t3.setStyle(TableStyle(t3_cmds))
         elements.append(t3)
 
+
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         doc.build(
             elements, 
-            canvasmaker=lambda *args, **kwargs: AdjustmentNumberedCanvas(
-                *args, 
+            canvasmaker=partial(
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά LASCA",
                 font_name=my_font, 
+                font_bold_name=my_font_bold, # ή 'Helvetica-Bold' αν δεν έχεις ξεχωριστό bold ελληνικό font
                 timestamp_str=current_timestamp, 
-                logo_path=str(LOGO_PATH), 
-                **kwargs
+                logo_path=str(LOGO_PATH)
             )
         )
         buffer.seek(0)
@@ -835,55 +864,6 @@ def run_traverse():
 # ==========================================
 # 2B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - CUSTOM STYLING)
 # ==========================================
-# --- KOINO/GENERIC CANVAS ΓΙΑ ΟΛΑ ΤΑ REPORTS (HEADER, FOOTER & PAGES) ---
-class TopoNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-        self.font_name = font_name
-        self.timestamp_str = timestamp_str
-        self.header_title = header_title
-
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            super().showPage()
-        super().save()
-
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        
-        # --- Πάνω Κεφαλίδα (Header) ---
-        self.setFont(self.font_name, 10)
-        self.setFillColor(colors.HexColor('#475569'))
-        
-        header_y = A4[1] - 30
-        self.drawString(30, header_y, self.header_title)
-        
-        # Αρίθμηση σελίδας στην κεφαλίδα
-        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, header_y, page_str)
-        
-        # Διαχωριστική Γραμμή Κεφαλίδας
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(1)
-        self.line(30, header_y - 8, A4[0] - 30, header_y - 8)
-        
-        # --- Κάτω Υποσέλιδο (Footer) ---
-        self.setFont(self.font_name, 8)
-        self.setLineWidth(0.75)
-        self.line(30, 35, A4[0] - 30, 35)
-        
-        # Αριστερά: Timestamp παραγωγής αναφοράς
-        self.drawString(30, 22, f"Ημερομηνία εξαγωγής: {self.timestamp_str}")
-        
-        self.restoreState()
 
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
@@ -1187,12 +1167,13 @@ def export_traverse_report():
 
         doc.build(
             elements, 
-            canvasmaker=lambda *args, **kwargs: TopoNumberedCanvas(
-                *args, 
+            canvasmaker=partial(
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά LASCA",
                 font_name=my_font, 
+                font_bold_name=my_font_bold, # ή 'Helvetica-Bold' αν δεν έχεις ξεχωριστό bold ελληνικό font
                 timestamp_str=current_timestamp, 
-                header_title="Αυτοματοποιημένη αναφορά LASCA",
-                **kwargs
+                logo_path=str(LOGO_PATH)
             )
         )
         buffer.seek(0)
@@ -2144,55 +2125,6 @@ def run_stakeout():
 # ==========================================
 # 2C. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (STAKEOUT - CUSTOM STYLING)
 # ==========================================
-class StakeoutNumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, font_name='Helvetica', timestamp_str='', header_title="Αυτοματοποιημένη αναφορά LASCA", **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-        self.font_name = font_name
-        self.timestamp_str = timestamp_str
-        self.header_title = header_title
-
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            super().showPage()
-        super().save()
-
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        
-        # --- Πάνω Κεφαλίδα (Header) ---
-        self.setFont(self.font_name, 10)
-        self.setFillColor(colors.HexColor('#475569'))
-        
-        header_y = A4[1] - 30
-        self.drawString(30, header_y, self.header_title)
-        
-        # Αρίθμηση σελίδας στην κεφαλίδα
-        page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, header_y, page_str)
-        
-        # Διαχωριστική Γραμμή Κεφαλίδας
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(1)
-        self.line(30, header_y - 8, A4[0] - 30, header_y - 8)
-        
-        # --- Κάτω Υποσέλιδο (Footer) ---
-        self.setFont(self.font_name, 8)
-        self.setLineWidth(0.75)
-        self.line(30, 35, A4[0] - 30, 35)
-        
-        # Αριστερά: Timestamp παραγωγής αναφοράς
-        self.drawString(30, 22, f"Ημερομηνία εξαγωγής: {self.timestamp_str}")
-        
-        self.restoreState()
-
 
 @app.route('/api/projects/stakeout/report', methods=['POST'])
 def export_stakeout_report():
@@ -2486,12 +2418,13 @@ def export_stakeout_report():
 
         doc.build(
             elements, 
-            canvasmaker=lambda *args, **kwargs: StakeoutNumberedCanvas(
-                *args, 
+            canvasmaker=partial(
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά LASCA",
                 font_name=my_font, 
+                font_bold_name=my_font_bold, # ή 'Helvetica-Bold' αν δεν έχεις ξεχωριστό bold ελληνικό font
                 timestamp_str=current_timestamp, 
-                header_title="Αυτοματοποιημένη αναφορά LASCA",
-                **kwargs
+                logo_path=str(LOGO_PATH)
             )
         )
         buffer.seek(0)

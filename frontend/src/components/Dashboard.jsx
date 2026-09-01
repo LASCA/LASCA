@@ -307,18 +307,18 @@ const Dashboard = ({
             <div className="grid grid-cols-2 gap-6 shrink-0">
               {/* FILE OPERATIONS */}
               <div className="flex flex-col gap-3">
-                <SectionTitle title="FILE OPERATIONS" />
+                <SectionTitle title="ΔΙΑΧΕΙΡΙΣΗ ΑΡΧΕΙΩΝ" />
                 <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
                   <ActionButton 
                     icon={<Plus size={18} />} 
-                    title="Create New" 
+                    title="Δημιουργία Νέου" 
                     subtitle="Νέο αρχείο" 
                     theme="primary" 
                     onClick={onOpenProjectManager}
                   />
                   <ActionButton 
                     icon={<FolderOpen size={18} />} 
-                    title="Open Project" 
+                    title="Άνοιγμα Έργου" 
                     subtitle="Ανάκτηση από δίσκο" 
                     theme="default"
                     onClick={onOpenProjectManager}
@@ -328,11 +328,11 @@ const Dashboard = ({
 
               {/* DATA INGESTION */}
               <div className="flex flex-col gap-3">
-                <SectionTitle title="DATA INGESTION" />
+                <SectionTitle title="ΕΙΣΑΓΩΓΗ ΔΕΔΟΜΕΝΩΝ" />
                 <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center gap-3 shadow-sm h-full">
                   <ActionButton 
                     icon={<FileSpreadsheet size={18} />} 
-                    title="Excel Template" 
+                    title="Πρότυπο Excel" 
                     subtitle="Λήψη πρότυπου αρχείου" 
                     theme="emerald"
                     onClick={downloadSurveyTemplate}
@@ -422,7 +422,7 @@ const Dashboard = ({
 
           {/* ----- ΔΕΞΙΑ ΣΤΗΛΗ (Compact Version) ----- */}
           <div className="flex flex-col gap-3">
-            <SectionTitle title="ACTIVE PROJECT OVERVIEW" />
+            <SectionTitle title="ΕΠΙΣΚΟΠΗΣΗ ΕΝΕΡΓΟΥ ΕΡΓΟΥ" />
             
             <div className="bg-[#0B1221] border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-4 shadow-lg h-fit">
               
@@ -523,13 +523,7 @@ const Dashboard = ({
                   <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
                      <RefreshCw size={13} />
                      <span className="text-[10px] font-bold tracking-wide">
-                       {hasData ? 'Sync: OK' : 'Απαιτείται Εισαγωγή'}
-                     </span>
-                  </div>
-                  <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${levelingMetrics?.error_dh !== undefined ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
-                     {levelingMetrics?.error_dh !== undefined ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                     <span className="text-[10px] font-bold tracking-wide">
-                       {levelingMetrics?.error_dh !== undefined ? 'Υψόμετρα: Εντός Ανοχής' : 'Χωροστάθμιση: Εκκρεμεί'}
+                       {hasData ? 'Συγχρονισμός: OK' : 'Απαιτείται Εισαγωγή'}
                      </span>
                   </div>
               </div>
@@ -591,7 +585,7 @@ const ImportButton = ({ onChange }) => (
     </div>
     <div className="overflow-hidden">
       <h4 className="text-[12px] font-bold tracking-wide truncate group-hover:text-white transition-colors text-slate-200">
-        Import Data
+        Εισαγωγή Δεδομένων
       </h4>
       <p className="text-[10px] mt-0.5 truncate text-slate-500">
         Εισαγωγή δεδομένων μορφής .xlsx

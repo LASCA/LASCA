@@ -1,48 +1,48 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  DraftingCompass, 
-  GitBranch, 
-  TriangleRight, 
-  Ruler, 
-  Axis3d, 
-  TrendingUp, 
-  Spline, 
-  Flag, 
-  Calculator,
-  Activity // Το κρατάμε για το default case
-} from 'lucide-react';
+import { Activity } from 'lucide-react'; // Κρατάμε μόνο αυτό για το default case
+
+// Κάνουμε import τα custom εικονίδια
+import {
+  DashboardIcon,
+  GoniometriseisIcon,
+  SynorthosiStathmouIcon,
+  TrigonometrikiYpsometriaIcon,
+  GeometrikiChorostathmisiIcon,
+  OrizontiografiaXYIcon,
+  YpsometriaHIcon,
+  TachymetriaIcon,
+  CharaxiIcon,
+  VasikoiYpologismoiIcon
+} from './icons';
 
 const Header = ({ activeTab }) => {
-  // Καθαρό configuration μόνο με τα απολύτως απαραίτητα (Τίτλος, Εικονίδιο, Χρώμα)
+  // Ενημερωμένο configuration με τα νέα custom εικονίδια
   const getHeaderConfig = () => {
     switch(activeTab) {
       case 'dashboard': 
-        return { icon: LayoutDashboard, label: "Project Setup", color: "blue" };
+        return { icon: DashboardIcon, label: "Project Setup", color: "blue" };
       case 'goniometry': 
-        return { icon: DraftingCompass, label: "Γωνιομετρήσεις", color: "cyan" };
+        return { icon: GoniometriseisIcon, label: "Γωνιομετρήσεις", color: "cyan" };
       case 'adjustment': 
-        return { icon: GitBranch, label: "Συνόρθωση Σταθμού", color: "emerald" };
+        return { icon: SynorthosiStathmouIcon, label: "Συνόρθωση Σταθμού", color: "emerald" };
       case 'trig_leveling': 
-        return { icon: TriangleRight, label: "Τριγωνομετρική Υψομετρία", color: "indigo" };
+        return { icon: TrigonometrikiYpsometriaIcon, label: "Τριγωνομετρική Υψομετρία", color: "indigo" };
       case 'geom_leveling': 
-        return { icon: Ruler, label: "Γεωμετρική Χωροστάθμηση", color: "purple" };
+        return { icon: GeometrikiChorostathmisiIcon, label: "Γεωμετρική Χωροστάθμηση", color: "purple" };
       case 'traverse': 
-        return { icon: Axis3d, label: "Οριζοντιογραφία Όδευσης", color: "amber" };
+        return { icon: OrizontiografiaXYIcon, label: "Οριζοντιογραφία Όδευσης", color: "amber" };
       case 'traverse_height': 
-        return { icon: TrendingUp, label: "Υψομετρία Όδευσης", color: "orange" };
+        return { icon: YpsometriaHIcon, label: "Υψομετρία Όδευσης", color: "orange" };
       case 'tachymetry': 
-        return { icon: Spline, label: "Ταχυμετρία", color: "pink" };
+        return { icon: TachymetriaIcon, label: "Ταχυμετρία", color: "pink" };
       case 'stakeout': 
-        return { icon: Flag, label: "Χάραξη", color: "emerald" };
+        return { icon: CharaxiIcon, label: "Χάραξη", color: "emerald" };
       case 'basic_calc': 
-        return { icon: Calculator, label: "Βασικοί Υπολογισμοί", color: "blue" };
+        return { icon: VasikoiYpologismoiIcon, label: "Βασικοί Υπολογισμοί", color: "blue" };
       default: 
         return { icon: Activity, label: activeTab ? activeTab.replace('_', ' ').toUpperCase() : "MODULE", color: "slate" };
     }
   };
-
-  // ... (Ο υπόλοιπος κώδικας του component παραμένει ίδιος)
 
   const config = getHeaderConfig();
   const Icon = config.icon;
@@ -74,9 +74,10 @@ const Header = ({ activeTab }) => {
       {/* ΑΡΙΣΤΕΡΟ ΚΟΜΜΑΤΙ: Branding & Active Module (Premium Style) */}
       <div className="flex items-center gap-4 z-10">
         
-        {/* Glassmorphism Icon Container */}
-        <div className={`p-2.5 rounded-lg border backdrop-blur-sm transition-all duration-500 ${theme.iconBg} ${theme.border} ${theme.glow}`}>
-          <Icon className={theme.text} size={20} strokeWidth={2} />
+        {/* Glassmorphism Icon Container - Προστέθηκε το ${theme.text} στο div */}
+        <div className={`p-2.5 rounded-lg border backdrop-blur-sm transition-all duration-500 ${theme.iconBg} ${theme.border} ${theme.glow} ${theme.text}`}>
+          {/* Προστέθηκε color="currentColor" για να παίρνει το χρώμα από το div */}
+          <Icon className={theme.text} color="currentColor" size={20} strokeWidth={2} />
         </div>
         
         <div className="flex flex-col justify-center gap-1">
@@ -96,10 +97,6 @@ const Header = ({ activeTab }) => {
 
       </div>
 
-      {/* Ο χώρος στο κέντρο μένει εντελώς κενός.
-          Ο χώρος δεξιά είναι ελεύθερος για να πάρει θέση το "Project: test"
-          ή οποιοδήποτε άλλο κουμπί έρχεται από τον γονέα του Header. */}
-      
     </header>
   );
 };
