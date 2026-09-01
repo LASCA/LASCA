@@ -875,7 +875,7 @@ def export_traverse_report():
 
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
         raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
-        
+
         sources_to_check = []
         if isinstance(raw_proj, dict) and raw_proj:
             sources_to_check.append(raw_proj)
@@ -900,7 +900,7 @@ def export_traverse_report():
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
-        
+
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
@@ -924,7 +924,7 @@ def export_traverse_report():
         )
 
         elements = []
-        
+
         # --- Παλέτα Χρωμάτων ---
         HEADER_BG = colors.HexColor('#0f172a')     
         SUBHEADER_BG = colors.HexColor('#1e293b')  
@@ -947,7 +947,7 @@ def export_traverse_report():
             'TopoTH', parent=styles['Normal'], fontName=my_font_bold,
             fontSize=8.5, leading=10, textColor=colors.white, alignment=1
         )
-        
+
         td_norm_style = ParagraphStyle(
             'TopoTDNorm', parent=styles['Normal'], fontName=my_font,
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
@@ -957,7 +957,6 @@ def export_traverse_report():
             fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1
         )
 
-        # Νέα Styles για το Modern Dashboard Box
         modern_label_style = ParagraphStyle(
             'ModernLabel', 
             fontName=my_font_bold, 
@@ -966,7 +965,7 @@ def export_traverse_report():
             spaceAfter=2,
             textTransform='uppercase'
         )
-        
+
         modern_value_style = ParagraphStyle(
             'ModernValue', 
             fontName=my_font_bold, 
@@ -988,10 +987,10 @@ def export_traverse_report():
             [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
             [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
-        
+
         col_width = (A4[0] - 60) / 2
         info_table = Table(project_data, colWidths=[col_width, col_width])
-        
+
         info_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
             ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
@@ -1002,12 +1001,12 @@ def export_traverse_report():
             ('RIGHTPADDING', (0,0), (-1,-1), 15),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ]))
-        
+
         elements.append(info_table)
         elements.append(Spacer(1, 25))
 
         # ========================================================
-        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ (Μεταφέρθηκε κάτω από τις πληροφορίες)
+        # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
         # ========================================================
         elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
         elements.append(Spacer(1, 20))
@@ -1025,7 +1024,7 @@ def export_traverse_report():
             Paragraph("Τετμημένη X [m]", th_style),
             Paragraph("Τεταγμένη Y [m]", th_style)
         ]
-        
+
         table_data = [t_headers]
         for pt in points:
             hz_val = f"{float(pt.get('hz')):.4f}" if pt.get('hz') not in [None, '', '-'] else "-"
@@ -1040,7 +1039,7 @@ def export_traverse_report():
                 Paragraph(x_val, td_bold_style),
                 Paragraph(y_val, td_bold_style)
             ])
-            
+
         t = Table(table_data, colWidths=[65, 120, 100, 125, 125])
         t_style_cmds = [
             ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
@@ -1074,6 +1073,10 @@ def export_traverse_report():
         ds_act = safe_fmt(metrics.get('w'), 3, " m")
         ds_max = safe_fmt(metrics.get('ds_max'), 3, " m")
 
+        # Ανάκτηση Συντελεστή Κλίμακας
+        scale_factor_val = metrics.get('scaleFactor') or metrics.get('scale_factor') or metrics.get('k') or metrics.get('scale')
+        scale_factor_fmt = safe_fmt(scale_factor_val, 6)
+
         try:
             pass_wb = abs(float(metrics.get('fb', 0))) <= float(metrics.get('Wb_max', 0))
             pass_ds = abs(float(metrics.get('w', 0))) <= float(metrics.get('ds_max', 0))
@@ -1088,19 +1091,42 @@ def export_traverse_report():
         def val_p(val):
             return Paragraph(str(val), td_bold_style)
 
+        # ----------------- Ένθετος Πίνακας για τα Γενικά Στοιχεία (6 Στήλες) -----------------
+        gen_data = [[
+            Paragraph("Αριθμός Στάσεων (n):", td_norm_style), val_p(metrics.get('n', '-')),
+            Paragraph("Συνολικό Μήκος (L):", td_norm_style), val_p(safe_fmt(metrics.get('totalLength'), 2, " m")),
+            Paragraph("Συντελεστής Κλίμακας (m<sub>ij</sub>):", td_norm_style), val_p(scale_factor_fmt)
+        ]]
+        
+        # Συνολικό διαθέσιμο πλάτος: 140 + 127 + 140 + 128 = 535
+        # Δίνουμε στην κάθε στήλη ακριβώς τον χώρο που χρειάζεται
+        gen_table = Table(gen_data, colWidths=[105, 40, 105, 65, 140, 80])
+        gen_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, GRID_COLOR), # Μόνο εσωτερικές γραμμές για να μην διπλασιάσει το εξωτερικό περίγραμμα
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('ALIGN', (3, 0), (3, 0), 'CENTER'),
+            ('ALIGN', (5, 0), (5, 0), 'CENTER'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        # -------------------------------------------------------------------------------------
+
         metrics_table_data = [
             [Paragraph("Γενικά Στοιχεία", th_style), '', '', ''],
-            ["Αριθμός Στάσεων (n):", val_p(metrics.get('n', '-')), "Συνολικό Μήκος (L):", val_p(safe_fmt(metrics.get('totalLength'), 2, " m"))],
-            
+            [gen_table, '', '', ''], # Εισαγωγή του nested table
+
             [Paragraph("Γωνιακός & Γραμμικός Έλεγχος", th_style), '', '', ''],
             ["G (πρέπει):", val_p(safe_fmt(metrics.get('gTarget'), 4, " g")), "G (είναι):", val_p(safe_fmt(metrics.get('gActual'), 4, " g"))],
             ["Μέγιστη Γωνιακή Ανοχή (Wβmax):", val_p(wb_max), "Γωνιακό Σφάλμα (Wβ):", val_p(wb_act)],
-            
+
             ["ΔX (πρέπει):", val_p(safe_fmt(metrics.get('dxTarget'), 3, " m")), "ΔY (πρέπει):", val_p(safe_fmt(metrics.get('dyTarget'), 3, " m"))],
             ["ΔX (είναι):", val_p(safe_fmt(metrics.get('dxActual'), 3, " m")), "ΔY (είναι):", val_p(safe_fmt(metrics.get('dyActual'), 3, " m"))],
             ["Σφάλμα δX:", val_p(safe_fmt(metrics.get('dx'), 3, " m")), "Σφάλμα δY:", val_p(safe_fmt(metrics.get('dy'), 3, " m"))],
             ["Ολικό Γραμμικό Σφάλμα (fs / δs):", val_p(ds_act), "Μέγιστη Γραμμική Ανοχή (δs_max):", val_p(ds_max)],
-            
+
             [status_p, '', '', '']
         ]
 
@@ -1110,18 +1136,30 @@ def export_traverse_report():
             ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('TEXTCOLOR', (0, 0), (-1, -1), TEXT_MAIN),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            
+
+            # Επικεφαλίδα Γενικών Στοιχείων
             ('SPAN', (0, 0), (3, 0)),
             ('BACKGROUND', (0, 0), (3, 0), SUBHEADER_BG),
+            
+            # --- Ρυθμίσεις για τον Nested Table ---
+            ('SPAN', (0, 1), (3, 1)), # Η γραμμή 1 ενώνεται ώστε να χωρέσει ολόκληρος ο nested table
+            ('LEFTPADDING', (0, 1), (3, 1), 0),
+            ('RIGHTPADDING', (0, 1), (3, 1), 0),
+            ('TOPPADDING', (0, 1), (3, 1), 0),
+            ('BOTTOMPADDING', (0, 1), (3, 1), 0),
+            # --------------------------------------
+
+            # Επικεφαλίδα Ελέγχου
             ('SPAN', (0, 2), (3, 2)),
             ('BACKGROUND', (0, 2), (3, 2), SUBHEADER_BG),
-            
+
+            # Γραμμή Κατάστασης
             ('SPAN', (0, 9), (3, 9)),
             ('BACKGROUND', (0, 9), (3, 9), colors.HexColor('#f1f5f9')),
 
             ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
-            ('ALIGN', (1, 1), (1, 8), 'CENTER'),
-            ('ALIGN', (3, 1), (3, 8), 'CENTER'),
+            ('ALIGN', (1, 3), (1, 8), 'CENTER'),
+            ('ALIGN', (3, 3), (3, 8), 'CENTER'),
 
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -1129,7 +1167,6 @@ def export_traverse_report():
         metrics_table.setStyle(metrics_style)
         elements.append(metrics_table)
         elements.append(Spacer(1, 35))
-
         # ========================================================
         # 3. ΣΚΑΡΙΦΗΜΑ / ΔΙΑΓΡΑΜΜΑ
         # ========================================================
@@ -1138,10 +1175,10 @@ def export_traverse_report():
                 encoded_image = plot_base64.split(",")[1]
                 img_data = base64.b64decode(encoded_image)
                 img_stream = BytesIO(img_data)
-                
+
                 img_reader = ImageReader(img_stream)
                 orig_w, orig_h = img_reader.getSize()
-                
+
                 max_width = a4_w - 60
                 max_height = 380
 
@@ -1171,13 +1208,13 @@ def export_traverse_report():
                 UniversalNumberedCanvas,
                 doc_title="Αυτοματοποιημένη Αναφορά LASCA",
                 font_name=my_font, 
-                font_bold_name=my_font_bold, # ή 'Helvetica-Bold' αν δεν έχεις ξεχωριστό bold ελληνικό font
+                font_bold_name=my_font_bold,
                 timestamp_str=current_timestamp, 
                 logo_path=str(LOGO_PATH)
             )
         )
         buffer.seek(0)
-        
+
         return send_file(
             buffer,
             as_attachment=True,
@@ -2305,7 +2342,7 @@ def export_stakeout_report():
             ["Στάση (St):", val_p(st_name), "Προσανατολισμός (Bs):", val_p(bs_name)],
             ["X Στάσης:", val_p(st_x), "X Προσανατολισμού:", val_p(bs_x)],
             ["Y Στάσης:", val_p(st_y), "Y Προσανατολισμού:", val_p(bs_y)],
-            ["Αζιμούθιο G₀:", val_p(g0_str), "Συντελεστής mᵢⱼ:", val_p(mij_str)]
+            ["Αζιμούθιο G:", val_p(g0_str), "Συντελεστής mᵢⱼ:", val_p(mij_str)]
         ]
 
         summary_table = Table(summary_table_data, colWidths=[130, 137, 130, 138])

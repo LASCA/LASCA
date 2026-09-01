@@ -53,7 +53,7 @@ const applyProfessionalStyles = (ws) => {
  * Δημιουργεί και κατεβάζει αυτόματα το πρότυπο αρχείο Excel 
  * με τη σωστή δομή φύλλων και στηλών για την εφαρμογή.
  */
-export const downloadSurveyTemplate = () => {
+export const downloadSurveyTemplate = async () => {
   try {
     const wb = XLSX.utils.book_new();
     // γωνιομετρησεις
@@ -62,7 +62,6 @@ export const downloadSurveyTemplate = () => {
     ]);
     applyProfessionalStyles(wsgwn);
     XLSX.utils.book_append_sheet(wb, wsgwn, "gwniometriseis");
-
 
     // 1. Συνόρθωση (synorthosi_stathmou)
     const wsAdj = XLSX.utils.aoa_to_sheet([
@@ -101,7 +100,7 @@ export const downloadSurveyTemplate = () => {
     ]);
     applyProfessionalStyles(wsChar);
     XLSX.utils.book_append_sheet(wb, wsChar, "charaxi");
-    
+
     // 6. Τριγωνομετρική Υψομετρία (trig_leveling)
     const wsTrig = XLSX.utils.aoa_to_sheet([
       ["From", "To", "Slope_D", "Z[grad]", "H_station", "H_target"]
@@ -109,8 +108,43 @@ export const downloadSurveyTemplate = () => {
     applyProfessionalStyles(wsTrig);
     XLSX.utils.book_append_sheet(wb, wsTrig, "trig_leveling");
 
-    // Αποθήκευση και λήψη του αρχείου Excel
-    XLSX.writeFile(wb, 'Surveying_Data_Template.xlsx');
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const defaultFileName = 'Surveying_Data_Template.xlsx';
+
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{
+            description: 'Excel Workbook',
+            accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        toast.success('Το πρότυπο αρχείο αποθηκεύτηκε επιτυχώς!');
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
     toast.success('Το πρότυπο αρχείο κατέβηκε επιτυχώς!');
   } catch (error) {
     console.error('Template Download Error:', error);

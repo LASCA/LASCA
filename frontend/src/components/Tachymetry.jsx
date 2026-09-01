@@ -254,6 +254,36 @@ const Tachymetry = ({
     }
   };
 
+  const saveBlobFile = async (blob, defaultFileName, fileTypeDescription = 'File', acceptedExtensions = ['.txt']) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: fileTypeDescription, accept: { '*/*': acceptedExtensions } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   // 3. ΕΞΑΓΩΓΗ ΟΛΩΝ ΤΩΝ ΣΗΜΕΙΩΝ ΣΕ .TXT
   const handleExportAll = async () => {
     if (!measurements.length) {
@@ -273,14 +303,8 @@ const Tachymetry = ({
 
       if (response.data && response.data.txt_content) {
         const blob = new Blob([response.data.txt_content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = response.data.filename || 'tachymetry_all_points.txt';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        const defaultFileName = response.data.filename || 'tachymetry_all_points.txt';
+        await saveBlobFile(blob, defaultFileName, 'Text file', ['.txt']);
 
         toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .txt!`);
       } else {
@@ -313,14 +337,8 @@ const Tachymetry = ({
 
       if (response.data && response.data.dxf_content) {
         const blob = new Blob([response.data.dxf_content], { type: 'application/dxf' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = response.data.filename || 'tachymetry_all_points.dxf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        const defaultFileName = response.data.filename || 'tachymetry_all_points.dxf';
+        await saveBlobFile(blob, defaultFileName, 'DXF Drawing', ['.dxf']);
 
         toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .dxf!`);
       } else {
@@ -334,14 +352,18 @@ const Tachymetry = ({
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!plotImage) return;
-    const a = document.createElement('a');
-    a.href = plotImage;
-    a.download = `tachymetry_plot_${activeStation}_${activeOrientation}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+
+    try {
+      const response = await fetch(plotImage);
+      const blob = await response.blob();
+      const defaultFileName = `tachymetry_plot_${activeStation}_${activeOrientation}.png`;
+      await saveBlobFile(blob, defaultFileName, 'PNG Image', ['.png']);
+    } catch (error) {
+      console.error('Σφάλμα κατά την εξαγωγή γραφήματος:', error);
+      toast.error('Αποτυχία αποθήκευσης γραφήματος.');
+    }
   };
 
   const svgBounds = useMemo(() => {
