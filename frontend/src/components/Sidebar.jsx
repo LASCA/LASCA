@@ -82,19 +82,16 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-gradient-to-b from-slate-900 to-slate-950 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative z-50`}>
         
         {/* Toggle Button */}
+        {/* Toggle Button - Minimal Floating Badge */}
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute -right-3.5 top-[22px] bg-slate-900 hover:bg-slate-800 rounded-lg w-7 h-7 border border-slate-700 hover:border-blue-500/50 z-[100] transition-all duration-300 shadow-sm hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] flex items-center justify-center group"
+          className="absolute -right-3 top-6 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-blue-400 w-6 h-6 rounded-full border border-slate-700 hover:border-blue-500/50 z-[100] transition-all duration-300 shadow-md hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] flex items-center justify-center"
           title={isOpen ? "Σύμπτυξη Sidebar" : "Επέκταση Sidebar"}
         >
-          <div className="relative flex items-center justify-center w-full h-full">
-            <Crosshair size={18} className="absolute opacity-40 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500 text-slate-400 group-hover:text-blue-400" />
-            {isOpen ? (
-              <ChevronLeft size={11} className="relative z-10 text-slate-300 group-hover:text-white group-hover:-translate-x-0.5 transition-all stroke-[3]" />
-            ) : (
-              <ChevronRight size={11} className="relative z-10 text-slate-300 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[3]" />
-            )}
-          </div>
+          <ChevronLeft 
+            size={14} 
+            className={`transition-transform duration-300 stroke-[2.5] ${!isOpen ? 'rotate-180' : ''}`} 
+          />
         </button>
 
         {/* Header Sidebar */}

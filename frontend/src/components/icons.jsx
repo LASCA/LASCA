@@ -29,6 +29,7 @@ export const DashboardIcon = forwardRef(function DashboardIcon(
   );
 });
 
+
 export const MetriseisStathmouIcon = forwardRef(function MetriseisStathmouIcon(
   { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
   ref
@@ -47,13 +48,32 @@ export const MetriseisStathmouIcon = forwardRef(function MetriseisStathmouIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M6 20h12" />
-      <path d="M9 20v-3h6v3" />
-      <rect x="5" y="6" width="14" height="8" rx="1.5" />
-      <path d="M9 14v3" />
-      <path d="M15 14v3" />
-      <path d="M12 3v3" />
-      <circle cx="12" cy="10" r="1.6" />
+      {/* Λαβή Μεταφοράς (Top Handle) */}
+      <path d="M9 2h6" />
+      <path d="M9 2v2" />
+      <path d="M15 2v2" />
+
+      {/* Πλαϊνοί Βραχίονες & Άνω Γέφυρα */}
+      <path d="M7 4h10" />
+      <path d="M7 4v8" />
+      <path d="M17 4v8" />
+
+      {/* Τηλεσκόπιο & Κεντρικός Φακός (Συμμαζεμένο Πλάτος) */}
+      <path d="M5.5 8.5h13" />
+      <circle cx="12" cy="8.5" r="1.8" />
+
+      {/* Κάτω Σώμα & Ψηφιακή Οθόνη */}
+      <rect x="6.5" y="12" width="11" height="6" rx="1" />
+      <rect x="8" y="13.5" width="4.5" height="3" rx="0.5" />
+      <path d="M14.5 14h1.5" />
+      <path d="M14.5 16h1.5" />
+
+      {/* Βάση Tribrach & Κοχλίες Αλφαδιάσματος (Ευθυγραμμισμένα) */}
+      <path d="M7 18v3" />
+      <path d="M17 18v3" />
+      <path d="M6 19.5h2.5" />
+      <path d="M15.5 19.5h2.5" />
+      <path d="M6 21h12" />
     </svg>
   );
 });
@@ -84,7 +104,7 @@ export const GoniometriseisIcon = forwardRef(function GoniometriseisIcon(
 });
 
 export const SynorthosiStathmouIcon = forwardRef(function SynorthosiStathmouIcon(
-  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
   ref
 ) {
   return (
@@ -101,13 +121,17 @@ export const SynorthosiStathmouIcon = forwardRef(function SynorthosiStathmouIcon
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M12 12 5.6 6.6" />
-      <path d="M12 12l6.6-4.2" />
-      <path d="M12 12l-4 6.6" />
-      <circle cx="12" cy="12" r="2.4" />
-      <circle cx="4.5" cy="5.5" r="1.5" />
-      <circle cx="19.5" cy="6.9" r="1.5" />
-      <circle cx="7.2" cy="19.6" r="1.5" />
+      {/* Περιστραμμένη Έλλειψη Σφάλματος */}
+      <ellipse cx="12" cy="12" rx="8" ry="4" transform="rotate(-30 12 12)" strokeDasharray="2 2" />
+      
+      {/* Κεντρικό συνορθωμένο σημείο */}
+      <circle cx="12" cy="12" r="2" fill={color} />
+      
+      {/* Άξονες ακρίβειας */}
+      <path d="M12 4v3" />
+      <path d="M12 17v3" />
+      <path d="M4 12h3" />
+      <path d="M17 12h3" />
     </svg>
   );
 });
@@ -245,7 +269,7 @@ export const OrizontiografiaXYIcon = forwardRef(function OrizontiografiaXYIcon(
 });
 
 export const YpsometriaHIcon = forwardRef(function YpsometriaHIcon(
-  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
   ref
 ) {
   return (
@@ -262,11 +286,21 @@ export const YpsometriaHIcon = forwardRef(function YpsometriaHIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M3 19h8" />
-      <path d="M13 8h8" />
-      <path d="M12 17.4V9.6" />
-      <path d="M9.8 11.8 12 9.6l2.2 2.2" />
-      <path d="M9.8 15.2 12 17.4l2.2-2.2" />
+      {/* Σταθμοί & Όδευση */}
+      <circle cx="5" cy="18" r="1.5" fill={color} />
+      <circle cx="13" cy="6" r="1.5" fill={color} />
+      <path d="M 5 18 L 13 6" />
+
+      {/* Οριζόντιες προβολές (πιο αραιό dash για αποφυγή οπτικού θορύβου) */}
+      <path d="M 15 6 H 20" strokeDasharray="2 3" />
+      <path d="M 7 18 H 20" strokeDasharray="2 3" />
+
+      {/* Κάθετη γραμμή διάστασης */}
+      <path d="M 19 6 V 18" />
+      
+      {/* Ticks διάστασης (Αντί για βέλη) */}
+      <path d="M 17.5 6 H 20.5" />
+      <path d="M 17.5 18 H 20.5" />
     </svg>
   );
 });
@@ -318,14 +352,17 @@ export const CharaxiIcon = forwardRef(function CharaxiIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M5 19V3" />
-      <path d="M3.2 4.8 5 3l1.8 1.8" />
-      <path d="M5 19 7.2 16.9" />
-      <path d="M9.6 14.6 12.4 11.9" />
-      <path d="M14.8 9.6 17 7.5" />
-      <path d="M17.4 13V3.6" />
-      <path d="M17.4 3.8000000000000003 23.7 6.7L17.4 9.5" />
-      <path d="M5 13a6 6 0 0 1 4.3 1.8" />
+      {/* Σημαία Χάραξης / Σηματόσημο */}
+      <path d="M12 3l7 3.5-7 3.5" />
+
+      {/* Κορμός Πασσάλου */}
+      <path d="M12 3v14" />
+
+      {/* Μυτερή Άκρη Πασσάλου */}
+      <path d="M10.5 17l1.5 3.5 1.5-3.5" />
+
+      {/* Γραμμή Εδάφους */}
+      <path d="M5 20.5h14" />
     </svg>
   );
 });
