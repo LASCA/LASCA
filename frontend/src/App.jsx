@@ -90,6 +90,18 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const blockDevToolsShortcuts = (event) => {
+      if (event.key === 'F12' || (event.shiftKey && event.ctrlKey && event.key.toLowerCase() === 'i') || (event.shiftKey && event.metaKey && event.key.toLowerCase() === 'i')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener('keydown', blockDevToolsShortcuts, true);
+    return () => document.removeEventListener('keydown', blockDevToolsShortcuts, true);
+  }, []);
+
 
   // --- ΚΑΘΑΡΙΣΜΟΣ STATE (RESET ALL DATA) ---
   const resetAllData = () => {

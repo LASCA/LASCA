@@ -2741,4 +2741,4 @@ if __name__ == '__main__':
     server_thread.start()
 
     webview.create_window('LASCA', f'http://127.0.0.1:{port}', width=1280, height=800, resizable=True)
-    webview.start(debug=True)
+    webview.start(debug=False)

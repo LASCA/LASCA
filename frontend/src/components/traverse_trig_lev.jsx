@@ -38,24 +38,60 @@ const TraverseTrigLevel = ({
     return isNaN(num) ? val : num.toFixed(decimals);
   };
 
+  // ΕΞΥΠΝΟ FORMATTING: Εφαρμόζει δεκαδικά παντού, ΕΚΤΟΣ από το κελί που κάνουμε edit (όπως στο Adjustment)
   useEffect(() => {
-    if (observations && observations.length > 0) {
-      setLocalObs(observations.map(obs => ({
-        ...obs,
-        s: to3(obs.s),
-        z: to4(obs.z),
-        hi: to3(obs.hi),
-        ht: to3(obs.ht)
-      })));
-    } else if (localObs.length === 0) {
-      const initialRows = Array.from({ length: 3 }).map((_, index) => ({
-        id: Date.now() + index, 
-        from: "", to: "", s: "", z: "", hi: "", ht: ""
-      }));
-      setLocalObs(initialRows);
-      if (setObservations) setObservations(initialRows);
+    if (!observations || observations.length === 0) {
+      if (localObs.length === 0) {
+        const initialRows = Array.from({ length: 3 }).map((_, index) => ({
+          id: Date.now() + index, 
+          from: "", to: "", s: "", z: "", hi: "", ht: ""
+        }));
+        setLocalObs(initialRows);
+        if (setObservations) setObservations(initialRows);
+      }
+      return;
     }
-  }, [observations]);
+
+    let hasChanges = false;
+    // Βρίσκουμε ποιο input έχει το focus αυτή τη στιγμή (αν υπάρχει)
+    const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
+
+    const formattedObservations = observations.map((obs, index) => {
+      let updatedObs = { ...obs };
+      
+      const isSFocused = activeId === `input-${index}-s`;
+      const isZFocused = activeId === `input-${index}-z`;
+      const isHiFocused = activeId === `input-${index}-hi`;
+      const isHtFocused = activeId === `input-${index}-ht`;
+
+      if (!isSFocused && obs.s !== "" && obs.s != null) {
+        const formattedVal = to3(obs.s);
+        if (formattedVal !== String(obs.s)) { updatedObs.s = formattedVal; hasChanges = true; }
+      }
+      if (!isZFocused && obs.z !== "" && obs.z != null) {
+        const formattedVal = to4(obs.z);
+        if (formattedVal !== String(obs.z)) { updatedObs.z = formattedVal; hasChanges = true; }
+      }
+      if (!isHiFocused && obs.hi !== "" && obs.hi != null) {
+        const formattedVal = to3(obs.hi);
+        if (formattedVal !== String(obs.hi)) { updatedObs.hi = formattedVal; hasChanges = true; }
+      }
+      if (!isHtFocused && obs.ht !== "" && obs.ht != null) {
+        const formattedVal = to3(obs.ht);
+        if (formattedVal !== String(obs.ht)) { updatedObs.ht = formattedVal; hasChanges = true; }
+      }
+
+      return updatedObs;
+    });
+
+    if (hasChanges) {
+      setLocalObs(formattedObservations);
+      if (setObservations) setObservations(formattedObservations);
+    } else {
+      // Κρατάμε το localObs συγχρονισμένο με τα observations χωρίς να ενοχλούμε την πληκτρολόγηση
+      setLocalObs(observations);
+    }
+  }, [observations, setObservations]);
 
   const updateObsData = (newData) => {
     const finalData = typeof newData === 'function' ? newData(localObs) : newData;
@@ -109,6 +145,47 @@ const TraverseTrigLevel = ({
   const handleObsBlur = (id, field, value) => {
     if (field === 's' || field === 'hi' || field === 'ht') handleObsInputChange(id, field, to3(value));
     else if (field === 'z') handleObsInputChange(id, field, to4(value));
+  };
+
+  // Έξυπνη πλοήγηση με τα βελάκια χωρίς μαρκάρισμα/επιλογή του κειμένου
+  const handleKeyDown = (e, index, colName) => {
+    const columns = ['from', 'to', 's', 'z', 'hi', 'ht'];
+    const colIndex = columns.indexOf(colName);
+    let nextRow = index;
+    let nextCol = colIndex;
+    let shouldMove = false;
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') { 
+      e.preventDefault(); 
+      nextRow = index + 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowUp') { 
+      e.preventDefault(); 
+      nextRow = index - 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) { 
+      e.preventDefault(); 
+      nextCol = colIndex - 1; 
+      shouldMove = true; 
+    }
+    else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) { 
+      e.preventDefault(); 
+      nextCol = colIndex + 1; 
+      shouldMove = true; 
+    }
+
+    if (shouldMove) {
+      if (nextRow >= 0 && nextRow < localObs.length && nextCol >= 0 && nextCol < columns.length) {
+        const nextInput = document.getElementById(`input-${nextRow}-${columns[nextCol]}`);
+        if (nextInput) { 
+          nextInput.focus(); 
+          const valLength = nextInput.value.length;
+          nextInput.setSelectionRange(valLength, valLength);
+        }
+      }
+    }
   };
 
   const addObsRowAt = (index) => {
@@ -219,15 +296,15 @@ const TraverseTrigLevel = ({
                   <React.Fragment key={obs.id || index}>
                     <tr className="group hover:bg-slate-800/20 transition-all">
                       <td className="p-4 text-center text-[10px] text-slate-600 font-mono font-bold">{index + 1}</td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.from} onChange={(e) => handleObsInputChange(obs.id, 'from', e.target.value)} placeholder="-" disabled={showTrigResults} /></td>
-                      <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.to} onChange={(e) => handleObsInputChange(obs.id, 'to', e.target.value)} placeholder="-" disabled={showTrigResults} /></td>
+                      <td className="p-2"><input id={`input-${index}-from`} className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.from} onChange={(e) => handleObsInputChange(obs.id, 'from', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'from')} placeholder="-" disabled={showTrigResults} /></td>
+                      <td className="p-2"><input id={`input-${index}-to`} className="w-full bg-transparent p-2 text-sm text-center font-bold tracking-tight outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-slate-500/80 transition-all text-slate-200" value={obs.to} onChange={(e) => handleObsInputChange(obs.id, 'to', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'to')} placeholder="-" disabled={showTrigResults} /></td>
                       
                       {!showTrigResults && (
                         <>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.s} onBlur={(e) => handleObsBlur(obs.id, 's', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 's', e.target.value)} placeholder="-" /></td>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} placeholder="-" /></td>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} placeholder="-" /></td>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} placeholder="-" /></td>
+                          <td className="p-2"><input id={`input-${index}-s`} className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.s} onBlur={(e) => handleObsBlur(obs.id, 's', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 's', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 's')} placeholder="-" /></td>
+                          <td className="p-2"><input id={`input-${index}-z`} className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.z} onBlur={(e) => handleObsBlur(obs.id, 'z', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'z', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'z')} placeholder="-" /></td>
+                          <td className="p-2"><input id={`input-${index}-hi`} className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.hi} onBlur={(e) => handleObsBlur(obs.id, 'hi', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'hi', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'hi')} placeholder="-" /></td>
+                          <td className="p-2"><input id={`input-${index}-ht`} className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" value={obs.ht} onBlur={(e) => handleObsBlur(obs.id, 'ht', e.target.value)} onChange={(e) => handleObsInputChange(obs.id, 'ht', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'ht')} placeholder="-" /></td>
                         </>
                       )}
 

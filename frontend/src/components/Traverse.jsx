@@ -342,7 +342,15 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       }
 
       const blob = await response.blob();
-      await saveBlobFile(blob, 'Traverse_Report.pdf');
+      const projectName = String((projectInfo || projectSettings)?.name || '').trim();
+      const sanitizedProjectName = projectName
+        .replace(/\s+/g, '_')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+      const fileName = sanitizedProjectName
+        ? `${sanitizedProjectName}_Traverse_Report.pdf`
+        : 'Traverse_Report.pdf';
+
+      await saveBlobFile(blob, fileName);
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
       console.error('Σφάλμα κατά τη δημιουργία του Report:', error);

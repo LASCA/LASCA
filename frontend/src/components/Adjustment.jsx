@@ -257,7 +257,15 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         throw new Error(errorJson.error || 'Αποτυχία δημιουργίας PDF Report.');
       }
 
-      await saveBlobFile(response.data, 'Adjustment_Report.pdf');
+      const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
+      const sanitizedProjectName = projectName
+        .replace(/\s+/g, '_')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+      const fileName = sanitizedProjectName
+        ? `${sanitizedProjectName}_Adjustment_Report.pdf`
+        : 'Adjustment_Report.pdf';
+
+      await saveBlobFile(response.data, fileName);
     } catch (error) {
       const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία δημιουργίας PDF Report.';
       console.error('Σφάλμα κατά την εξαγωγή του Report:', error);

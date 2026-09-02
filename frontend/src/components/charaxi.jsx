@@ -178,7 +178,15 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
       }
 
       const blob = await response.blob();
-      await saveBlobFile(blob, `Stakeout_Report_${station.name || 'Station'}.pdf`);
+      const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
+      const sanitizedProjectName = projectName
+        .replace(/\s+/g, '_')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+      const fileName = sanitizedProjectName
+        ? `${sanitizedProjectName}_charaxi_report.pdf`
+        : 'charaxi_report.pdf';
+
+      await saveBlobFile(blob, fileName);
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: loadingToast });
     } catch (err) {
       console.error('Σφάλμα κατά τη δημιουργία του report:', err);
