@@ -630,7 +630,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
               <div className="flex-1 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
                   <CompactStat label="Κορυφές (n)" value={metrics.n} icon={<Target size={12}/>} color="text-slate-200" />
-                  <CompactStat label="Μήκος (L)" value={metrics.totalLength} unit="m" icon={<Ruler size={12}/>} color="text-slate-200" />
+                  <CompactStat label="Μήκος (S)" value={metrics.totalLength} unit="m" icon={<Ruler size={12}/>} color="text-slate-200" />
                 </div>
                 <DetailedAngleGroup 
                   title="Γωνιακό Σφάλμα (Wβ)"
@@ -647,7 +647,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   yTarget={metrics.dyTarget} yActual={metrics.dyActual} yError={metrics.dy}
                   ds={metrics.w}
                   maxDs={metrics.ds_max}
-                  labels={["ΔX (πρέπει)", "ΔX (είναι)", "δx", "ΔY (πρέπει)", "ΔY (είναι)", "δy", "δs (W)"]}
+                  labels={["ΔX (πρέπει)", "ΔX (είναι)", "δx", "ΔY (πρέπει)", "ΔY (είναι)", "δy", "δs"]}
                 />
               </div>
             </div>

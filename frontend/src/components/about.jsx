@@ -25,21 +25,22 @@ const About = ({ isOpen, onClose }) => {
   // -------------------------------------------------------------
   const teamMembers = [
     {
-      name: "Αλέξανδρος Χ. Καραχλές",
+      name: "Αλέξανδρος Καραχλές",
       role: "",
       email: "akarachles@gmail.com",
       linkedin: "https://linkedin.com/in/username1",
       github: "https://github.com/Neversplit2"
     },
     {
-      name: "Ηλίας Α. Σαούλιας",
-      role: "Frontend Engineer / UI UX",
-      email: "developer2@example.com",
+      name: "Ηλίας Σαούλιας",
+      role: "",
+      email: "ilias.saoulias@gmail.com",
       linkedin: "https://linkedin.com/in/username2",
+      github: "https://github.com/iliasaou"
     },
     {
-      name: "Σάββας E. Τσιγκουτζίδης",
-      role: "Algorithm & Math Specialist",
+      name: "Σάββας Τσιγκουτζίδης",
+      role: "",
       email: "savvastsigou@gmail.com",
       linkedin: "https://linkedin.com/in/username3",
       github: "https://github.com/Savvas-Tsigou"
@@ -61,7 +62,7 @@ const About = ({ isOpen, onClose }) => {
           <div className="flex items-center gap-3">
             <img src="/LASCA-logo-red-blue-1024.png" alt="LASCA Logo" className="w-8 h-8 object-contain" />
             <div>
-              <h3 className="text-base font-bold text-white leading-none">LASCA Suite</h3>
+              <h3 className="text-base font-bold text-white leading-none">LASCA</h3>
               <span className="text-[11px] font-mono text-cyan-400">v1.0.0 </span>
             </div>
           </div>
@@ -78,13 +79,14 @@ const About = ({ isOpen, onClose }) => {
         <div className="p-6 space-y-5 text-sm text-slate-300 max-h-[75vh] overflow-y-auto custom-scrollbar">
           
           <p className="leading-relaxed text-slate-400">
-            Το <strong className="text-slate-100">LASCA</strong> είναι ένα εξειδικευμένο τοπογραφικό λογισμικό σχεδιασμένο για την επεξεργασία, συνόρθωση και υπολογισμό γεωδαιτικών δεδομένων.
+            Το <strong className="text-slate-100">LASCA</strong> ειναι ένα σύγχρονο λογισμικό τοπογραφικών υπολογισμών, που σχεδιάστηκε για να καλύψει τις εργασίες γραφείου μέσα από μία ενιαία ροή εργασιών. 
+Αναπτύχθηκε από  φοιτητές Αγρονόμους και Τοπογράφους Μηχανικούς του ΑΠΘ.
           </p>
 
           <div className="space-y-3 pt-1">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
               <Code2 size={15} className="text-blue-400" />
-              <span>Laska Developers</span>
+              <span>Lasca Developers</span>
             </div>
             
             {/* Team List with Hover expansion */}

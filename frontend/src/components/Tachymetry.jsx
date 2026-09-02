@@ -582,7 +582,7 @@ const Tachymetry = ({
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [gon]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [gon]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">
-                    SD [m] {scaleMode !== "Χωρίς" && <span className="text-[8px] text-amber-400/80 font-normal">(αναγ.)</span>}
+                    SD [m] {scaleMode !== "Χωρίς" && <span className="text-[8px] text-amber-400/80 font-normal"></span>}
                   </th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">X [m]</th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Y [m]</th>

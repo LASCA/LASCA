@@ -102,22 +102,29 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
       
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
-        
-        {currentProject && (
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 p-1.5 hover:bg-slate-900 rounded-lg transition-colors"
-          >
-            <X size={16} />
-          </button>
-        )}
 
         <div className="bg-[#0f172a]/80 p-4 border-b border-slate-800 flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <Settings className="text-amber-500" size={16} />
-            <span className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Διαχείριση Εργασιών</span>
+          
+          {/* Γραμμή Τίτλου + Κουμπί Χ (Ευθυγραμμισμένα) */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings className="text-amber-500" size={16} />
+              <span className="text-[10px] font-black tracking-[0.2em] text-slate-400">
+                Διαχείριση Εργασιών
+              </span>
+            </div>
+
+            <button 
+              onClick={onClose}
+              type="button"
+              aria-label="Κλείσιμο"
+              className="p-1.5 text-slate-400 hover:text-slate-100 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 rounded-xl transition-all duration-200 active:scale-95 group shadow-sm"
+            >
+              <X size={15} className="group-hover:rotate-90 transition-transform duration-200" />
+            </button>
           </div>
 
+          {/* Tabs Επιλογής */}
           <div className="flex bg-slate-950/60 p-1 rounded-xl border border-slate-800/60">
             <button
               onClick={() => { setActiveTab('create'); setError(''); }}
@@ -128,7 +135,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               }`}
             >
               <FolderPlus size={14} />
-              Νέο Project
+              Νέο Έργο
             </button>
             <button
               onClick={() => { setActiveTab('open'); setError(''); }}

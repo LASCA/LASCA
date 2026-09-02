@@ -44,7 +44,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     if (observations && observations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
         id: Date.now() + index, 
-        station: "", target: "", Period: "1", Face_I: "", Face_II: "", adj_hz: "", std_dev: ""
+        station: "", target: "", Period: "", Face_I: "", Face_II: "", adj_hz: "", std_dev: ""
       }));
       setObservations(initialRows);
     }
@@ -144,7 +144,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   };
 
   const addRowAt = (index) => {
-    const newRow = { id: Date.now(), station: "", target: "", Period: "1", Face_I: "", Face_II: "", adj_hz: "", std_dev: "" };
+    const newRow = { id: Date.now(), station: "", target: "", Period: "", Face_I: "", Face_II: "", adj_hz: "", std_dev: "" };
     const updated = [...observations];
     updated.splice(index + 1, 0, newRow);
     setObservations(updated);
@@ -370,6 +370,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
                                 value={obs.Period} 
                                 onChange={(e) => handleInputChange(obs.id, 'Period', e.target.value)} 
                                 onKeyDown={(e) => handleKeyDown(e, index, 'Period')}
+                                placeholder="-"
                               />
                             </td>
                             <td className="p-2">

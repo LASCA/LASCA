@@ -58,19 +58,18 @@ if not LOGO_PATH.exists():
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
 
+
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
 
 class UniversalNumberedCanvas(canvas.Canvas):
     """
     Universal canvas για ReportLab με υποστήριξη 2 περασμάτων (Page X of Y),
-    δυναμικό τίτλο αναφοράς, λογότυπο και υποσέλιδο.
+    δυναμικό τίτλο αναφοράς, λογότυπο (εικονίδιο + κείμενο LASCA) και υποσέλιδο.
     """
     def __init__(self, *args, 
                  doc_title="Αυτοματοποιημένη Αναφορά LASCA", 
                  font_name='Helvetica', 
-                 font_bold_name='Helvetica-Bold',  # Νέα παράμετρος για Bold font
+                 font_bold_name='Helvetica-Bold', 
                  timestamp_str='', 
                  logo_path=None, 
                  **kwargs):
@@ -95,60 +94,84 @@ class UniversalNumberedCanvas(canvas.Canvas):
         super().save()
 
     def draw_page_decorations(self, page_count):
+        from reportlab.lib import colors
+        from reportlab.lib.utils import ImageReader
+
         self.saveState()
         
-        # --- Πάνω Κεφαλίδα (Header) ---
-        header_y = A4[1] - 30
-        logo_width, logo_height = 32, 32
-        logo_y = header_y - 10
+        page_width, page_height = self._pagesize
         
+        # ==========================================
+        # ΕΥΚΟΛΕΣ ΡΥΘΜΙΣΕΙΣ (Άλλαξε αυτά τα νούμερα και δες το αποτέλεσμα live)
+        # ==========================================
+        ICON_HEIGHT = 34           # Ύψος του εικονιδίου (34 αντί για 40 για να είναι πιο κομψό)
+        GAP_ICON_LASCA = -4        # Βάλε αρνητικό (π.χ. -5 ή -10) αν η εικόνα έχει διάφανο φόντο και θέλεις το LASCA πιο κοντά!
+        GAP_LASCA_TITLE = 16       # Το (μεγαλύτερο) κενό ανάμεσα στο "LASCA" και τον τίτλο
+        FONT_SIZE_LASCA = 18       # Μέγεθος γραμμάτων για το "LASCA"
+        FONT_SIZE_TITLE = 10       # Μέγεθος γραμμάτων για τον τίτλο
+        # ==========================================
+        
+        # Το κοινό Y (baseline) που πατάνε ΚΑΙ το "LASCA" ΚΑΙ ο Τίτλος για να είναι σε ΑΠΟΛΥΤΗ ευθεία κάτω
+        header_y = page_height - 35 
+        current_x = 30
+        
+        # --- 1. Σχεδίαση Λογότυπου ---
         if self.logo_path:
             try:
-                self.drawImage(self.logo_path, 30, logo_y, width=logo_width, height=logo_height, mask='auto')
+                img = ImageReader(self.logo_path)
+                orig_w, orig_h = img.getSize()
+                
+                icon_width = ICON_HEIGHT * (orig_w / float(orig_h))
+                
+                # Το κατεβάζουμε λίγο (κατά 8) για να ευθυγραμμιστεί η "κοιλιά" του εικονιδίου με τα γράμματα
+                icon_y = header_y - 8 
+                
+                self.drawImage(self.logo_path, current_x, icon_y, width=icon_width, height=ICON_HEIGHT, mask='auto')
+                
+                # Μετακινούμε τον "κέρσορα" δεξιά για να ξεκινήσει το LASCA (εδώ εφαρμόζεται το GAP_ICON_LASCA)
+                current_x += icon_width + GAP_ICON_LASCA  
             except Exception as e:
                 print(f"Δεν ήταν δυνατή η φόρτωση του λογότυπου: {e}")
         
-        self.setFillColor(colors.HexColor('#475569'))
-        text_x = (30 + logo_width + 10) if self.logo_path else 30
+        # --- 2. Σχεδίαση του "LASCA" ---
+        self.setFont(self.font_bold_name, FONT_SIZE_LASCA) 
+        self.setFillColor(colors.black)
+        self.drawString(current_x, header_y, "LASCA")
         
-        # --- ΣΧΕΔΙΑΣΗ ΤΙΤΛΟΥ ΜΕ BOLD "LASCA" ---
-        if "LASCA" in self.doc_title:
-            prefix = self.doc_title.replace("LASCA", "").rstrip() + " "
-            
-            # 1. Σχεδίαση του πρώτου μέρους (Regular)
-            self.setFont(self.font_name, 10)
-            self.drawString(text_x, header_y, prefix)
-            
-            # 2. Υπολογισμός πλάτους κειμένου
-            prefix_width = self.stringWidth(prefix, self.font_name, 10)
-            
-            # 3. Σχεδίαση του "LASCA" (Bold)
-            self.setFont(self.font_bold_name, 10)
-            self.drawString(text_x + prefix_width, header_y, "LASCA")
-        else:
-            self.setFont(self.font_name, 10)
-            self.drawString(text_x, header_y, self.doc_title)
+        lasca_width = self.stringWidth("LASCA", self.font_bold_name, FONT_SIZE_LASCA) 
         
-        # Αριθμός Σελίδας
+        # Προσθέτουμε το μεγάλο κενό που ζήτησες μετά το LASCA
+        current_x += lasca_width + GAP_LASCA_TITLE 
+        
+        # --- 3. Σχεδίαση του Υπόλοιπου Τίτλου ---
+        self.setFillColor(colors.HexColor('#475569')) 
+        clean_title = self.doc_title.replace("LASCA", "").strip()
+        
+        if clean_title:
+            self.setFont(self.font_name, FONT_SIZE_TITLE)
+            # Τυπώνεται ΑΚΡΙΒΩΣ στο ίδιο header_y με το LASCA (τέλεια ευθυγράμμιση βάσης)
+            self.drawString(current_x, header_y, clean_title)
+        
+        # --- 4. Αριθμός Σελίδας ---
         self.setFont(self.font_name, 10)
+        self.setFillColor(colors.HexColor('#475569'))
         page_str = f"Σελίδα {self._pageNumber} από {page_count}"
-        self.drawRightString(A4[0] - 30, header_y, page_str)
+        self.drawRightString(page_width - 30, header_y, page_str)
         
-        # Διαχωριστική γραμμή
+        # Διαχωριστική γραμμή κεφαλίδας
         self.setStrokeColor(colors.HexColor('#cbd5e1'))
         self.setLineWidth(1)
-        self.line(30, header_y - 12, A4[0] - 30, header_y - 12)
+        self.line(30, header_y - 12, page_width - 30, header_y - 12)
         
-        # --- Κάτω Υποσέλιδο (Footer) ---
+        # --- 5. Κάτω Υποσέλιδο (Footer) ---
         self.setFont(self.font_name, 8)
         self.setLineWidth(0.75)
-        self.line(30, 35, A4[0] - 30, 35)
+        self.line(30, 35, page_width - 30, 35)
         
         if self.timestamp_str:
             self.drawString(30, 22, f"{self.timestamp_str}")
         
         self.restoreState()
-
 
 @app.route('/')
 def serve_index():
@@ -362,11 +385,6 @@ def run_adjustment():
                 'vv': float(station_stats.get('vv', 0.0))
             }
             stats_list.append(clean_stats)
-
-        # ΠΡΟΣΘΗΚΗ: Εκτυπώνουμε τη λίστα που θα σταλεί στο React για έλεγχο
-        print("====== DEBUGGING ΤΕΛΙΚΩΝ ΣΤΑΤΙΣΤΙΚΩΝ ΠΡΟΣ REACT ======")
-        print(f"Τελική Λίστα (stats_list): {stats_list}")
-        print("======================================================")
             
         # Επιστρέφουμε τα αποτελέσματα στο Frontend
         return jsonify({
@@ -538,7 +556,7 @@ def export_adjustment_report():
 
         project_data = [
             [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
-            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
         
         # Πλάτος Στήλης (A4 = 595.27, Margin = 30+30 = 60, Σύνολο = 535.27 / 2)
@@ -1008,7 +1026,7 @@ def export_traverse_report():
         # ========================================================
         # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ
         # ========================================================
-        elements.append(Paragraph("Τεύχος Υπολογισμού Όδευσης", title_style))
+        elements.append(Paragraph("Αναφορά Πολυγωνικής Όδευσης", title_style))
         elements.append(Spacer(1, 20))
 
         # ========================================================
@@ -1094,7 +1112,7 @@ def export_traverse_report():
         # ----------------- Ένθετος Πίνακας για τα Γενικά Στοιχεία (6 Στήλες) -----------------
         gen_data = [[
             Paragraph("Αριθμός Στάσεων (n):", td_norm_style), val_p(metrics.get('n', '-')),
-            Paragraph("Συνολικό Μήκος (L):", td_norm_style), val_p(safe_fmt(metrics.get('totalLength'), 2, " m")),
+            Paragraph("Συνολικό Μήκος (S):", td_norm_style), val_p(safe_fmt(metrics.get('totalLength'), 2, " m")),
             Paragraph("Συντελεστής Κλίμακας (m<sub>ij</sub>):", td_norm_style), val_p(scale_factor_fmt)
         ]]
         
@@ -1125,7 +1143,7 @@ def export_traverse_report():
             ["ΔX (πρέπει):", val_p(safe_fmt(metrics.get('dxTarget'), 3, " m")), "ΔY (πρέπει):", val_p(safe_fmt(metrics.get('dyTarget'), 3, " m"))],
             ["ΔX (είναι):", val_p(safe_fmt(metrics.get('dxActual'), 3, " m")), "ΔY (είναι):", val_p(safe_fmt(metrics.get('dyActual'), 3, " m"))],
             ["Σφάλμα δX:", val_p(safe_fmt(metrics.get('dx'), 3, " m")), "Σφάλμα δY:", val_p(safe_fmt(metrics.get('dy'), 3, " m"))],
-            ["Ολικό Γραμμικό Σφάλμα (fs / δs):", val_p(ds_act), "Μέγιστη Γραμμική Ανοχή (δs_max):", val_p(ds_max)],
+            ["Μέγιστη Γραμμική Ανοχή (δs_max):", val_p(ds_max),"δs:", val_p(ds_act)],
 
             [status_p, '', '', '']
         ]
@@ -2308,7 +2326,7 @@ def export_stakeout_report():
         # ========================================================
         # ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ (Μεταφέρθηκε κάτω από τις πληροφορίες)
         # ========================================================
-        elements.append(Paragraph("Τεύχος Υπολογισμού Χάραξης", title_style))
+        elements.append(Paragraph("Αναφορά Χάραξης", title_style))
         elements.append(Spacer(1, 20))
 
         # ========================================================
