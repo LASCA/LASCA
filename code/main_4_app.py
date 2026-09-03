@@ -7,6 +7,7 @@ if sys.stderr and hasattr(sys.stderr, 'buffer'):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 import os
+import socket
 import threading
 import webview
 import pandas as pd
@@ -19,7 +20,7 @@ import data_proccessing as dpr
 import vis_4_app as vis
 
 from datetime import datetime
-from project_manager import TopoProject
+from project_manager import TopoProject, get_safe_workspace_dir
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
@@ -57,6 +58,12 @@ if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
+
+
+def find_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
 
 
 from reportlab.pdfgen import canvas
@@ -210,8 +217,8 @@ def get_active_project_name():
         
     return None
 
-# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects - ΑΣΦΑΛΗΣ ΠΡΟΣΕΓΓΙΣΗ ΜΕ BASE_DIR
-WORKSPACE_DIR = BASE_DIR / "Topo_Workspace"
+# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects στο AppData
+WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -2732,7 +2739,7 @@ def run_trig_leveling():
         return jsonify({"error": str(e)}), 500
     
 if __name__ == '__main__':
-    port = 5000
+    port = find_free_port()
 
     def run_server():
         app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
