@@ -461,12 +461,17 @@ function App() {
             )}
 
             {activeTab === 'trig_leveling' && (
-              <TrigonometricHeight 
-                data={trigHeightData}
-                setData={setTrigHeightData}
-                projectSettings={currentProject}
-              />
-            )}
+            <TrigonometricHeight 
+              data={trigHeightData}
+              setData={setTrigHeightData}
+              projectSettings={{
+                name: currentProject,
+                designer: globalSettings.designer,
+                employer: globalSettings.employer,
+                location: globalSettings.location
+              }}
+            />
+          )}
             
             {activeTab === 'tachymetry' && (
               <Tachymetry 

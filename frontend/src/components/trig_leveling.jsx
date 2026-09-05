@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
-import { Calculator, Database, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft } from 'lucide-react';
+import { Calculator, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
 
 const TrigonometricHeight = ({ 
@@ -11,6 +11,37 @@ const TrigonometricHeight = ({
   const [localData, setLocalData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false); // Προσθήκη state για εμφάνιση/απόκρυψη αποτελεσμάτων
+  const [calculationInput, setCalculationInput] = useState([]);
+
+  const saveBlobFile = async (blob, defaultFileName) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: 'PDF Report', accept: { 'application/pdf': ['.pdf'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to download link:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   // --- HELPERS ΣΤΡΟΓΓΥΛΟΠΟΙΗΣΗΣ ---
   const to3 = (val) => {
@@ -121,6 +152,7 @@ const TrigonometricHeight = ({
   const handleCalculate = async () => {
     setIsLoading(true);
     try {
+      setCalculationInput(localData.map(row => ({ ...row })));
       const projectNamePayload = typeof projectSettings === 'string' 
         ? projectSettings 
         : (projectSettings?.name || '');
@@ -158,6 +190,40 @@ const TrigonometricHeight = ({
     } catch (error) {
       console.error("Σφάλμα στην Τριγωνομετρική Υψομετρία:", error);
       alert("Αποτυχία σύνδεσης με το backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!showResults || localData.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/reports/trig-leveling`, {
+        initialData: calculationInput.length > 0 ? calculationInput : localData,
+        results: localData,
+        projectInfo: projectSettings
+      }, { responseType: 'blob' });
+
+      if (response.data && response.data.type === 'application/json') {
+        const errorJson = JSON.parse(await response.data.text());
+        throw new Error(errorJson.error || 'Αποτυχία δημιουργίας PDF Report.');
+      }
+
+      const projectName = String(projectSettings?.name || projectSettings?.projectName || '').trim();
+      const sanitizedProjectName = projectName
+        .replace(/\s+/g, '_')
+        .replace(/[<>:"/\\|?*]/g, '');
+      const fileName = sanitizedProjectName
+        ? `${sanitizedProjectName}_Trig_Leveling_Report.pdf`
+        : 'Trig_Leveling_Report.pdf';
+
+      await saveBlobFile(response.data, fileName);
+    } catch (error) {
+      const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία δημιουργίας PDF Report.';
+      console.error('Σφάλμα κατά την εξαγωγή του Report:', error);
+      alert(backendMessage);
     } finally {
       setIsLoading(false);
     }
@@ -252,6 +318,17 @@ const TrigonometricHeight = ({
                       >
                         {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
                       </button>
+                      {showResults && (
+                        <button
+                          type="button"
+                          onClick={handleDownloadReport}
+                          disabled={isLoading}
+                          title="Δημιουργία Report"
+                          className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                          <FileText size={14} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                        </button>
+                      )}
                     </div>
                   </th>
                 </tr>

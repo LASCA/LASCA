@@ -1010,7 +1010,7 @@ def export_traverse_report():
 
         project_data = [
             [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
-            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
 
         col_width = (A4[0] - 60) / 2
@@ -2310,7 +2310,7 @@ def export_stakeout_report():
 
         project_data = [
             [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
-            [make_info_cell("ΜΗΧΑΝΙΚΟΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
         ]
         
         col_width = (A4[0] - 60) / 2
@@ -2737,6 +2737,236 @@ def run_trig_leveling():
         import traceback
         print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/reports/trig-leveling', methods=['POST'])
+def export_trig_leveling_report():
+    try:
+        data = request.json or {}
+        initial_data = data.get('initialData', [])
+        results = data.get('results', [])
+
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (MODERN DASHBOARD INFO) ---
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or {}
+        
+        sources_to_check = []
+        if isinstance(raw_proj, dict) and raw_proj:
+            sources_to_check.append(raw_proj)
+            if isinstance(raw_proj.get('settings'), dict):
+                sources_to_check.append(raw_proj.get('settings'))
+        sources_to_check.append(data)
+
+        def extract_field(keys):
+            for src in sources_to_check:
+                if isinstance(src, dict):
+                    for key in keys:
+                        val = src.get(key)
+                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                            return str(val).strip()
+            return 'Μη διαθέσιμο'
+
+        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
+        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
+        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
+        proj_location = extract_field(['location', 'place', 'address'])
+
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
+        try:
+            pdfmetrics.registerFont(TTFont('TrigGreekFont', 'C:/Windows/Fonts/arial.ttf'))
+            pdfmetrics.registerFont(TTFont('TrigGreekFont-Bold', 'C:/Windows/Fonts/arialbd.ttf'))
+            registerFontFamily('TrigGreekFont', normal='TrigGreekFont', bold='TrigGreekFont-Bold')
+            my_font, my_font_bold = 'TrigGreekFont', 'TrigGreekFont-Bold'
+        except Exception:
+            my_font, my_font_bold = 'Helvetica', 'Helvetica-Bold'
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=30, rightMargin=30, topMargin=55, bottomMargin=45)
+        
+        # --- Παλέτα Χρωμάτων ---
+        HEADER_BG = colors.HexColor('#0f172a')
+        ROW_BG_1 = colors.HexColor('#ffffff')
+        ROW_BG_2 = colors.HexColor('#f8fafc')
+        GRID_COLOR = colors.HexColor('#cbd5e1')
+        TEXT_MAIN = colors.HexColor('#0f172a')
+        ACCENT_TITLE = colors.HexColor('#0284c7')
+        EMERALD_BG = colors.HexColor('#ecfdf5') # Απαλό πράσινο για την στήλη του Μ.Ο.
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('TrigTitle', parent=styles['Title'], fontName=my_font_bold, fontSize=22, leading=24, textColor=ACCENT_TITLE, alignment=0)
+        section_style = ParagraphStyle('TrigSection', fontName=my_font_bold, fontSize=14, leading=16, textColor=HEADER_BG)
+        th_style = ParagraphStyle('TrigTH', parent=styles['Normal'], fontName=my_font_bold, fontSize=8.5, leading=10, textColor=colors.white, alignment=1)
+        td_style = ParagraphStyle('TrigTD', parent=styles['Normal'], fontName=my_font, fontSize=8, leading=10, textColor=TEXT_MAIN, alignment=1)
+        td_bold_style = ParagraphStyle('TrigTDBold', parent=td_style, fontName=my_font_bold)
+
+        # Νέα Styles για το Modern Dashboard Box
+        modern_label_style = ParagraphStyle(
+            'ModernLabel', fontName=my_font_bold, fontSize=7.5, textColor=colors.HexColor('#64748b'), spaceAfter=2, textTransform='uppercase'
+        )
+        modern_value_style = ParagraphStyle(
+            'ModernValue', fontName=my_font_bold, fontSize=11, textColor=TEXT_MAIN, spaceAfter=8
+        )
+
+        def make_info_cell(label, value):
+            return [Paragraph(label, modern_label_style), Paragraph(value, modern_value_style)]
+
+        # --- 1. Dashboard Πληροφοριών ---
+        project_data = [
+            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
+            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+        ]
+        
+        col_width = (A4[0] - 60) / 2
+        info_table = Table(project_data, colWidths=[col_width, col_width])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
+            ('TOPPADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 15),
+            ('RIGHTPADDING', (0,0), (-1,-1), 15),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ]))
+
+        def cell(value, bold=False):
+            if value in (None, '', '-'): return Paragraph('-', td_style)
+            return Paragraph(str(value), td_bold_style if bold else td_style)
+
+        # --- 2. Πίνακας Αρχικών Δεδομένων (Χωρίς Α/Α) ---
+        def build_initial_table(rows):
+            headers = ['Από', 'Προς', 'S [m]', 'Z [grad]', 'Ύψος Οργάνου [m]', 'Ύψος Στόχου [m]']
+            table_rows = [[Paragraph(h, th_style) for h in headers]]
+            
+            for row in rows:
+                values = [
+                    row.get('from', row.get('From', '-')),
+                    row.get('to', row.get('To', '-')),
+                    row.get('s', row.get('Slope_D', '-')),
+                    row.get('z', row.get('Z[grad]', '-')),
+                    row.get('hi', row.get('H_station', '-')),
+                    row.get('ht', row.get('H_target', '-'))
+                ]
+                table_rows.append([cell(v) for v in values])
+                
+            widths = [75, 75, 90, 90, 100, 100]
+            table = Table(table_rows, colWidths=widths, repeatRows=1)
+            
+            commands = [
+                ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG), 
+                ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR), 
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), 
+                ('TOPPADDING', (0, 0), (-1, -1), 5), 
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]
+            for index in range(1, len(table_rows)):
+                commands.append(('BACKGROUND', (0, index), (-1, index), ROW_BG_1 if index % 2 else ROW_BG_2))
+                
+            table.setStyle(TableStyle(commands))
+            return table
+
+        # --- 3. Πίνακας Τελικών Αποτελεσμάτων (Χωρίς Α/Α & Με RowSpan) ---
+        def build_results_table(rows):
+            headers = ['Από', 'Προς', 'S [m]', 'Z [grad]', 'Ύψος Οργάνου [m]', 'Ύψος Στόχου [m]', 'ΔH [m]', 'ΔH Μ.Ο. [m]']
+            table_rows = [[Paragraph(h, th_style) for h in headers]]
+            
+            # Προετοιμασία δεδομένων για Merging (ακριβώς όπως στο JSX)
+            processed_data = []
+            current_group_start = 0
+            
+            for i, row in enumerate(rows):
+                from_val = row.get('from', row.get('From', '-'))
+                to_val = row.get('to', row.get('To', '-'))
+                dh_avg_val = row.get('dh_avg', row.get('dh_mean', '-'))
+                
+                if i == 0:
+                    processed_data.append({**row, 'isFirst': True, 'span': 1, 'groupDhAvg': dh_avg_val})
+                else:
+                    prev = rows[i - 1]
+                    prev_from = prev.get('from', prev.get('From', '-'))
+                    prev_to = prev.get('to', prev.get('To', '-'))
+                    
+                    if from_val == prev_from and to_val == prev_to and from_val not in ('-', '') and to_val not in ('-', ''):
+                        processed_data[current_group_start]['span'] += 1
+                        if dh_avg_val and str(dh_avg_val).strip() not in ('-', '') and not processed_data[current_group_start]['groupDhAvg']:
+                            processed_data[current_group_start]['groupDhAvg'] = dh_avg_val
+                        processed_data.append({**row, 'isFirst': False})
+                    else:
+                        current_group_start = i
+                        processed_data.append({**row, 'isFirst': True, 'span': 1, 'groupDhAvg': dh_avg_val})
+
+            spans = []
+            row_idx = 1
+            for item in processed_data:
+                values = [
+                    item.get('from', item.get('From', '-')),
+                    item.get('to', item.get('To', '-')),
+                    item.get('s', item.get('Slope_D', '-')),
+                    item.get('z', item.get('Z[grad]', '-')),
+                    item.get('hi', item.get('H_station', '-')),
+                    item.get('ht', item.get('H_target', '-')),
+                    item.get('dh', '-'),
+                    item.get('groupDhAvg', '-') if item['isFirst'] else ""
+                ]
+                # Έντονα γράμματα στις τελευταίες 2 στήλες
+                table_rows.append([cell(v, bold=(c >= 6)) for c, v in enumerate(values)])
+                
+                # Προσθήκη του Span command αν η ομάδα έχει παραπάνω από 1 γραμμές
+                if item['isFirst'] and item['span'] > 1:
+                    spans.append(('SPAN', (7, row_idx), (7, row_idx + item['span'] - 1)))
+                
+                row_idx += 1
+                
+            widths = [65, 65, 65, 65, 65, 65, 70, 75]
+            table = Table(table_rows, colWidths=widths, repeatRows=1)
+            
+            commands = [
+                ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG), 
+                ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR), 
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), 
+                ('TOPPADDING', (0, 0), (-1, -1), 5), 
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]
+            
+            # Εφαρμογή zebra-striping στις πρώτες 7 στήλες
+            for index in range(1, len(table_rows)):
+                commands.append(('BACKGROUND', (0, index), (6, index), ROW_BG_1 if index % 2 else ROW_BG_2))
+                
+            # Χρώμα φόντου για τη στήλη του Μ.Ο. (ταιριάζει με το UI)
+            for index, item in enumerate(processed_data, 1):
+                if item['isFirst']:
+                    end_idx = index + item['span'] - 1
+                    commands.append(('BACKGROUND', (7, index), (7, end_idx), EMERALD_BG))
+            
+            # Προσθήκη των spans
+            for span in spans:
+                commands.append(span)
+                
+            table.setStyle(TableStyle(commands))
+            return table
+
+        elements = [
+            info_table, 
+            Spacer(1, 25), 
+            Paragraph('Αναφορά Τριγωνομετρικής Υψομετρίας', title_style), 
+            Spacer(1, 20), 
+            Paragraph('1. Αρχικά Δεδομένα', section_style), 
+            Spacer(1, 10), 
+            build_initial_table(initial_data), 
+            Spacer(1, 30), 
+            Paragraph('2. Τελικά Αποτελέσματα', section_style), 
+            Spacer(1, 10), 
+            build_results_table(results)
+        ]
+        
+        current_timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        doc.build(elements, canvasmaker=partial(UniversalNumberedCanvas, doc_title='Αυτοματοποιημένη Αναφορά LASCA', font_name=my_font, font_bold_name=my_font_bold, timestamp_str=current_timestamp, logo_path=str(LOGO_PATH)))
+        buffer.seek(0)
+        
+        return send_file(buffer, as_attachment=True, download_name='Trig_Leveling_Report.pdf', mimetype='application/pdf')
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τη δημιουργία Trig Leveling Report:\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
     
 if __name__ == '__main__':
     port = find_free_port()
