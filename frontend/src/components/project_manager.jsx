@@ -11,7 +11,9 @@ import {
   X,
   Settings,
   Briefcase,
-  MapPin
+  MapPin,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
@@ -26,6 +28,9 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Κατάσταση για το project προς διαγραφή
+  const [projectToDelete, setProjectToDelete] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'open' && isOpen) {
@@ -96,6 +101,28 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     }
   };
 
+  const handleDeleteClick = (e, projectName) => {
+    e.stopPropagation();
+    setProjectToDelete(projectName);
+  };
+
+  const executeDelete = async () => {
+    if (!projectToDelete) return;
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      await axios.delete(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectToDelete)}`);
+      setProjectToDelete(null);
+      await fetchExistingProjects();
+    } catch (err) {
+      console.error("Σφάλμα διαγραφής project:", err);
+      setError("Αποτυχία διαγραφής του project.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -103,9 +130,52 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
       
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
 
+        {/* ΔΙΑΦΑΝΕΣ & ΚΟΜΨΟ CONFIRMATION OVERLAY */}
+        {projectToDelete && (
+          <div className="absolute inset-0 z-[160] bg-slate-950/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-5 w-full max-w-[320px] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150">
+              
+              <div className="w-10 h-10 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center text-red-400 mb-3 shadow-inner">
+                <AlertTriangle size={20} />
+              </div>
+
+              <h3 className="text-sm font-bold text-slate-100 tracking-wide mb-1">
+                Διαγραφή Έργου
+              </h3>
+              
+              <p className="text-[11px] text-slate-400 mb-5 leading-relaxed">
+                Είστε σίγουροι ότι θέλετε να διαγράψετε το <span className="font-mono font-semibold text-slate-200 bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 rounded-md">{projectToDelete}</span>;
+              </p>
+
+              <div className="flex items-center gap-2.5 w-full">
+                <button
+                  type="button"
+                  onClick={() => setProjectToDelete(null)}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 px-3 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs rounded-xl border border-slate-700/80 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  Ακύρωση
+                </button>
+                <button
+                  type="button"
+                  onClick={executeDelete}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 px-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-xs rounded-xl shadow-md shadow-red-900/30 transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    "Διαγραφή"
+                  )}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         <div className="bg-[#0f172a]/80 p-4 border-b border-slate-800 flex flex-col gap-3">
           
-          {/* Γραμμή Τίτλου + Κουμπί Χ (Ευθυγραμμισμένα) */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Settings className="text-amber-500" size={16} />
@@ -124,7 +194,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
             </button>
           </div>
 
-          {/* Tabs Επιλογής */}
           <div className="flex bg-slate-950/60 p-1 rounded-xl border border-slate-800/60">
             <button
               onClick={() => { setActiveTab('create'); setError(''); }}
@@ -161,8 +230,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
 
           {activeTab === 'create' && (
             <form onSubmit={handleCreateProject} className="flex flex-col gap-4">
-              
-              {/* Όνομα Project */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   Έργο <span className="text-amber-500">*</span>
@@ -177,7 +244,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                 />
               </div>
 
-              {/* Μελετητής */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   <User size={10} /> Μελετητής
@@ -191,7 +257,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                 />
               </div>
 
-              {/* Τοποθεσία */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   <MapPin size={10} /> Τοποθεσία
@@ -205,7 +270,6 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                 />
               </div>
 
-              {/* Εργοδότης */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-slate-500 flex items-center gap-1">
                   <Briefcase size={10} /> Εργοδότης
@@ -250,11 +314,18 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               ) : existingProjects.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
                   {existingProjects.map((projName) => (
-                    <button
+                    <div
                       key={projName}
-                      disabled={isSubmitting}
-                      onClick={() => handleOpenProject(projName)}
-                      className="group w-full bg-slate-950/30 hover:bg-amber-500/[0.03] border border-slate-800/80 hover:border-amber-500/30 p-3.5 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] disabled:opacity-50"
+                      role="button"
+                      tabIndex={isSubmitting ? -1 : 0}
+                      onClick={() => !isSubmitting && handleOpenProject(projName)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && !isSubmitting) {
+                          e.preventDefault();
+                          handleOpenProject(projName);
+                        }
+                      }}
+                      className={`group w-full bg-slate-950/30 hover:bg-amber-500/[0.03] border border-slate-800/80 hover:border-amber-500/30 p-3.5 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-mono font-bold text-slate-300 group-hover:text-amber-400 transition-colors">
@@ -264,8 +335,20 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
                           Κλικ για άμεση επαναφορά
                         </span>
                       </div>
-                      <ChevronRight size={16} className="text-slate-600 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
-                    </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Διαγραφή του project ${projName}`}
+                          title="Διαγραφή project"
+                          onClick={(e) => handleDeleteClick(e, projName)}
+                          disabled={isSubmitting}
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                        <ChevronRight size={16} className="text-slate-600 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : (

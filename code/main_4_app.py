@@ -7,6 +7,7 @@ if sys.stderr and hasattr(sys.stderr, 'buffer'):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 import os
+import shutil
 import socket
 import threading
 import webview
@@ -241,6 +242,25 @@ def list_projects():
     except Exception as e:
         print(f"ERROR: Σφάλμα κατά τη λίστα των projects: {str(e)}")
         return jsonify({"error": "Αποτυχία ανάγνωσης φακέλων εργασίας"}), 500
+
+@app.route('/api/projects/<project_name>', methods=['DELETE'])
+def delete_project(project_name):
+    project_dir = (WORKSPACE_DIR / project_name).resolve()
+
+    try:
+        project_dir.relative_to(WORKSPACE_DIR.resolve())
+    except ValueError:
+        return jsonify({"error": "Μη έγκυρο όνομα project"}), 400
+
+    if not project_dir.is_dir():
+        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
+
+    try:
+        shutil.rmtree(project_dir)
+        return jsonify({"status": "success", "message": f"Το project '{project_name}' διαγράφηκε."})
+    except OSError as e:
+        print(f"ERROR: Σφάλμα διαγραφής project: {str(e)}")
+        return jsonify({"error": "Αποτυχία διαγραφής project"}), 500
 
 @app.route('/api/projects/load', methods=['POST'])
 def load_project():
