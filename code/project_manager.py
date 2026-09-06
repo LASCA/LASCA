@@ -1,19 +1,12 @@
 import json
 from pathlib import Path
 from datetime import datetime
-import os
 
 def get_safe_workspace_dir(app_folder="Topo_Workspace"):
     """
-    Βρίσκει τον ασφαλή φάκελο του λειτουργικού συστήματος για αποθήκευση δεδομένων.
-    Στα Windows είναι το %APPDATA% (π.χ. C:\\Users\\User\\AppData\\Roaming\\Topo_Workspace)
+    Επιστρέφει τον φάκελο του χρήστη για αποθήκευση δεδομένων.
     """
-    if os.name == 'nt':  # Για Windows
-        base = os.environ.get('APPDATA', os.path.expanduser('~'))
-    else:  # Για Mac/Linux
-        base = os.path.join(os.path.expanduser('~'), '.local', 'share')
-    
-    workspace_path = Path(base) / app_folder
+    workspace_path = Path.home() / app_folder
     workspace_path.mkdir(parents=True, exist_ok=True)
     return workspace_path
 

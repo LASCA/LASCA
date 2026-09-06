@@ -218,7 +218,7 @@ def get_active_project_name():
         
     return None
 
-# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects στο AppData
+# Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects στον home φάκελο
 WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
 
 # Helper functions για την Ταχυμετρία
