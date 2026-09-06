@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import proj4 from 'proj4';
 import { toast } from 'react-hot-toast';
+import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   Plus, FolderOpen, Upload, 
   FileSpreadsheet, LayoutGrid,
@@ -13,6 +16,13 @@ import {
 } from 'recharts';
 
 import { downloadSurveyTemplate } from '../utils/excel_template';
+
+proj4.defs("EPSG:2100", "+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9996 +x_0=500000 +y_0=0 +ellps=GRS80 +towgs84=-199.87,74.79,246.62,0,0,0,0 +units=m +no_defs");
+
+const convertEgsa87ToWgs84 = (points) => points.map((point) => {
+  const [longitude, latitude] = proj4('EPSG:2100', 'EPSG:4326', [point.x, point.y]);
+  return [latitude, longitude];
+});
 
 // Custom Tooltip για τον Χάρτη
 const MapTooltip = ({ active, payload }) => {
@@ -58,6 +68,8 @@ const Dashboard = ({
   levelingMetrics = null
 }) => {
 
+  const [isMapView, setIsMapView] = useState(false);
+
   const stationCount = traverseMetrics?.n || traverseData?.length || 0;
   const measurementCount = tachymetryData?.measurements?.length || 0;
   const stakeoutCount = stakeoutData?.points?.length || 0;
@@ -90,6 +102,20 @@ const Dashboard = ({
 
     return { stations, details, hasPoints: stations.length > 0 || details.length > 0 };
   }, [traverseData, tachymetryData]);
+
+  const leafletData = useMemo(() => {
+    const allPoints = [...mapData.stations, ...mapData.details];
+    const points = convertEgsa87ToWgs84(allPoints);
+    const stationPoints = convertEgsa87ToWgs84(mapData.stations);
+    const center = points.length > 0
+      ? points.reduce(
+          ([lat, lon], [pointLat, pointLon]) => [lat + pointLat, lon + pointLon],
+          [0, 0]
+        ).map((value) => value / points.length)
+      : [38.2466, 21.7346];
+
+    return { allPoints, points, stationPoints, center };
+  }, [mapData]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -351,57 +377,65 @@ const Dashboard = ({
                     <Map size={16} className="text-cyan-500" />
                     <span className="text-[11px] font-bold text-slate-300 tracking-wider">Τοπογραφικό Δίκτυο & Αποτύπωση</span>
                   </div>
-                  <div className="text-[9px] text-slate-500 font-mono font-bold">
-                    {mapData.hasPoints ? `${mapData.stations.length + mapData.details.length} ΣΗΜΕΙΑ ΣΤΟΝ ΧΑΡΤΗ` : 'ΑΝΑΜΟΝΗ ΣΥΝΤΕΤΑΓΜΕΝΩΝ'}
+                  <div className="flex items-center gap-3">
+                    <div className="text-[9px] text-slate-500 font-mono font-bold">
+                      {mapData.hasPoints ? `${mapData.stations.length + mapData.details.length} ΣΗΜΕΙΑ ΣΤΟΝ ΧΑΡΤΗ` : 'ΑΝΑΜΟΝΗ ΣΥΝΤΕΤΑΓΜΕΝΩΝ'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMapView((current) => !current)}
+                      className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[9px] font-bold text-slate-300 transition-colors hover:border-cyan-500 hover:text-cyan-300"
+                      aria-pressed={isMapView}
+                    >
+                      {isMapView ? 'ΓΡΑΦΗΜΑ' : 'ΧΑΡΤΗΣ'}
+                    </button>
                   </div>
                 </div>
                 
                 {/* ΧΩΡΟΣ ΧΑΡΤΗ */}
                 <div className="flex-1 bg-[#080E1A] rounded-xl border border-slate-800/50 relative flex items-center justify-center overflow-hidden [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px]">
                   
-                  {mapData.hasPoints ? (
+                  {mapData.hasPoints ? (isMapView ? (
+                    <MapContainer
+                      center={leafletData.center}
+                      zoom={15}
+                      scrollWheelZoom
+                      className="w-full h-full z-0"
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      {leafletData.stationPoints.length > 1 && (
+                        <Polyline positions={leafletData.stationPoints} pathOptions={{ color: '#2563eb', weight: 3 }} />
+                      )}
+                      {leafletData.points.map(([latitude, longitude], index) => (
+                        <CircleMarker
+                          key={`${leafletData.allPoints[index].name}-${index}`}
+                          center={[latitude, longitude]}
+                          radius={leafletData.allPoints[index].type === 'station' ? 6 : 4}
+                          pathOptions={{
+                            color: leafletData.allPoints[index].type === 'station' ? '#1d4ed8' : '#047857',
+                            fillColor: leafletData.allPoints[index].type === 'station' ? '#3b82f6' : '#10b981',
+                            fillOpacity: 0.9
+                          }}
+                        />
+                      ))}
+                    </MapContainer>
+                  ) : (
                     <div className="w-full h-full p-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.5} />
-                          <XAxis 
-                            type="number" 
-                            dataKey="x" 
-                            name="Easting" 
-                            domain={['auto', 'auto']} 
-                            tickFormatter={(val) => val.toFixed(0)} 
-                            stroke="#475569"
-                            tick={{ fill: '#64748b', fontSize: 10 }}
-                          />
-                          <YAxis 
-                            type="number" 
-                            dataKey="y" 
-                            name="Northing" 
-                            domain={['auto', 'auto']} 
-                            tickFormatter={(val) => val.toFixed(0)} 
-                            stroke="#475569"
-                            tick={{ fill: '#64748b', fontSize: 10 }}
-                          />
+                          <XAxis type="number" dataKey="x" name="Easting" domain={['auto', 'auto']} tickFormatter={(val) => val.toFixed(0)} stroke="#475569" tick={{ fill: '#64748b', fontSize: 10 }} />
+                          <YAxis type="number" dataKey="y" name="Northing" domain={['auto', 'auto']} tickFormatter={(val) => val.toFixed(0)} stroke="#475569" tick={{ fill: '#64748b', fontSize: 10 }} />
                           <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#334155' }} content={<MapTooltip />} />
-                          
-                          <Scatter 
-                            name="Αποτύπωση" 
-                            data={mapData.details} 
-                            fill="#10b981" 
-                            shape="circle"
-                          />
-                          
-                          <Scatter 
-                            name="Στάσεις" 
-                            data={mapData.stations} 
-                            fill="#3b82f6" 
-                            shape="triangle"
-                            line={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeOpacity: 0.6 }}
-                          />
+                          <Scatter name="Αποτύπωση" data={mapData.details} fill="#10b981" shape="circle" />
+                          <Scatter name="Στάσεις" data={mapData.stations} fill="#3b82f6" shape="triangle" line={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeOpacity: 0.6 }} />
                         </ScatterChart>
                       </ResponsiveContainer>
                     </div>
-                  ) : (
+                  )) : (
                     <div className="flex flex-col items-center gap-2 opacity-30">
                       <Map size={32} className="text-slate-600" />
                       <span className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">
