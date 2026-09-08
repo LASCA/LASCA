@@ -11,18 +11,32 @@ import shutil
 import socket
 import threading
 import webview
+import logging
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 import math
 import base64
 import ezdxf
 import json, io, traceback
+import re
+import uuid
+from html import escape
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 import data_proccessing as dpr
 import vis_4_app as vis
+
+try:
+    import resend
+except ImportError:
+    resend = None
 
 from datetime import datetime
 from project_manager import TopoProject, get_safe_workspace_dir
 from flask import Flask, request, jsonify, send_file, send_from_directory
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.utils import secure_filename
 from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
 from io import BytesIO
@@ -44,12 +58,29 @@ except:
     print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
     font_name = 'Helvetica'
 
-if getattr(sys, 'frozen', False):
-    BASE_DIR = Path(sys._MEIPASS)
+IS_FROZEN = bool(getattr(sys, 'frozen', False))
+SCRIPT_DIR = Path(__file__).resolve().parent
+if IS_FROZEN:
+    MEIPASS_DIR = getattr(sys, '_MEIPASS', None)
+    BASE_DIR = Path(MEIPASS_DIR) if MEIPASS_DIR else SCRIPT_DIR
+    EXECUTABLE_DIR = Path(sys.executable).resolve().parent
+    ENV_FILE_CANDIDATES = []
+    if MEIPASS_DIR:
+        ENV_FILE_CANDIDATES.append(BASE_DIR / '.env')
+    ENV_FILE_CANDIDATES.extend([EXECUTABLE_DIR / '.env', SCRIPT_DIR / '.env'])
     STATIC_FOLDER = BASE_DIR / 'frontend' / 'dist'
 else:
-    BASE_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR
+    EXECUTABLE_DIR = SCRIPT_DIR
+    ENV_FILE_CANDIDATES = [SCRIPT_DIR / '.env']
     STATIC_FOLDER = BASE_DIR.parent / 'frontend' / 'dist'
+
+ENV_FILE_PATH = None
+for env_file in ENV_FILE_CANDIDATES:
+    if env_file.is_file():
+        load_dotenv(env_file)
+        ENV_FILE_PATH = env_file
+        break
 
 STATIC_FOLDER = STATIC_FOLDER.resolve()
 
@@ -59,6 +90,59 @@ if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
+app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('FEEDBACK_MAX_SIZE_MB', '5')) * 1024 * 1024
+
+logger = logging.getLogger(__name__)
+logger.handlers.clear()
+log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+logger.addHandler(console_handler)
+if IS_FROZEN:
+    app_data_dir = os.environ.get('LOCALAPPDATA') or os.environ.get('APPDATA')
+    log_dir = os.path.join(app_data_dir or str(Path.home()), 'LASCA')
+else:
+    log_dir = str(EXECUTABLE_DIR)
+os.makedirs(log_dir, exist_ok=True)
+file_handler = logging.FileHandler(os.path.join(log_dir, 'lasca_app.log'), encoding='utf-8')
+file_handler.setFormatter(log_formatter)
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
+logger.info('Environment file loaded: %s', ENV_FILE_PATH or 'none found')
+
+
+def _mask_secret(value: str | None) -> str:
+    if not value:
+        return '<missing>'
+    if len(value) <= 8:
+        return '*' * len(value)
+    return f'{value[:4]}...{value[-4:]}'
+
+
+logger.info('Startup RESEND_API_KEY=%s NOTIFICATION_EMAIL=%s', _mask_secret(os.getenv('RESEND_API_KEY')), os.getenv('NOTIFICATION_EMAIL') or '<missing>')
+FEEDBACK_TYPES = {'bug', 'feature', 'general'}
+ALLOWED_FEEDBACK_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
+if IS_FROZEN:
+    feedback_upload_default = Path(log_dir) / 'feedback_uploads'
+    feedback_log_default = Path(log_dir) / 'feedback.jsonl'
+    FEEDBACK_UPLOAD_FOLDER = feedback_upload_default
+    FEEDBACK_LOG_FILE = feedback_log_default
+else:
+    FEEDBACK_UPLOAD_FOLDER = Path(
+        os.getenv(
+            'FEEDBACK_UPLOAD_FOLDER',
+            os.getenv('UPLOAD_FOLDER', str(BASE_DIR / 'feedback_uploads')),
+        )
+    ).expanduser().resolve()
+    FEEDBACK_LOG_FILE = Path(
+        os.getenv('FEEDBACK_LOG_FILE', str(FEEDBACK_UPLOAD_FOLDER / 'feedback.jsonl'))
+    ).expanduser().resolve()
+logger.info('Feedback upload folder: %s', FEEDBACK_UPLOAD_FOLDER)
+logger.info('Feedback log file: %s', FEEDBACK_LOG_FILE)
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+if resend is not None:
+    resend.api_key = os.environ.get('RESEND_API_KEY')
 
 
 def find_free_port():
@@ -188,6 +272,162 @@ def serve_index():
 @app.errorhandler(404)
 def not_found(e):
     return send_from_directory(app.static_folder, 'index.html')
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def request_too_large(e):
+    return jsonify({"error": "Feedback upload exceeds the maximum size limit"}), 413
+
+
+def _feedback_error(message: str, status_code: int):
+    return jsonify({'status': 'error', 'message': message}), status_code
+
+
+def _send_feedback_webhook(feedback: dict[str, str]) -> None:
+    webhook_url = os.getenv('FEEDBACK_WEBHOOK_URL', '').strip()
+    if not webhook_url:
+        return
+
+    attachment = feedback.get('screenshot_path') or 'No screenshot attached'
+    formatted_message = (
+        f"**New LASCA feedback ({feedback['type']})**\n"
+        f"**From:** {feedback.get('email') or 'Anonymous'}\n"
+        f"**Message:** {feedback['message']}\n"
+        f"**Screenshot:** {attachment}"
+    )
+    payload = {
+        'content': formatted_message,
+        'text': formatted_message,
+    }
+    request_data = json.dumps(payload).encode('utf-8')
+    webhook_request = Request(
+        webhook_url,
+        data=request_data,
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urlopen(webhook_request, timeout=10) as response:
+            if response.status >= 400:
+                raise RuntimeError(f'Webhook returned HTTP {response.status}')
+    except (HTTPError, URLError, OSError, RuntimeError) as error:
+        raise RuntimeError(f'Feedback webhook delivery failed: {error}') from error
+
+
+def _write_feedback_log(feedback: dict[str, str]) -> None:
+    FEEDBACK_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with FEEDBACK_LOG_FILE.open('a', encoding='utf-8') as log_file:
+        log_file.write(json.dumps(feedback, ensure_ascii=False) + '\n')
+
+
+def _send_feedback_email(
+    feedback: dict[str, str],
+    screenshot_content: bytes | None = None,
+    screenshot_filename: str = 'screenshot',
+) -> None:
+    """Send feedback through Resend and fail clearly when email is unavailable."""
+    try:
+        api_key = os.environ.get('RESEND_API_KEY', '').strip()
+        receiver_email = os.environ.get('NOTIFICATION_EMAIL', '').strip()
+        if resend is None:
+            logger.error('Feedback email unavailable: the resend package is not installed')
+            raise RuntimeError('Feedback email service is unavailable')
+        if not api_key or not receiver_email:
+            logger.error(
+                'Feedback email configuration is incomplete: RESEND_API_KEY=%s, NOTIFICATION_EMAIL=%s',
+                _mask_secret(api_key),
+                receiver_email or '<missing>',
+            )
+            raise RuntimeError('Feedback email configuration is incomplete')
+
+        resend.api_key = api_key
+        sender_email = feedback.get('email') or 'Anonymous'
+        subject = f"[Feedback - {feedback['type']}] New message from {sender_email}"
+        html_body = (
+            '<h2>New LASCA feedback</h2>'
+            f'<p><strong>Sender email:</strong> {escape(sender_email)}</p>'
+            f'<p><strong>Subject:</strong> {escape(subject)}</p>'
+            f'<p><strong>Feedback details:</strong></p>'
+            f'<p>{escape(feedback["message"]).replace(chr(10), "<br>")}</p>'
+            f'<p><strong>Timestamp:</strong> {escape(feedback["created_at"])}</p>'
+        )
+        email_data = {
+            'from': 'LASCA App <onboarding@resend.dev>',
+            'to': [receiver_email],
+            'subject': subject,
+            'html': html_body,
+        }
+        if screenshot_content is not None:
+            email_data['attachments'] = [{
+                'filename': screenshot_filename,
+                'content': base64.b64encode(screenshot_content).decode('ascii'),
+            }]
+        resend.Emails.send(email_data)
+    except Exception:
+        logger.exception('Failed to send feedback email notification through Resend')
+        print('Feedback email exception:\n' + traceback.format_exc(), file=sys.stderr, flush=True)
+        raise
+
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    try:
+        data = request.get_json(silent=True) or {}
+        is_json_request = bool(data)
+        feedback_type = str(data.get('type', 'general') if is_json_request else request.form.get('type', 'general')).strip().lower() or 'general'
+        email = str(data.get('user_email', '') if is_json_request else request.form.get('email', '')).strip()
+        message = str(data.get('details', '') if is_json_request else request.form.get('message', '')).strip()
+
+        if feedback_type not in FEEDBACK_TYPES:
+            return _feedback_error('Invalid feedback type', 400)
+        if not message:
+            return _feedback_error('Message is required', 400)
+        if email and not EMAIL_RE.fullmatch(email):
+            return _feedback_error('Invalid email address', 400)
+
+        screenshot_content = None
+        screenshot_filename = 'screenshot'
+        screenshot = request.files.get('screenshot')
+        screenshot_path = ''
+        if is_json_request and data.get('screenshot'):
+            screenshot_value = data['screenshot']
+            if isinstance(screenshot_value, str) and ',' in screenshot_value:
+                screenshot_value = screenshot_value.split(',', 1)[1]
+            screenshot_content = base64.b64decode(screenshot_value, validate=True)
+            screenshot_filename = str(data.get('screenshot_filename', 'screenshot.png'))
+        elif screenshot and screenshot.filename:
+            safe_name = secure_filename(screenshot.filename)
+            extension = Path(safe_name).suffix.lower()
+            if not safe_name or extension not in ALLOWED_FEEDBACK_EXTENSIONS:
+                return _feedback_error('Unsupported screenshot format', 400)
+
+            FEEDBACK_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+            unique_name = f'{Path(safe_name).stem}-{uuid.uuid4().hex}{extension}'
+            destination = FEEDBACK_UPLOAD_FOLDER / unique_name
+            screenshot.save(destination)
+            screenshot_path = str(destination)
+            with destination.open('rb') as screenshot_file:
+                screenshot_content = screenshot_file.read()
+            screenshot_filename = destination.name
+
+        feedback = {
+            'type': feedback_type,
+            'email': email,
+            'message': message,
+            'screenshot_path': screenshot_path,
+            'created_at': datetime.utcnow().isoformat() + 'Z',
+        }
+        _write_feedback_log(feedback)
+        _send_feedback_email(feedback, screenshot_content, screenshot_filename)
+        _send_feedback_webhook(feedback)
+        return jsonify({
+            'status': 'success',
+            'message': 'Feedback submitted successfully',
+        }), 200
+    except Exception:
+        logger.exception('Failed to process feedback submission')
+        print('Feedback submission exception:\n' + traceback.format_exc(), file=sys.stderr, flush=True)
+        return _feedback_error('Unable to submit feedback. Check lasca_app.log for details.', 500)
 
 def get_active_project_name():
     """ Ψάχνει το όνομα του ενεργού project σε όλα τα πιθανά σημεία του request """
