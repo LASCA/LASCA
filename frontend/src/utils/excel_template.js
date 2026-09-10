@@ -86,13 +86,13 @@ export const downloadSurveyTemplate = async () => {
     const wsStat = XLSX.utils.aoa_to_sheet([
       ["Station_Name", "XS", "YS", "ZS"]]);
     applyProfessionalStyles(wsStat);
-    XLSX.utils.book_append_sheet(wb, wsStat, "stations_taxymetria");
+    XLSX.utils.book_append_sheet(wb, wsStat, "stations_apotiposi");
 
     // 4. Μετρήσεις Ταχυμετρίας (measurements_taxymetria)
     const wsMeas = XLSX.utils.aoa_to_sheet([
       ["Station", "Orientation", "HZ_O", "Station_Height", "", "From", "O", "Point_ID", "Hz", "Z", "SD", "TargetHeight"]]);
     applyProfessionalStyles(wsMeas);
-    XLSX.utils.book_append_sheet(wb, wsMeas, "measurements_taxymetria");
+    XLSX.utils.book_append_sheet(wb, wsMeas, "measurements_apotiposi");
 
     // 5. Χάραξη
     const wsChar = XLSX.utils.aoa_to_sheet([

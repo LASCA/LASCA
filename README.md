@@ -1,320 +1,235 @@
-# LASCA Suite - Geodesy Edition
+# LASCA
 
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0.10-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.2.4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Flask](https://img.shields.io/badge/Flask-3.1.3-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-LASCA Suite is a precision geodesy and topographic surveying platform built for engineers, surveyors, and technical teams who need reliable field computation, network adjustment, and stakeout workflows in a single digital environment. Designed to reduce manual calculation overhead while preserving engineering rigor, it brings together angle observation processing, traverses, leveling, tachymetry, and coordinate-based project management into one modern interface.
+LASCA is a desktop-oriented surveying and geodetic computation suite for field and office workflows. It brings project management, station observations, coordinate computation, leveling, tachymetry, stakeout preparation, visualization, and engineering report generation into one application.
 
-The application supports common surveying tasks such as station observations, traverse adjustment, trigonometric and geometric leveling, angle/azimuth calculation, point stakeout, and report generation. It blends a Python scientific backend with a React + Tailwind frontend to deliver computational accuracy and a clear operational workflow.
+The application combines a React and Vite interface with a Python and Flask computational backend. Projects are stored as JSON and organized in a per-user workspace, so survey data remains separate from the installed application and source tree.
 
----
+## Project Overview
 
-## Overview
+LASCA is designed for surveyors, civil engineers, and technical teams working with horizontal and vertical control, topographic observations, coordinate systems, and field layout. Its workflow supports both manual data entry and Excel-based project intake.
 
-LASCA solves the practical problems of modern surveying and civil engineering projects by providing a structured digital workflow for:
+The application provides:
 
-- Coordinate and network processing for topographic surveys
-- Adjustment of angular observations and station measurements
-- Traverse computation in planar coordinates and height systems
-- Leveling workflows for forward and backward observations
-- Tachymetric point determination and plotting
-- Stakeout/charaxí planning and output generation
-- Excel-driven project intake and reporting
+- A project dashboard with data import, project actions, summary counts, and coordinate visualization.
+- Separate calculation modules for observations, traverses, leveling, tachymetry, and stakeout.
+- Persistent project state with automatic saving through the Flask API.
+- PDF, image, DXF, and spreadsheet-related workflows where supported by each module.
+- A desktop runtime based on PyWebView for the packaged application.
 
-This repository combines the frontend experience with the computational engine behind the scenes. In the codebase, the geodetic logic lives primarily in the Python modules under the `code/` directory, while the user-facing workflows and project management interfaces are implemented in the React application under `frontend/src/`.
+## Key Features
 
----
+### Project Dashboard and Management
 
-## Key Modules & Features
+- Create, open, list, and delete survey projects.
+- Save project metadata such as scale, terrain, survey class, designer, employer, and location.
+- Automatically persist the active project state.
+- Import supported Excel worksheets into the relevant modules.
+- View traverse stations and tachymetric detail points in a coordinate chart or Leaflet map.
 
-### 1. Dashboard & Project Workspace
+### Station Measurements
 
-The dashboard is the project command center. It enables:
+- **Goniometry:** process face I and face II angular observations.
+- **Station adjustment:** calculate adjusted observations and station statistics, including residual and standard-deviation information.
+- **Trigonometric height:** calculate height differences from slope-distance and zenith-angle observations and export a report.
+- **Geometric leveling:** process forward and backward leveling observations, calculate height differences, and report the height misclosure.
 
-- selecting or creating a project workspace
-- importing survey data from Excel templates
-- visualizing existing traverse and measurement data on a coordinate map
-- summarizing counts for station measurements, traverses, and stakeout points
-- maintaining project-level persistence across sessions
+### Traverse and Height Workflows
 
-This module is implemented around the dashboard and project management utilities, and it connects to the backend project storage and loading APIs.
+- **Horizontal traverse:** calculate X/Y coordinates, traverse totals, angular and linear closure values, and tolerance-related metrics.
+- **Traverse height:** calculate height propagation along a traverse.
+- **Traverse outputs:** generate a traverse report, a visualization, and DXF export data.
 
-### 2. Station Measurements
+### Tachymetry
 
-This section brings together the fundamental angular and observation tools used at a survey station.
+- Manage tachymetric stations and observations.
+- Group observations by occupied station and orientation.
+- Calculate detail-point coordinates and elevations.
+- Export tachymetric results and DXF data.
 
-- Goniometry: input of face I / face II observations, averaging, residual analysis, and angular correction routines
-- Station Adjustment: least-squares style processing of directional observations to compute adjusted horizontal angles and standard deviations
-- Trigonometric Leveling: slope distance and zenith angle reduction to determine height differences
-- Geometric Leveling: forward/backward leveling workflow with checks and height transfer logic
+### Stakeout
 
-These screens are mapped to the app modules `gwniometriseis`, `Adjustment`, `trig_leveling`, and `leveling`.
+- Define an instrument station and backsight.
+- Manage target design points.
+- Calculate stakeout direction and distance values.
+- Generate stakeout report output.
 
-### 3. Basic Calculations
+### Basic Geodetic Calculations
 
-The `Basic_Calc` module acts as a calculator toolkit for common geodetic operations, including:
+The basic-calculation module provides tools for:
 
-- angle unit conversions between radians, grads, and degrees
-- basic coordinate and azimuth problems
-- intersection and resection calculations
-- scale factor handling and related reduction formulas
+- Angle and unit calculations.
+- Coordinate and azimuth problems.
+- Intersection and resection calculations.
+- Scale-factor calculations.
 
-This is a compact engineering utility set for rapid field and office checks.
+### Visualization, Reporting, and Feedback
 
-### 4. Traverse Computation
+- Recharts coordinate visualization and Leaflet map display.
+- PDF reports for adjustment, traverse, stakeout, and trigonometric leveling workflows.
+- DXF export workflows for traverse and tachymetry data.
+- Toast notifications, loading states, project-switching feedback, and responsive navigation.
 
-The traverse module handles coordinate and orientation calculations for closed or open traverses. It supports:
+## Tech Stack and Architecture
 
-- station and bearing/distance entries
-- coordinate propagation for X/Y computation
-- scale factor modes and adjustment options
-- traverse metrics, closure checks, and generated visual outputs
-
-The implementation is split between the React UI (`Traverse.jsx`) and the backend processing functions in `code/data_proccessing.py` and `code/main_4_app.py`.
-
-### 5. Traverse Height / Elevation Workflow
-
-This functionality focuses on height propagation and elevations along traverses. It is designed to support survey tasks where reduced levels and vertical control are critical, including route-based leveling and height transfer from one station to the next.
-
-### 6. Tachymetry
-
-The tachymetry module enables point determination from horizontal and vertical readings, station orientation, and slope distances. It supports:
-
-- station-based measurement grouping
-- orientation selection and local detail processing
-- reduced point coordinates and plotted survey geometry
-- data export for downstream workflows and DXF-style output
-
-This is one of the most operationally rich parts of the suite because it transforms raw field observations into coordinate points suitable for later mapping or stakeout operations.
-
-### 7. Stakeout / Charaxí
-
-The stakeout module is intended for transferring design coordinates into the field. It allows users to:
-
-- define a station and backsight reference
-- calculate azimuth and offset relationships
-- prepare point lists for staking out positions
-- generate visual stakeout previews and PDF reports
-
-This is directly aligned with field engineering execution and final construction layout tasks.
-
-### 8. Reporting & Data Export
-
-The application includes output generation for:
-
-- PDF reports
-- image exports of plots and charts
-- DXF-like export flows for topographic geometry
-- Excel or XLSX project intake
-
-The codebase uses Python libraries such as `reportlab`, `ezdxf`, and Excel tooling to produce engineering deliverables.
-
----
-
-## Tech Stack
-
-| Category | Stack | Notes |
+| Layer | Technologies | Purpose |
 | --- | --- | --- |
-| Frontend Core | React 19.2.5 | Modern component-based UI |
-| Build Tool | Vite 8.0.10 | Fast development and build pipeline |
-| Styling | Tailwind CSS 4.2.4 | Utility-first design system |
-| Component Icons | Lucide React 1.14.0 | Survey, mapping, dashboard controls |
-| Data Fetching | Axios 1.16.1 | API interactions with Flask backend |
-| Query / State Utility | TanStack React Query 5.100.9 | Data caching and coordination |
-| Visualization | Recharts, html2canvas, react-zoom-pan-pinch | Charts, plots, map previews |
-| Spreadsheet Support | xlsx, xlsx-js-style | Excel input/output processing |
-| UX / Feedback | react-hot-toast | Notifications and status feedback |
-| Backend | Python + Flask 3.1.3 | API orchestration and geodetic computations |
-| Scientific Computing | Pandas, NumPy, SciPy, Matplotlib | Survey analysis and plot generation |
-| PDF / CAD | reportlab, ezdxf | Reporting and export generation |
-| Data Modeling | openpyxl, Excel / JSON project storage | Project persistence and templates |
+| Frontend | React 19, Vite 8, JavaScript/JSX | Application UI and workflow navigation |
+| Styling | Tailwind CSS 4, PostCSS | Layout, theming, and responsive interface styling |
+| Frontend visualization | Leaflet, React Leaflet, Recharts, proj4 | Maps, coordinate plots, and EPSG:2100 conversion |
+| Frontend utilities | Axios, xlsx, xlsx-js-style, html2canvas, react-hot-toast, Lucide React | API calls, Excel intake, visual output, notifications, and icons |
+| Backend | Python, Flask 3.1, Flask-CORS | Local API, project persistence, and application orchestration |
+| Survey computation | NumPy, Pandas, SciPy, Matplotlib, project-specific Python modules | Numerical processing, tabular data, calculations, and plots |
+| Export and desktop runtime | ReportLab, ezdxf, PyWebView | PDF reports, DXF output, and the desktop window |
+| Packaging | PyInstaller and Inno Setup 6 | Windows executable and installer builds |
 
----
+### Application Architecture
 
-## Architecture & Directory Structure
+The frontend keeps the active project state in `frontend/src/App.jsx` and sends calculation requests to the Flask API. The backend routes are implemented in `code/main_4_app.py`; domain calculations are primarily in `code/data_proccessing.py` and the visualization modules.
+
+The backend exposes endpoints for project management, goniometry, adjustment, traverse, traverse height, tachymetry, stakeout, basic calculations, geometric leveling, and trigonometric leveling. The frontend API base URL is configurable through `VITE_API_BASE_URL`; when it is unset, the frontend uses a same-origin base URL.
+
+## Installation and Running Locally
+
+### Prerequisites
+
+- Windows 10 or later is recommended for the packaged workflow.
+- Node.js and npm for frontend development.
+- Python 3.10 or newer recommended for the backend environment.
+- PowerShell or another terminal available on the system path.
+
+### Install the frontend
+
+From the repository root:
+
+```powershell
+Push-Location frontend
+npm install
+Pop-Location
+```
+
+### Create a Python environment
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+The repository also contains a pre-existing `Lasca.venv` directory in some development environments. A new environment is preferred for a clean setup; do not commit virtual-environment files.
+
+### Run the desktop/backend application
+
+```powershell
+python code\main_4_app.py
+```
+
+The backend selects an available loopback port, starts Flask on `127.0.0.1`, and opens a PyWebView window. For the packaged experience, the backend serves the built frontend from `frontend/dist`.
+
+### Run the Vite frontend during development
+
+In a separate terminal:
+
+```powershell
+Push-Location frontend
+npm run dev
+Pop-Location
+```
+
+For a split frontend/backend development session, set `VITE_API_BASE_URL` to the loopback URL and port reported by the Flask process before starting Vite:
+
+```powershell
+$env:VITE_API_BASE_URL = "http://127.0.0.1:<backend-port>"
+Push-Location frontend
+npm run dev
+Pop-Location
+```
+
+The frontend package also provides these scripts:
+
+```powershell
+npm run build    # Create frontend/dist
+npm run preview  # Preview the production frontend build
+npm run lint     # Run ESLint
+```
+
+### Build the Windows release
+
+The repository includes an end-to-end PowerShell release script:
+
+```powershell
+.\build_release.ps1
+```
+
+This script builds the Vite frontend, runs PyInstaller using `LASCA.spec`, and compiles the installer with Inno Setup 6. It expects the repository's `Lasca.venv` Python executable and an available `ISCC.exe` installation. The installer is written to `installer-output\LASCA_Setup.exe` when all three build stages succeed.
+
+## Project Structure and Storage
 
 ```text
 survey_project/
 ├── README.md
 ├── requirements.txt
-├── SurveyProject.spec
-├── build/
-│   └── SurveyProject/
+├── build_release.ps1
+├── LASCA.spec
+├── installer/
+│   └── LASCA_Setup.iss
+├── code/
+│   ├── main_4_app.py
+│   ├── data_proccessing.py
+│   ├── project_manager.py
+│   ├── gwn.py
+│   ├── visualization.py
+│   ├── vis_4_app.py
+│   └── assets/
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── index.html
-│   ├── public/
 │   └── src/
 │       ├── App.jsx
-│       ├── main.jsx
-│       ├── index.css
-│       ├── components/
-│       │   ├── Sidebar.jsx
-│       │   ├── Header.jsx
-│       │   ├── Dashboard.jsx
-│       │   ├── Adjustment.jsx
-│       │   ├── Basic_Calc.jsx
-│       │   ├── Traverse.jsx
-│       │   ├── Tachymetry.jsx
-│       │   ├── gwniometriseis.jsx
-│       │   ├── leveling.jsx
-│       │   ├── traverse_height.jsx
-│       │   ├── traverse_lev.jsx
-│       │   ├── traverse_trig_lev.jsx
-│       │   ├── trig_leveling.jsx
-│       │   ├── charaxi.jsx
-│       │   ├── project_manager.jsx
-│       │   └── animations/
-│       └── utils/
-│           └── excel_template.js
-├── code/
-│   ├── main_4_app.py
-│   ├── main.py
-│   ├── data_proccessing.py
-│   ├── project_manager.py
-│   ├── configuration_settings.py
-│   ├── visualization.py
-│   ├── vis_4_app.py
-│   ├── gwn.py
-│   └── assets/
-│       └── LASCA-logo-red-blue-1024.png
-├── data/
-│   └── diafora/
-├── Topo_Workspace/
-├── Logo_library/
-├── Lasca.venv/
-└── .gitignore (if present in the repo root)
+│       ├── config.js
+│       └── components/
+└── data/
 ```
 
-### Architectural view
+### User project storage
 
-The codebase follows a two-layer design:
-
-- Frontend layer: React application for interactive workflow, forms, reports, and visualization
-- Backend layer: Flask API with geodetic and computational logic, project persistence, and report exports
-
-This keeps the domain logic separate from the UI while supporting a fast survey-analysis workflow and easy project-level state management.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20.x or later recommended
-- npm 10.x or later
-- Python 3.10+ recommended for the backend processing environment
-- A local terminal with access to the repository
-
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd survey_project
-```
-
-### 2. Install frontend dependencies
-
-```bash
-cd frontend
-npm install
-```
-
-### 3. Start the development server
-
-```bash
-npm run dev
-```
-
-The frontend is typically served by Vite on a local port such as `http://localhost:5173`.
-
-### 4. Run the Python backend
-
-From the project root, install the backend requirements and launch the Flask service:
-
-```bash
-pip install -r requirements.txt
-python code/main_4_app.py
-```
-
-The backend API is expected to run locally on `http://127.0.0.1:5000` and communicates with the frontend through CORS-enabled endpoints.
-
-> Note: The full LASCA Suite experience requires both the frontend and backend processes to be running concurrently for calculations, reports, and project state saving.
-
----
-
-## Usage Workflow
-
-A typical engineering workflow in LASCA follows this pattern:
-
-1. Create or open a survey project in the dashboard
-2. Import data from an Excel workbook or manual entry forms
-3. Fill in geodetic observations for goniometry, traverse, or leveling
-4. Run the backend computation modules
-5. Review residuals, metrics, and visual plots
-6. Export reports or generate downstream outputs for field stakeout
-
-This structure reflects the application’s emphasis on accuracy, repeatability, and a controlled workflow for surveying tasks.
-
----
-
-## Team & Credits
-
-### Laska Developers
-
-LASCA Suite was developed and maintained by the Laska Developers team with a focus on geospatial engineering workflows, surveying logic, and software usability for field and office teams.
-
-This section is intentionally prepared for project ownership and contact details:
-
-- Team Name: Laska Developers
-- Contact: Add project contact details here
-- Email: add@company.example
-- Website / Portfolio: Add URL here
-- GitHub / Organization: Add repository or organization link here
-
-The project currently includes author references in the app’s about panel, with placeholders for broader team coordination and formal ownership documentation.
-
----
-
-## License
-
-This project is currently documented as a standard open-source MIT-style project for distribution and reuse, with the understanding that commercial or proprietary use may require formal legal review.
-
-If this repository is intended to remain proprietary, replace the license text with your organization’s legal licensing terms.
+The backend stores projects below the current user's home directory:
 
 ```text
-MIT License
-
-Copyright (c) 2026 Laska Developers
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+C:\Users\<username>\LASCA\
+└── <project-name>\
+    ├── project_data.json
+    ├── data\
+    ├── results\
+    │   ├── charaxi\
+    │   ├── odeusi\
+    │   └── taxymetria\
+    └── reports\
+        ├── charaxi\
+        ├── odeusi\
+        └── taxymetria\
 ```
 
----
+This path is generated dynamically with Python's `Path.home()` and therefore changes with the Windows user account. It is not tied to the repository location or the installation directory. The `Topo_Workspace` directories included in the repository are development/sample data and should not be treated as the production storage root.
 
-## Summary
+`project_data.json` contains project metadata and the persisted application state, including observations, traverse data and metrics, tachymetry data, stakeout data, goniometry, leveling data, and trigonometric-height data. Calculation endpoints may also write files such as `latest_traverse.json` and `latest_leveling.json` inside the active project directory.
 
-LASCA Suite - Geodesy Edition is a practical, engineering-focused surveying toolkit for modern topographic work. It blends precision calculations, structured project workflows, and clear digital interfaces to support surveyors, civil engineers, and technical teams working with coordinates, elevations, bearings, and field stakeout logic.
+## Development Team
 
-Its design reflects the realities of geodetic operations: iterative computation, data traceability, reporting, and field-to-office continuity.
+LASCA was developed by students of Surveying and Geomatics Engineering at Aristotle University of Thessaloniki (AUTH). The application credits the following LASCA Developers:
+
+| Contributor | Contact |
+| --- | --- |
+| Alexandros Karachles | [GitHub](https://github.com/Neversplit2) |
+| Ilias Saoulias | [GitHub](https://github.com/iliasaou) |
+| Savvas Tsigou | [GitHub](https://github.com/Savvas-Tsigou) |
+
+## License and Distribution
+
+No `LICENSE` file is currently present in this repository. Licensing and redistribution terms should be confirmed with the project owners before publishing or distributing the software.

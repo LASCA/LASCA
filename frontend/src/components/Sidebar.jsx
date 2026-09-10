@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-// 1. Κρατάμε ΜΟΝΟ τα UI εικονίδια από το lucide-react
+// 1. Κρατάμε τα UI εικονίδια από το lucide-react (Προσθήκη MessageSquare)
 import { 
   Crosshair,
   ChevronRight, 
   ChevronLeft, 
   ChevronDown, 
   Settings,
-  Info 
+  Info,
+  MessageSquare 
 } from 'lucide-react';
 
-// 2. Κάνουμε import τα νέα custom εικονίδια του φίλου σου
+// 2. Custom εικονίδια
 import {
   DashboardIcon,
   MetriseisStathmouIcon,
@@ -26,14 +27,14 @@ import {
 } from './icons'; 
 
 import About from './about'; 
+import FeedbackModal from './FeedbackModal'; // Εισαγωγή του νέου Modal
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
   const [isTraverseMenuOpen, setIsTraverseMenuOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false); // State για το Feedback Modal
 
-  // 3. Ενημερώνουμε το menuItems περνώντας color="currentColor" 
-  // για να δουλεύουν σωστά τα hover χρώματα του Tailwind
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon size={20} color="currentColor" /> },
     { 
@@ -57,10 +58,9 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         { id: 'traverse_height', label: 'Υψομετρία (H)', icon: <YpsometriaHIcon size={16} color="currentColor" /> }
       ]
     },
-    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <TachymetriaIcon size={20} color="currentColor" /> },
+    { id: 'tachymetry', label: 'Αποτύπωση', icon: <TachymetriaIcon size={20} color="currentColor" /> },
     { id: 'stakeout', label: 'Χάραξη', icon: <CharaxiIcon size={20} color="currentColor" /> },
   ];
-
 
   const handleItemClick = (item) => {
     if (item.subItems) {
@@ -78,11 +78,9 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 
   return (
     <>
-      {/* Προσθήκη Gradient Background (from-slate-900 to-slate-950) */}
       <aside className={`${isOpen ? 'w-72' : 'w-20'} bg-gradient-to-b from-slate-900 to-slate-950 border-r border-slate-800 flex flex-col shadow-2xl h-screen transition-all duration-300 relative z-50`}>
         
         {/* Toggle Button */}
-        {/* Toggle Button - Minimal Floating Badge */}
         <button 
           onClick={() => setIsOpen(!isOpen)}
           className="absolute -right-3 top-6 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-blue-400 w-6 h-6 rounded-full border border-slate-700 hover:border-blue-500/50 z-[100] transition-all duration-300 shadow-md hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] flex items-center justify-center"
@@ -130,13 +128,11 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
                     : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
                   }`}
                 >
-                  {/* "Pill" Active Indicator στα αριστερά */}
                   {isParentActive && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-500 rounded-r-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
                   )}
 
                   <div className="flex items-center gap-3 shrink-0">
-                    {/* Micro-animation στο εικονίδιο */}
                     <div className="transition-transform duration-200 group-hover:scale-110">
                       {item.icon}
                     </div>
@@ -152,11 +148,9 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
                   {isOpen && !item.subItems && activeTab === item.id && <ChevronRight size={16} className="opacity-40" />}
                 </button>
 
-                {/* Custom Tooltip (Εμφανίζεται ΜΟΝΟ όταν το sidebar είναι κλειστό) */}
                 {!isOpen && (
                   <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover/menuItem:opacity-100 group-hover/menuItem:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
                     {item.label}
-                    {/* Τριγωνάκι (arrow) του tooltip */}
                     <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
                   </div>
                 )}
@@ -188,7 +182,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 
         {/* Footer Sidebar */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-900/50 backdrop-blur-sm overflow-hidden shrink-0 space-y-1 relative">
-          
+
+          {/* Κουμπί Σχετικά */}
           <button 
             onClick={() => setIsAboutOpen(true)}
             className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
@@ -204,6 +199,23 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
             )}
           </button>
 
+          {/* Κουμπί Feedback / Contact Us */}
+          <button 
+            onClick={() => setIsFeedbackOpen(true)}
+            className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
+          >
+            <MessageSquare size={20} className="shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:text-blue-400" />
+            {isOpen && <span className="font-medium text-sm whitespace-nowrap">Επικοινωνία</span>}
+
+            {!isOpen && (
+              <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
+                Επικοινωνία
+                <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
+              </div>
+            )}
+          </button>
+
+          {/* Κουμπί Ρυθμίσεις */}
           <button 
             className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
           >
@@ -221,6 +233,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
       </aside>
 
       <About isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </>
   );
 };

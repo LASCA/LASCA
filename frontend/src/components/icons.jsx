@@ -48,32 +48,10 @@ export const MetriseisStathmouIcon = forwardRef(function MetriseisStathmouIcon(
       strokeLinejoin="round"
       {...props}
     >
-      {/* Λαβή Μεταφοράς (Top Handle) */}
-      <path d="M9 2h6" />
-      <path d="M9 2v2" />
-      <path d="M15 2v2" />
-
-      {/* Πλαϊνοί Βραχίονες & Άνω Γέφυρα */}
-      <path d="M7 4h10" />
-      <path d="M7 4v8" />
-      <path d="M17 4v8" />
-
-      {/* Τηλεσκόπιο & Κεντρικός Φακός (Συμμαζεμένο Πλάτος) */}
-      <path d="M5.5 8.5h13" />
-      <circle cx="12" cy="8.5" r="1.8" />
-
-      {/* Κάτω Σώμα & Ψηφιακή Οθόνη */}
-      <rect x="6.5" y="12" width="11" height="6" rx="1" />
-      <rect x="8" y="13.5" width="4.5" height="3" rx="0.5" />
-      <path d="M14.5 14h1.5" />
-      <path d="M14.5 16h1.5" />
-
-      {/* Βάση Tribrach & Κοχλίες Αλφαδιάσματος (Ευθυγραμμισμένα) */}
-      <path d="M7 18v3" />
-      <path d="M17 18v3" />
-      <path d="M6 19.5h2.5" />
-      <path d="M15.5 19.5h2.5" />
-      <path d="M6 21h12" />
+      <path d="M5 8V19H8.5V17.8H15.5V19H19V8L15.5 2H8.5Z" />
+      <rect x="5" y="22" width="14" height="0.7" rx="0.2" />
+      <path d="M9.3 5H14.7L16.4 9H7.6Z" />
+      <circle cx="12" cy="13" r="2.2" />
     </svg>
   );
 });

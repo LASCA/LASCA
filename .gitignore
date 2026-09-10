@@ -3,6 +3,10 @@ Lasca.venv/
 venv/
 ENV/
 .env
+<<<<<<< HEAD
+=======
+
+>>>>>>> exe-try-2
 # Python cache (Αρχεία που φτιάχνει η Python για να τρέχει πιο γρήγορα)
 **/__pycache__/
 *.py[cod]
