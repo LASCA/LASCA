@@ -206,8 +206,8 @@ const Dashboard = ({
           }
         }
 
-        const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_taxymetria'));
-        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_taxymetria'));
+        const measSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('measurements_apotiposi'));
+        const stationsSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('stations_apotiposi'));
 
         if (setTachymetryData) {
           let cleanMeasurements = [];

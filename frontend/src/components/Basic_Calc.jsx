@@ -2,15 +2,110 @@ import React, { useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { 
   Calculator, MapPin, Target, Navigation, Repeat, 
-  Play, RotateCcw, Plus, Minus,
+  Play, RotateCcw, Trash2, Plus, Minus,
   Compass, Crosshair, SlidersHorizontal
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // ------------------------------------------------------------------
+// ΥΠΟ-COMPONENT: SVG Διάγραμμα Αλληλοτομιών
+// ------------------------------------------------------------------
+const IntersectionDiagram = ({ points, title }) => {
+  if (!points || points.length === 0) return null;
+
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  let minX = Math.min(...xs);
+  let maxX = Math.max(...xs);
+  let minY = Math.min(...ys);
+  let maxY = Math.max(...ys);
+
+  let rangeX = maxX - minX || 1;
+  let rangeY = maxY - minY || 1;
+  
+  // Padding 18% γύρω από το γράφημα για να χωράνε τα labels
+  const padX = rangeX * 0.18;
+  const padY = rangeY * 0.18;
+  minX -= padX; maxX += padX;
+  minY -= padY; maxY += padY;
+  rangeX = maxX - minX;
+  rangeY = maxY - minY;
+
+  const width = 280;
+  const height = 150;
+  const margin = 20;
+
+  // Μετατροπή Τοπογραφικών Συντεταγμένων σε SVG Canvas coordinates (Y-flip)
+  const mapCoord = (x, y) => {
+    const cx = margin + ((x - minX) / rangeX) * (width - 2 * margin);
+    const cy = height - (margin + ((y - minY) / rangeY) * (height - 2 * margin));
+    return { x: cx, y: cy };
+  };
+
+  const mappedPoints = points.map(p => ({
+    ...p,
+    coord: mapCoord(p.x, p.y)
+  }));
+
+  const targetPt = mappedPoints.find(p => p.isTarget);
+  const basePts = mappedPoints.filter(p => !p.isTarget);
+
+  return (
+    <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 flex flex-col items-center shadow-inner">
+      <span className="text-[10px] font-bold text-indigo-400 tracking-wider uppercase mb-1">{title}</span>
+      <svg width="100%" height="150" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+        {/* Διακεκομμένες γραμμές μεταξύ γνωστών σημείων */}
+        {basePts.map((pt, idx) => {
+          if (idx === basePts.length - 1) return null;
+          const nextPt = basePts[idx + 1];
+          return (
+            <line
+              key={`base-${idx}`}
+              x1={pt.coord.x} y1={pt.coord.y}
+              x2={nextPt.coord.x} y2={nextPt.coord.y}
+              stroke="#475569" strokeWidth="1.5" strokeDasharray="3 3"
+            />
+          );
+        })}
+
+        {/* Ευθείες σκοπεύσεων προς το άγνωστο σημείο */}
+        {targetPt && basePts.map((pt, idx) => (
+          <line
+            key={`ray-${idx}`}
+            x1={pt.coord.x} y1={pt.coord.y}
+            x2={targetPt.coord.x} y2={targetPt.coord.y}
+            stroke="#818cf8" strokeWidth="1.5"
+          />
+        ))}
+
+        {/* Σημεία & Labels */}
+        {mappedPoints.map((pt) => (
+          <g key={pt.id}>
+            <circle
+              cx={pt.coord.x} cy={pt.coord.y}
+              r={pt.isTarget ? 5 : 4}
+              fill={pt.isTarget ? '#10b981' : '#6366f1'}
+              stroke="#0f172a" strokeWidth="2"
+            />
+            <text
+              x={pt.coord.x} y={pt.coord.y - 8}
+              textAnchor="middle"
+              fill={pt.isTarget ? '#34d399' : '#a5b4fc'}
+              fontSize="10" fontWeight="bold" fontFamily="monospace"
+            >
+              {pt.id}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+// ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: High-End Card Widget
 // ------------------------------------------------------------------
-const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loading, resultLabels, hideActionArea, badge }) => (
+const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, result, loading, resultLabels, hideActionArea, badge }) => (
   <div className="group relative bg-slate-900/70 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all duration-300">
     <div>
       {/* Header */}
@@ -24,13 +119,26 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
             {badge && <span className="text-[10px] text-slate-400 font-medium">{badge}</span>}
           </div>
         </div>
-        <button 
-          onClick={onClear} 
-          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-lg transition-all" 
-          title="Επαναφορά (Διατήρηση δεδομένων)"
-        >
-          <RotateCcw size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          {onTrash && (
+            <button 
+              onClick={onTrash} 
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all" 
+              title="Καθαρισμός όλων των πεδίων"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+          {onClear && (
+            <button 
+              onClick={onClear} 
+              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-lg transition-all" 
+              title="Επαναφορά (Διατήρηση δεδομένων)"
+            >
+              <RotateCcw size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body Inputs */}
@@ -70,6 +178,96 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, result, loadi
 );
 
 // ------------------------------------------------------------------
+// ΥΠΟ-COMPONENT: 3D Flip Card Widget για τις Αλληλοτομίες
+// ------------------------------------------------------------------
+const FlipCalcWidget = ({ 
+  title, icon, badge, isFlipped, onFlipBack, children, onCalculate, onTrash, loading, result, resultLabels, diagramPoints, diagramTitle 
+}) => (
+  <div style={{ perspective: '1000px' }} className="w-full">
+    <div 
+      style={{
+        transformStyle: 'preserve-3d',
+        transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)'
+      }}
+      className="relative w-full"
+    >
+      {/* ΜΠΡΟΣΤΙΝΗ ΠΛΕΥΡΑ: INPUTS */}
+      <div style={{ backfaceVisibility: 'hidden' }} className="w-full">
+        <CalcWidget
+          title={title}
+          icon={icon}
+          badge={badge}
+          loading={loading}
+          result={null}
+          onCalculate={onCalculate}
+          onClear={onFlipBack}
+          onTrash={onTrash}
+        >
+          {children}
+        </CalcWidget>
+      </div>
+
+      {/* ΠΙΣΩ ΠΛΕΥΡΑ: ΔΙΑΓΡΑΜΜΑ & ΑΠΟΤΕΛΕΣΜΑΤΑ */}
+      <div 
+        style={{ 
+          backfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)'
+        }} 
+        className="absolute inset-0 w-full h-full bg-slate-900/90 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl"
+      >
+        <div>
+          {/* Header Πίσω Πλευράς με Κάδο και Κουμπί Επαναφοράς */}
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/70">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                {icon}
+              </div>
+              <h3 className="text-xs font-bold text-slate-100 tracking-wide">{title} — Διάγραμμα</h3>
+            </div>
+            <div className="flex items-center gap-1">
+              {onTrash && (
+                <button 
+                  onClick={onTrash} 
+                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all" 
+                  title="Καθαρισμός όλων των πεδίων"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+              <button 
+                onClick={onFlipBack} 
+                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-lg transition-all" 
+                title="Επαναφορά (Επιστροφή εισαγωγής)"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* SVG Διάγραμμα */}
+          <IntersectionDiagram points={diagramPoints} title={diagramTitle} />
+        </div>
+
+        {/* Κάτω μέρος: Μόνο τα Αποτελέσματα */}
+        {result && (
+          <div className="mt-3 pt-3 border-t border-slate-800/70">
+            <div className="grid grid-cols-2 gap-2">
+              {result.map((res, idx) => (
+                <div key={idx} className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center shadow-inner">
+                  <p className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase mb-0.5">{resultLabels[idx]}</p>
+                  <p className="text-sm font-mono font-semibold text-emerald-300">{res}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+// ------------------------------------------------------------------
 // COMPONENT ΓΙΑ ΤΑ INPUTS
 // ------------------------------------------------------------------
 const InputField = ({ label, value, onChange }) => (
@@ -88,7 +286,11 @@ const InputField = ({ label, value, onChange }) => (
 const BasicCalculations = () => {
   const [activeSlide, setActiveSlide] = useState(0);
 
-  // --- STATES & API CALCULATIONS (100% ΠΛΗΡΕΣ ΚΑΙ ΔΙΑΤΗΡΗΜΕΝΟ) ---
+  // --- STATES FLIP ΓΙΑ ΑΛΛΗΛΟΤΟΜΙΕΣ ---
+  const [intersectFlipped, setIntersectFlipped] = useState(false);
+  const [resectFlipped, setResectFlipped] = useState(false);
+
+  // --- STATES & API CALCULATIONS ---
   const [loadings, setLoadings] = useState({});
   const [results, setResults] = useState({
     prob1: null, prob2: null, prob3: null, scale: null, intersect: null, resect: null
@@ -96,6 +298,7 @@ const BasicCalculations = () => {
 
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
 
+  // 0. ΓΩΝΙΕΣ
   const [angles, setAngles] = useState({ rad: '', grad: '', deg: '' });
   const handleAngleChange = (type, value) => {
     if (value === '') { setAngles({ rad: '', grad: '', deg: '' }); return; }
@@ -119,6 +322,7 @@ const BasicCalculations = () => {
     setAngles({ rad, grad, deg });
   };
 
+  // 1. 1ο ΘΕΜΕΛΙΩΔΕΣ
   const [prob1Data, setProb1Data] = useState({ xa: '', ya: '', d: '', gab: '' });
   const handleProb1Calculation = async () => {
     if (!prob1Data.xa || !prob1Data.ya || !prob1Data.d || !prob1Data.gab) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
@@ -135,7 +339,12 @@ const BasicCalculations = () => {
     } catch { toast.error('Αποτυχία επικοινωνίας με το server.'); } 
     finally { setLoadings(prev => ({ ...prev, prob1: false })); }
   };
+  const handleClearProb1 = () => {
+    setProb1Data({ xa: '', ya: '', d: '', gab: '' });
+    clearResult('prob1');
+  };
 
+  // 2. 2ο ΘΕΜΕΛΙΩΔΕΣ
   const [prob2Data, setProb2Data] = useState({ xa: '', ya: '', xb: '', yb: '' });
   const handleProb2Calculation = async () => {
     if (!prob2Data.xa || !prob2Data.ya || !prob2Data.xb || !prob2Data.yb) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
@@ -152,7 +361,12 @@ const BasicCalculations = () => {
     } catch { toast.error('Αποτυχία επικοινωνίας με το server.'); }
     finally { setLoadings(prev => ({ ...prev, prob2: false })); }
   };
+  const handleClearProb2 = () => {
+    setProb2Data({ xa: '', ya: '', xb: '', yb: '' });
+    clearResult('prob2');
+  };
 
+  // 3. 3ο ΘΕΜΕΛΙΩΔΕΣ
   const [prob3Data, setProb3Data] = useState({ gprev: '', b_angles: [''] });
   const handleProb3Calculation = async () => {
     const validAngles = prob3Data.b_angles.filter(b => b && b.trim() !== '');
@@ -170,7 +384,12 @@ const BasicCalculations = () => {
     } catch { toast.error('Αποτυχία επικοινωνίας με το server.'); }
     finally { setLoadings(prev => ({ ...prev, prob3: false })); }
   };
+  const handleClearProb3 = () => {
+    setProb3Data({ gprev: '', b_angles: [''] });
+    clearResult('prob3');
+  };
 
+  // 4. ΣΥΝΤΕΛΕΣΤΗΣ ΚΛΙΜΑΚΑΣ
   const [scaleData, setScaleData] = useState({ input1: '' });
   const handleScaleCalculation = async () => {
     if (!scaleData.input1) { toast.error('Παρακαλώ συμπληρώστε το πεδίο!'); return; }
@@ -187,7 +406,12 @@ const BasicCalculations = () => {
     } catch { toast.error('Αποτυχία επικοινωνίας με το server.'); }
     finally { setLoadings(prev => ({ ...prev, scale: false })); }
   };
+  const handleClearScale = () => {
+    setScaleData({ input1: '' });
+    clearResult('scale');
+  };
 
+  // 5. ΕΜΠΡΟΣΘΟΤΟΜΙΑ
   const [intersectData, setIntersectData] = useState({ xa: '', ya: '', xb: '', yb: '', a: '', b: '' });
   const handleIntersectCalculation = async () => {
     if (!intersectData.xa || !intersectData.ya || !intersectData.xb || !intersectData.yb || !intersectData.a || !intersectData.b) { toast.error('Παρακαλώ συμπληρώστε όλα τα πεδία!'); return; }
@@ -200,29 +424,35 @@ const BasicCalculations = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setResults(prev => ({ ...prev, intersect: [data.xm.toFixed(3), data.ym.toFixed(3)] }));
+      if (data.warnings?.length) {
+        data.warnings.forEach(w => toast(w, { icon: '⚠️', duration: 7000 }));
+      }
+      setIntersectFlipped(true);
       toast.success('Επιτυχής υπολογισμός!');
-    } catch (err) { toast.error(err.message || 'Αποτυχία επικοινωνίας.'); }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία επικοινωνίας.', { duration: 8000, style: { maxWidth: '520px', whiteSpace: 'pre-line' } });
+    }
     finally { setLoadings(prev => ({ ...prev, intersect: false })); }
   };
+  const handleClearIntersect = () => {
+    setIntersectData({ xa: '', ya: '', xb: '', yb: '', a: '', b: '' });
+    clearResult('intersect');
+    setIntersectFlipped(false);
+  };
 
-// Αφαίρεση των A, B, C από το initial state
+  // 6. ΟΠΙΣΘΟΤΟΜΙΑ
   const [resectData, setResectData] = useState({ xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', a: '', b: '', c: '' });
-  
   const handleResectCalculation = async () => {
     const { xa, ya, xb, yb, xc, yc, a, b, c } = resectData;
-    
-    // Έλεγχος πλέον για 9 πεδία
     if (!xa || !ya || !xb || !yb || !xc || !yc || !a || !b || !c) { 
       toast.error('Παρακαλώ συμπληρώστε όλα τα 9 πεδία!'); 
       return; 
     }
-    
     setLoadings(prev => ({ ...prev, resect: true }));
     try {
       const response = await fetch(`${API_BASE_URL}/api/basic_calc/resect`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
-        // Αποστολή μόνο των 9 συντεταγμένων/γωνιών
         body: JSON.stringify({ 
           xa: parseFloat(xa), ya: parseFloat(ya), 
           xb: parseFloat(xb), yb: parseFloat(yb), 
@@ -234,12 +464,21 @@ const BasicCalculations = () => {
       if (!response.ok) throw new Error(data.error);
       
       setResults(prev => ({ ...prev, resect: [data.xm.toFixed(3), data.ym.toFixed(3)] }));
+      if (data.warnings?.length) {
+        data.warnings.forEach(w => toast(w, { icon: '⚠️', duration: 7000 }));
+      }
+      setResectFlipped(true);
       toast.success('Επιτυχής υπολογισμός!');
     } catch (err) { 
-      toast.error(err.message || 'Αποτυχία επικοινωνίας.'); 
+      toast.error(err.message || 'Αποτυχία επικοινωνίας.', { duration: 8000, style: { maxWidth: '520px', whiteSpace: 'pre-line' } }); 
     } finally { 
       setLoadings(prev => ({ ...prev, resect: false })); 
     }
+  };
+  const handleClearResect = () => {
+    setResectData({ xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', a: '', b: '', c: '' });
+    clearResult('resect');
+    setResectFlipped(false);
   };
 
   // 4 ΟΡΙΣΜΕΝΕΣ ΚΑΤΗΓΟΡΙΕΣ (SLIDES)
@@ -250,16 +489,32 @@ const BasicCalculations = () => {
     { id: 3, title: 'Συντελεστής Κλίμακας', sub: 'Συντελεστής m_ij', icon: <SlidersHorizontal size={16} /> },
   ];
 
+  const getIntersectDiagramPoints = () => {
+    if (!results.intersect) return [];
+    return [
+      { id: 'A', x: parseFloat(intersectData.xa), y: parseFloat(intersectData.ya) },
+      { id: 'B', x: parseFloat(intersectData.xb), y: parseFloat(intersectData.yb) },
+      { id: 'E', x: parseFloat(results.intersect[0]), y: parseFloat(results.intersect[1]), isTarget: true }
+    ];
+  };
+
+  const getResectDiagramPoints = () => {
+    if (!results.resect) return [];
+    return [
+      { id: 'A', x: parseFloat(resectData.xa), y: parseFloat(resectData.ya) },
+      { id: 'B', x: parseFloat(resectData.xb), y: parseFloat(resectData.yb) },
+      { id: 'C', x: parseFloat(resectData.xc), y: parseFloat(resectData.yc) },
+      { id: 'O', x: parseFloat(results.resect[0]), y: parseFloat(results.resect[1]), isTarget: true }
+    ];
+  };
+
   return (
-    // ΑΛΛΑΓΗ: Μειώθηκε το πάνω padding (pt-1) για να ανέβουν όλα ένα κλικ πάνω
     <div className="relative h-full flex flex-col justify-between max-w-7xl mx-auto px-2 overflow-hidden pt-1 pb-3">
       
       {/* Background Ambient Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-indigo-600/10 blur-[120px] pointer-events-none rounded-full" />
 
-      {/* ------------------------------------------------------------------ */}
       {/* CAROUSEL TRACK */}
-      {/* ------------------------------------------------------------------ */}
       <div className="relative z-10 flex-1 overflow-hidden">
         <div 
           className="flex h-full w-full transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1)"
@@ -268,14 +523,13 @@ const BasicCalculations = () => {
           
           {/* --- SLIDE 0: ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ --- */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
-            {/* ΑΛΛΑΓΗ: pt-1 pb-16 για να μην κόβεται στο κάτω μέρος */}
             <div className="max-w-xl mx-auto pt-1 pb-16">
               <CalcWidget 
                 title="Μετατροπές Μονάδων Γωνίας" 
                 badge="Άμεση αυτόματη μετατροπή"
                 icon={<Repeat size={20} />}
                 hideActionArea={true} 
-                onClear={() => setAngles({ rad: '', grad: '', deg: '' })}
+                onTrash={() => setAngles({ rad: '', grad: '', deg: '' })}
               >
                 <div className="flex flex-col gap-4 py-2">
                   <InputField label="Ακτίνια [rad]" value={angles.rad} onChange={(e) => handleAngleChange('rad', e.target.value)} />
@@ -288,7 +542,6 @@ const BasicCalculations = () => {
 
           {/* --- SLIDE 1: 3 ΘΕΜΕΛΙΩΔΗ --- */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
-            {/* ΑΛΛΑΓΗ: pt-1 pb-16 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1 pb-16">
               
               {/* 1ο Θεμελιώδες */}
@@ -301,6 +554,7 @@ const BasicCalculations = () => {
                 resultLabels={[<span>X<sub>B</sub> [m]</span>, <span>Y<sub>B</sub> [m]</span>]}
                 onCalculate={handleProb1Calculation}
                 onClear={() => clearResult('prob1')}
+                onTrash={handleClearProb1}
               >
                 <div className="grid grid-cols-2 gap-3">
                   <InputField label={<span>X<sub>A</sub> [m]</span>} value={prob1Data.xa} onChange={(e) => setProb1Data({...prob1Data, xa: e.target.value})} />
@@ -320,6 +574,7 @@ const BasicCalculations = () => {
                 resultLabels={[<span>D<sub>AB</sub> [m]</span>, <span>G<sub>AB</sub> [grad]</span>]}
                 onCalculate={handleProb2Calculation}
                 onClear={() => clearResult('prob2')}
+                onTrash={handleClearProb2}
               >
                 <div className="grid grid-cols-2 gap-3">
                   <InputField label={<span>X<sub>A</sub> [m]</span>} value={prob2Data.xa} onChange={(e) => setProb2Data({...prob2Data, xa: e.target.value})} />
@@ -338,7 +593,8 @@ const BasicCalculations = () => {
                 result={results.prob3}
                 resultLabels={[<span>G<sub>τελική</sub> [grad]</span>]}
                 onCalculate={handleProb3Calculation}
-                onClear={() => { clearResult('prob3'); setProb3Data({ gprev: '', b_angles: [''] }); }}
+                onClear={() => clearResult('prob3')}
+                onTrash={handleClearProb3}
               >
                 <div className="flex flex-col gap-3">
                   <InputField label={<span>G<sub>prev</sub> [grad]</span>} value={prob3Data.gprev} onChange={(e) => setProb3Data({...prob3Data, gprev: e.target.value})} />
@@ -372,21 +628,24 @@ const BasicCalculations = () => {
             </div>
           </div>
 
-          {/* --- SLIDE 2: ΤΟΜΕΣ --- */}
+          {/* --- SLIDE 2: ΤΟΜΕΣ (3D FLIP CARDS) --- */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
-            {/* ΑΛΛΑΓΗ: pt-1 pb-16 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1 pb-16 max-w-5xl mx-auto">
               
               {/* Εμπροσθοτομία */}
-              <CalcWidget 
+              <FlipCalcWidget 
                 title="Εμπροσθοτομία" 
-                badge="Υπολογισμός Σημείου M"
+                badge="Υπολογισμός Σημείου E"
                 icon={<Target size={18} />}
                 loading={loadings.intersect}
                 result={results.intersect}
                 resultLabels={[<span>X<sub>E</sub> [m]</span>, <span>Y<sub>E</sub> [m]</span>]}
+                isFlipped={intersectFlipped}
+                onFlipBack={() => { setIntersectFlipped(false); clearResult('intersect'); }}
                 onCalculate={handleIntersectCalculation}
-                onClear={() => clearResult('intersect')}
+                onTrash={handleClearIntersect}
+                diagramPoints={getIntersectDiagramPoints()}
+                diagramTitle="Εμπροσθοτομία A, B → E"
               >
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2 flex gap-3">
@@ -400,19 +659,22 @@ const BasicCalculations = () => {
                   <InputField label={<span>a&#770; [grad]</span>} value={intersectData.a} onChange={(e) => setIntersectData({...intersectData, a: e.target.value})} />
                   <InputField label={<span>b&#770; [grad]</span>} value={intersectData.b} onChange={(e) => setIntersectData({...intersectData, b: e.target.value})} />
                 </div>
-              </CalcWidget>
+              </FlipCalcWidget>
 
               {/* Οπισθοτομία */}
-              {/* Οπισθοτομία */}
-              <CalcWidget 
+              <FlipCalcWidget 
                 title="Οπισθοτομία" 
                 badge="Υπολογισμός Σημείου O"
                 icon={<Target size={18} className="rotate-180" />}
                 loading={loadings.resect}
                 result={results.resect}
                 resultLabels={[<span>X<sub>O</sub> [m]</span>, <span>Y<sub>O</sub> [m]</span>]}
+                isFlipped={resectFlipped}
+                onFlipBack={() => { setResectFlipped(false); clearResult('resect'); }}
                 onCalculate={handleResectCalculation}
-                onClear={() => clearResult('resect')}
+                onTrash={handleClearResect}
+                diagramPoints={getResectDiagramPoints()}
+                diagramTitle="Οπισθοτομία A, B, C → O"
               >
                 <div className="grid grid-cols-3 gap-2">
                   <InputField label={<span>X<sub>A</sub></span>} value={resectData.xa} onChange={(e) => setResectData({...resectData, xa: e.target.value})} />
@@ -429,14 +691,13 @@ const BasicCalculations = () => {
                   <InputField label={<span>b&#770;</span>} value={resectData.b} onChange={(e) => setResectData({...resectData, b: e.target.value})} />
                   <InputField label={<span>c&#770;</span>} value={resectData.c} onChange={(e) => setResectData({...resectData, c: e.target.value})} />
                 </div>
-              </CalcWidget>
+              </FlipCalcWidget>
 
             </div>
           </div>
 
           {/* --- SLIDE 3: ΚΛΙΜΑΚΑ --- */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
-            {/* ΑΛΛΑΓΗ: pt-1 pb-16 */}
             <div className="max-w-xl mx-auto pt-1 pb-16">
               <CalcWidget 
                 title="Συντελεστής Κλίμακας m" 
@@ -447,6 +708,7 @@ const BasicCalculations = () => {
                 resultLabels={[<span>m<sub>ij</sub></span>]}
                 onCalculate={handleScaleCalculation}
                 onClear={() => clearResult('scale')}
+                onTrash={handleClearScale}
               >
                 <div className="flex flex-col gap-4 py-2">
                   <InputField 
@@ -462,10 +724,7 @@ const BasicCalculations = () => {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
       {/* NAVIGATION DOCK (ΚΑΤΩ & ΚΕΝΤΡΑΡΙΣΜΕΝΟ) */}
-      {/* ------------------------------------------------------------------ */}
-      {/* ΑΛΛΑΓΗ: mt-2 αντί για mt-4 για να κερδίσουμε χώρο */}
       <div className="relative z-10 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-2xl p-2 mt-2 shadow-2xl flex justify-center max-w-fit mx-auto">
         <div className="flex items-center gap-1.5 overflow-x-auto p-1 scrollbar-none">
           {slidesMeta.map((slide) => {

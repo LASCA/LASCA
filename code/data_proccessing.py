@@ -4,6 +4,10 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+class GeodeticError(ValueError):
+    """Σφάλμα γεωδαιτικού υπολογισμού με ελληνικό, περιγραφικό μήνυμα."""
+    pass
+
 # computation functions 
     #BASICS
 def g2r(g: float) -> float: return g * (math.pi / 200.0)
@@ -95,90 +99,167 @@ def calculate_azimuths_from_station_angles(start_azimuth_g, station_angles_g):
     return all_azimuths, final_azimuth_g, log_output
 
 def empros(xa, ya, xb, yb, a, b):
-    gwna = g2r(a)
-    gwnb = g2r(b)
-    ct_gwna = ctg(gwna)
-    ct_gwnb = ctg(gwnb)
+    """
+    Εμπροσθοτομία: υπολογισμός σημείου P από τα γνωστά A, B και τις γωνίες a, b.
+    Επιστρέφει (xm, ym, warnings).
+    """
+    warnings = []
+
+    # Ταύτιση σημείων βάσης
+    if math.hypot(xb - xa, yb - ya) < 1e-9:
+        raise GeodeticError(
+            "Τα σημεία A και B ταυτίζονται. Δεν ορίζεται βάση εμπροσθοτομίας — "
+            "ελέγξτε τις συντεταγμένες."
+        )
+
+    # Εύρος γωνιών
+    for name, val in (("a", a), ("b", b)):
+        if not (0.0 < val < 400.0):
+            raise GeodeticError(
+                f"Η γωνία {name} = {val:.4f}g είναι εκτός έγκυρου εύρους (0g – 400g)."
+            )
+        if val < 0.5 or abs(val - 200.0) < 0.5 or val > 399.5:
+            raise GeodeticError(
+                f"Η γωνία {name} = {val:.4f}g είναι σχεδόν μηδενική ή ευθεία (0g / 200g / 400g). "
+                f"Η σκόπευση πέφτει πάνω στη βάση AB και το σημείο P δεν ορίζεται."
+            )
+
+    # Άθροισμα γωνιών τριγώνου
+    ang_sum = a + b
+    if ang_sum >= 199.5:
+        raise GeodeticError(
+            f"Το άθροισμα των γωνιών a + b = {ang_sum:.4f}g πρέπει να είναι μικρότερο από 200g "
+            f"(άθροισμα γωνιών τριγώνου). Το τρίγωνο ABP δεν κλείνει — ελέγξτε τις μετρήσεις."
+        )
+
+    # Ασθενής γεωμετρία (προειδοποίηση, όχι σφάλμα)
+    gamma = 200.0 - ang_sum
+    if gamma < 20.0:
+        warnings.append(
+            f"Ασθενής γεωμετρία τομής: η γωνία στο σημείο P είναι {gamma:.4f}g (< 20g). "
+            f"Το αποτέλεσμα είναι ευαίσθητο σε σφάλματα μετρήσεων."
+        )
+
+    try:
+        ct_gwna = ctg(g2r(a))
+        ct_gwnb = ctg(g2r(b))
+    except ZeroDivisionError:
+        raise GeodeticError(
+            "Η συνεφαπτομένη δεν ορίζεται για τις δοθείσες γωνίες (τιμή 0g ή 200g). "
+            "Ελέγξτε τις γωνίες σας."
+        )
+
     denom = ct_gwna + ct_gwnb
     if abs(denom) < 1e-15:
-        raise ZeroDivisionError("Απροσδιοριστία (ctg(a) + ctg(b) = 0)")
+        raise GeodeticError(
+            "Απροσδιοριστία (ctg(a) + ctg(b) = 0). Οι δύο σκοπεύσεις είναι παράλληλες "
+            "και δεν τέμνονται — το σημείο P δεν ορίζεται. Ελέγξτε τις γωνίες σας."
+        )
+
     nom1 = yb - ya + xa * ct_gwnb + xb * ct_gwna
     nom2 = xa - xb + ya * ct_gwnb + yb * ct_gwna
-    xm = nom1 / denom
-    ym = nom2 / denom
-    return xm, ym
+    return nom1 / denom, nom2 / denom, warnings
 
 def tienstra(xa, ya, xb, yb, xc, yc, a, b, c):
     """
-    Υπολογισμός Οπισθοτομίας Tienstra.
-    xa, ya, xb, yb, xc, yc : Συντεταγμένες A, B, C (σε m)
-    a, b, c                : Σκοπευθείσες γωνίες a=BMC, b=CMA, c=AMB (σε grads/gons)
+    Οπισθοτομία (Tienstra): υπολογισμός σημείου P από τα γνωστά A, B, C
+    και τις σκοπευθείσες γωνίες a=BPC, b=CPA, c=APB.
+    Επιστρέφει (xm, ym, warnings).
     """
-    # 1. Υπολογισμός ctg(A), ctg(B), ctg(C) των εσωτερικών γωνιών του τριγώνου ABC
-    # Κορυφή A (Διανύσματα AB, AC)
-    uAx, uAy = xb - xa, yb - ya
-    vAx, vAy = xc - xa, yc - ya
-    dot_A = uAx * vAx + uAy * vAy
-    cross_A = abs(uAx * vAy - uAy * vAx)
-    if cross_A < 1e-15:
-        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
-    cot_A = dot_A / cross_A
+    warnings = []
 
-    # Κορυφή B (Διανύσματα BC, BA)
-    uBx, uBy = xc - xb, yc - yb
-    vBx, vBy = xa - xb, ya - yb
-    dot_B = uBx * vBx + uBy * vBy
-    cross_B = abs(uBx * vBy - uBy * vBx)
-    if cross_B < 1e-15:
-        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
-    cot_B = dot_B / cross_B
+    # Ταύτιση σημείων
+    for n1, x1, y1, n2, x2, y2 in (
+        ("A", xa, ya, "B", xb, yb),
+        ("B", xb, yb, "C", xc, yc),
+        ("A", xa, ya, "C", xc, yc),
+    ):
+        if math.hypot(x2 - x1, y2 - y1) < 1e-9:
+            raise GeodeticError(
+                f"Δεν μπορούν να υπολογιστούν οι γωνίες A, B, C. "
+                f"Τα σημεία {n1} και {n2} ταυτίζονται."
+            )
 
-    # Κορυφή C (Διανύσματα CA, CB)
-    uCx, uCy = xa - xc, ya - yc
-    vCx, vCy = xb - xc, yb - yc
-    dot_C = uCx * vCx + uCy * vCy
-    cross_C = abs(uCx * vCy - uCy * vCx)
-    if cross_C < 1e-15:
-        raise ValueError("Τα σημεία A, B, C είναι συνευθειακά.")
-    cot_C = dot_C / cross_C
+    # Εύρος γωνιών
+    for name, val in (("a", a), ("b", b), ("c", c)):
+        if not (0.0 < val < 400.0):
+            raise GeodeticError(
+                f"Η γωνία {name} = {val:.4f}g είναι εκτός έγκυρου εύρους (0g – 400g)."
+            )
+        if val < 0.5 or abs(val - 200.0) < 0.5:
+            raise GeodeticError(
+                f"Η γωνία {name} = {val:.4f}g είναι σχεδόν μηδενική ή ευθεία. "
+                f"Δύο σκοπεύσεις συμπίπτουν — το σημείο P δεν ορίζεται."
+            )
 
-    # 2. Μετατροπή σκοπευθεισών γωνιών α, β, γ από grads σε radians
-    rad_a = a * math.pi / 200.0
-    rad_b = b * math.pi / 200.0
-    rad_c = c * math.pi / 200.0
+    # Άθροισμα των τριών μετρημένων γωνιών (ίδιος έλεγχος με την παλιά έκδοση)
+    measured_angle_sum = a + b + c
+    if abs(measured_angle_sum - 400.0) > 0.001:
+        raise GeodeticError(
+            f"Το άθροισμα των τριών μετρημένων γωνιών (a, b, c) δεν είναι 400 grads!\n"
+            f"Άθροισμα: {measured_angle_sum:.4f}g\n"
+            f"Απόκλιση: {measured_angle_sum - 400.0:.4f}g"
+        )
 
-    # Υπολογισμός ctg = cos / sin (διατηρεί τα πρόσημα σε όλους τους τομείς)
+    # Συνεφαπτομένες των εσωτερικών γωνιών του τριγώνου ABC
+    def _cot_vertex(px, py, q1x, q1y, q2x, q2y):
+        ux, uy = q1x - px, q1y - py
+        vx, vy = q2x - px, q2y - py
+        dot = ux * vx + uy * vy
+        cross = abs(ux * vy - uy * vx)
+        if cross < 1e-15:
+            raise GeodeticError(
+                "Τα σημεία A, B, C είναι συνευθειακά (βρίσκονται στην ίδια ευθεία). "
+                "Η οπισθοτομία απαιτεί τρία σημεία που σχηματίζουν τρίγωνο."
+            )
+        return dot / cross
+
+    cot_A = _cot_vertex(xa, ya, xb, yb, xc, yc)
+    cot_B = _cot_vertex(xb, yb, xc, yc, xa, ya)
+    cot_C = _cot_vertex(xc, yc, xa, ya, xb, yb)
+
+    rad_a, rad_b, rad_c = g2r(a), g2r(b), g2r(c)
     cot_a = math.cos(rad_a) / math.sin(rad_a)
     cot_b = math.cos(rad_b) / math.sin(rad_b)
     cot_c = math.cos(rad_c) / math.sin(rad_c)
 
-    # 3. Συντελεστές βαρύτητας Tienstra k1, k2, k3
-    d1 = cot_A - cot_a
-    d2 = cot_B - cot_b
-    d3 = cot_C - cot_c
+    d1, d2, d3 = cot_A - cot_a, cot_B - cot_b, cot_C - cot_c
 
-    if abs(d1) < 1e-15 or abs(d2) < 1e-15 or abs(d3) < 1e-15:
-        raise ZeroDivisionError("Απροσδιοριστία (cot_vertex = cot_angle).")
+    for label, d in (("A", d1), ("B", d2), ("C", d3)):
+        if abs(d) < 0.002:
+            raise GeodeticError(
+                f"Απροσδιοριστία στην κορυφή {label} (A=a ή B=b ή C=c). "
+                f"ΠΙΘΑΝΗ ΑΙΤΙΑ: Η στάση P βρίσκεται πάνω στον 'Κύκλο Κινδύνου' "
+                f"(τον περιγεγραμμένο κύκλο των σημείων A, B, C)."
+            )
 
-    k1 = 1.0 / d1
-    k2 = 1.0 / d2
-    k3 = 1.0 / d3
-
+    k1, k2, k3 = 1.0 / d1, 1.0 / d2, 1.0 / d3
     sk = k1 + k2 + k3
-    if abs(sk) < 1e-15:
-        raise ZeroDivisionError("Απροσδιοριστία: Το σημείο βρίσκεται στον επικίνδυνο κύκλο.")
 
-    # 4. Υπολογισμός τελικών συντεταγμένων
+    if abs(sk) < 1e-12:
+        raise GeodeticError(
+            "Απροσδιοριστία (k1 + k2 + k3 = 0).\n"
+            "ΠΙΘΑΝΗ ΑΙΤΙΑ: Η στάση P βρίσκεται πάνω στον 'Κύκλο Κινδύνου' "
+            "(τον περιγεγραμμένο κύκλο των σημείων A, B, C)."
+        )
+
+    # Προειδοποίηση εγγύτητας στον Κύκλο Κινδύνου
+    min_d = min(abs(d1), abs(d2), abs(d3))
+    if min_d < 0.05:
+        warnings.append(
+            f"Προσοχή: η στάση P βρίσκεται κοντά στον 'Κύκλο Κινδύνου' των A, B, C "
+            f"(δείκτης ευστάθειας {min_d:.4f}). Το αποτέλεσμα είναι αναξιόπιστο."
+        )
+
     xm = (k1 * xa + k2 * xb + k3 * xc) / sk
     ym = (k1 * ya + k2 * yb + k3 * yc) / sk
-
-    return xm, ym
+    return xm, ym, warnings
 
 def tachymetry(data_meas, data_st=None, target_station=None, target_orientation=None, apply_scale=False, scale_factor=1.0):
     # 1. Φόρτωση: Αν περάσουμε path διαβάζει Excel (παλιός τρόπος). Αν περάσουμε DataFrame, τα παίρνει κατευθείαν (νέος τρόπος API).
     if isinstance(data_meas, str):
-        df_st = pd.read_excel(data_meas, sheet_name='stations_taxymetria')
-        df_meas = pd.read_excel(data_meas, sheet_name='measurements_taxymetria')
+        df_st = pd.read_excel(data_meas, sheet_name='stations_apotiposi')
+        df_meas = pd.read_excel(data_meas, sheet_name='measurements_apotiposi')
     else:
         df_st = data_st.copy()
         df_meas = data_meas.copy()

@@ -58,7 +58,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         { id: 'traverse_height', label: 'Υψομετρία (H)', icon: <YpsometriaHIcon size={16} color="currentColor" /> }
       ]
     },
-    { id: 'tachymetry', label: 'Ταχυμετρία', icon: <TachymetriaIcon size={20} color="currentColor" /> },
+    { id: 'tachymetry', label: 'Αποτύπωση', icon: <TachymetriaIcon size={20} color="currentColor" /> },
     { id: 'stakeout', label: 'Χάραξη', icon: <CharaxiIcon size={20} color="currentColor" /> },
   ];
 

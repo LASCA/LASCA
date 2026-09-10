@@ -34,7 +34,7 @@ const Header = ({ activeTab }) => {
       case 'traverse_height': 
         return { icon: YpsometriaHIcon, label: "Υψομετρία Όδευσης", color: "orange" };
       case 'tachymetry': 
-        return { icon: TachymetriaIcon, label: "Ταχυμετρία", color: "pink" };
+        return { icon: TachymetriaIcon, label: "Αποτύπωση", color: "pink" };
       case 'stakeout': 
         return { icon: CharaxiIcon, label: "Χάραξη", color: "emerald" };
       case 'basic_calc': 

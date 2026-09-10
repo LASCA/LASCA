@@ -2845,53 +2845,68 @@ def calc_prob3():
 @app.route('/api/basic_calc/intersect', methods=['POST'])
 def calc_intersect():
     try:
-        data = request.json
-        
-        # Λήψη δεδομένων από το React
-        xa = float(data.get('xa', 0))
-        ya = float(data.get('ya', 0))
-        xb = float(data.get('xb', 0))
-        yb = float(data.get('yb', 0))
-        a = float(data.get('a', 0))
-        b = float(data.get('b', 0))
+        data = request.json or {}
+        labels = {'xa': 'XA', 'ya': 'YA', 'xb': 'XB', 'yb': 'YB', 'a': 'a', 'b': 'b'}
+        vals = {}
+        for key, label in labels.items():
+            raw = data.get(key)
+            if raw is None or str(raw).strip() == '':
+                return jsonify({"error": f"Το πεδίο '{label}' είναι κενό."}), 400
+            try:
+                vals[key] = float(str(raw).replace(',', '.'))
+            except ValueError:
+                return jsonify({"error": f"Το πεδίο '{label}' δεν είναι έγκυρος αριθμός."}), 400
 
-        # Κλήση της έτοιμης συνάρτησης από το data_proccessing (dpr)
-        xm, ym = dpr.empros(xa, ya, xb, yb, a, b)
 
-        # Επιστροφή των αποτελεσμάτων
-        return jsonify({"xm": xm, "ym": ym})
+        xm, ym, warnings = dpr.empros(
+            vals['xa'], vals['ya'], vals['xb'], vals['yb'], vals['a'], vals['b']
+        )
+        return jsonify({"xm": xm, "ym": ym, "warnings": warnings})
         
-    except ZeroDivisionError as e:
+    except dpr.GeodeticError as e:
         return jsonify({"error": str(e)}), 400
+    except ZeroDivisionError as e:
+        return jsonify({"error": f"Προέκυψε διαίρεση με το μηδέν.\n{e}\nΕλέγξτε τις γωνίες σας."}), 400
     except Exception as e:
         import traceback
         print(f"Σφάλμα στην Εμπροσθοτομία:\n{traceback.format_exc()}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Προέκυψε σφάλμα: {str(e)}"}), 500
     
 @app.route('/api/basic_calc/resect', methods=['POST'])
 def calc_resect():
     try:
-        data = request.json
-        
-        # Λήψη των 9 δεδομένων από το React (χωρίς τις εσωτερικές γωνίες A, B, C)
-        xa, ya = float(data.get('xa', 0)), float(data.get('ya', 0))
-        xb, yb = float(data.get('xb', 0)), float(data.get('yb', 0))
-        xc, yc = float(data.get('xc', 0)), float(data.get('yc', 0))
-        
-        # Οι σκοπευθείσες γωνίες από το άγνωστο σημείο
-        a, b, c = float(data.get('a', 0)), float(data.get('b', 0)), float(data.get('c', 0))
+        data = request.json or {}
+        labels = {'xa': 'XA', 'ya': 'YA', 'xb': 'XB', 'yb': 'YB',
+                  'xc': 'XC', 'yc': 'YC', 'a': 'a', 'b': 'b', 'c': 'c'}
+        vals = {}
+        for key, label in labels.items():
+            raw = data.get(key)
+            if raw is None or str(raw).strip() == '':
+                return jsonify({"error": f"Το πεδίο '{label}' είναι κενό."}), 400
+            try:
+                vals[key] = float(str(raw).replace(',', '.'))
+            except ValueError:
+                return jsonify({"error": f"Το πεδίο '{label}' δεν είναι έγκυρος αριθμός."}), 400
 
         # Κλήση της ενημερωμένης συνάρτησης tienstra (με 9 παραμέτρους)
-        xm, ym = dpr.tienstra(xa, ya, xb, yb, xc, yc, a, b, c)
-
-        return jsonify({"xm": xm, "ym": ym})
+        xm, ym, warnings = dpr.tienstra(
+            vals['xa'], vals['ya'], vals['xb'], vals['yb'], vals['xc'], vals['yc'],
+            vals['a'], vals['b'], vals['c']
+        )
+        return jsonify({"xm": xm, "ym": ym, "warnings": warnings})
         
-    except ZeroDivisionError as e:
+    except dpr.GeodeticError as e:
         return jsonify({"error": str(e)}), 400
+    except ZeroDivisionError as e:
+        return jsonify({
+            "error": f"Προέκυψε διαίρεση με το μηδέν.\n{e}\n\n"
+                     "ΠΙΘΑΝΗ ΑΙΤΙΑ: Η στάση P βρίσκεται πάνω στον 'Κύκλο Κινδύνου' "
+                     "(τον περιγεγραμμένο κύκλο των σημείων A, B, C)."
+        }), 400
     except Exception as e:
         import traceback
         print(f"Σφάλμα στην Οπισθοτομία:\n{traceback.format_exc()}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Προέκυψε σφάλμα: {str(e)}"}), 500
     
 @app.route('/api/basic_calc/scale', methods=['POST'])
 def calc_scale():
@@ -3237,5 +3252,5 @@ if __name__ == '__main__':
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
-    webview.create_window('LASCA', f'http://127.0.0.1:{port}', width=1280, height=800, resizable=True)
+    webview.create_window('LASCA', f'http://127.0.0.1:{port}', maximized=True)
     webview.start(debug=False)

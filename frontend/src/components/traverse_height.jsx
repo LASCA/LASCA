@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, PlusCircle, Trash2 } from 'lucide-react';
 import TraverseTrigLevel from './traverse_trig_lev.jsx'; 
-// Το TraverseLeveling αφαιρέθηκε
 
 const TraverseHeight = ({ 
   observations = [], setObservations,   
   stations = [], setStations,
   projectSettings
-  // Αφαιρέθηκαν τα props: forwardData, backwardData, metrics[cite: 10]
 }) => {
   const [localStations, setLocalStations] = useState([]);
 
@@ -17,9 +15,34 @@ const TraverseHeight = ({
     return isNaN(num) ? val : num.toFixed(3);
   };
 
+  // --- ΕΞΥΠΝΟ FORMATTING ---
   useEffect(() => {
     if (stations && stations.length > 0) {
-      setLocalStations(stations.map(st => ({ ...st, h: to3(st.h) })));
+      let hasChanges = false;
+      const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
+
+      const formattedStations = stations.map((st) => {
+        let updatedSt = { ...st };
+        // Ελέγχουμε αν το συγκεκριμένο input έχει το focus του χρήστη
+        const isHFocused = activeId === `station-h-${st.id}`;
+
+        if (!isHFocused && st.h !== "" && st.h != null) {
+          const formattedVal = to3(st.h);
+          if (formattedVal !== String(st.h)) {
+            updatedSt.h = formattedVal;
+            hasChanges = true;
+          }
+        }
+        return updatedSt;
+      });
+
+      if (hasChanges) {
+        setLocalStations(formattedStations);
+        if (setStations) setStations(formattedStations);
+      } else {
+        // Διατηρούμε το state συγχρονισμένο χωρίς να ενοχλούμε την πληκτρολόγηση
+        setLocalStations(stations);
+      }
     } else if (localStations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
         id: Date.now() + 1000 + index, 
@@ -28,7 +51,7 @@ const TraverseHeight = ({
       setLocalStations(initialRows);
       if (setStations) setStations(initialRows);
     }
-  }, [stations]);
+  }, [stations, setStations]);
 
   const updateStationsData = (newData) => {
     const finalData = typeof newData === 'function' ? newData(localStations) : newData;
@@ -58,8 +81,6 @@ const TraverseHeight = ({
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
         `
       }} />
-
-      {/* Αφαιρέθηκε ο διακόπτης επιλογής μεθόδου */}
 
       {/* GRID LAYOUT */}
       <div className="grid grid-cols-[3.2fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden pb-4 mt-2">
@@ -106,6 +127,7 @@ const TraverseHeight = ({
                           </td>
                           <td className="p-2">
                             <input 
+                              id={`station-h-${st.id}`}
                               className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none rounded focus:bg-slate-800 focus:ring-1 focus:ring-cyan-500/80 transition-all text-cyan-400" 
                               value={st.h} 
                               onBlur={(e) => handleStationBlur(st.id, 'h', e.target.value)} 
