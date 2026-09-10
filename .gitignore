@@ -2,7 +2,7 @@
 Lasca.venv/
 venv/
 ENV/
-
+.env
 # Python cache (Αρχεία που φτιάχνει η Python για να τρέχει πιο γρήγορα)
 **/__pycache__/
 *.py[cod]
