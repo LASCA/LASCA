@@ -25,7 +25,8 @@ const Leveling = ({
 
   const handleInputChange = (index, field, value) => {
     const newData = [...currentData];
-    newData[index] = { ...newData[index], [field]: value };
+    const normalizedValue = field !== 'point' ? value.replace(/,/g, '.') : value;
+    newData[index] = { ...newData[index], [field]: normalizedValue };
     if (setCurrentData) setCurrentData(newData);
   };
 

@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config';
 import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play, ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import InputField from './InputField';
 
 const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const { station, backsight, points, mij } = stakeoutData;
@@ -50,17 +51,20 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   };
 
   const setStation = (field, val) => {
-    setStakeoutData(prev => ({ ...prev, station: { ...prev.station, [field]: val } }));
+    const normalizedValue = ['x', 'y'].includes(field) ? val.replace(/,/g, '.') : val;
+    setStakeoutData(prev => ({ ...prev, station: { ...prev.station, [field]: normalizedValue } }));
   };
 
   const setBacksight = (field, val) => {
-    setStakeoutData(prev => ({ ...prev, backsight: { ...prev.backsight, [field]: val } }));
+    const normalizedValue = ['x', 'y'].includes(field) ? val.replace(/,/g, '.') : val;
+    setStakeoutData(prev => ({ ...prev, backsight: { ...prev.backsight, [field]: normalizedValue } }));
   };
 
   const handlePointChange = (index, field, val) => {
+    const normalizedValue = ['x', 'y'].includes(field) ? val.replace(/,/g, '.') : val;
     setStakeoutData(prev => {
       const newPoints = [...prev.points];
-      newPoints[index] = { ...newPoints[index], [field]: val };
+      newPoints[index] = { ...newPoints[index], [field]: normalizedValue };
       return { ...prev, points: newPoints };
     });
   };
@@ -255,9 +259,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">X [m]</span>
-                <input 
+                <InputField 
                   disabled={isCalculated}
-                  type="number" 
                   value={station.x || ''} 
                   onChange={(e) => setStation('x', e.target.value)} 
                   className={`w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium bg-transparent border-transparent' : 'text-slate-200 font-bold'} ${noSpinnersClass}`} 
@@ -266,9 +269,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">Y [m]</span>
-                <input 
+                <InputField 
                   disabled={isCalculated}
-                  type="number" 
                   value={station.y || ''} 
                   onChange={(e) => setStation('y', e.target.value)} 
                   className={`w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium bg-transparent border-transparent' : 'text-slate-200 font-bold'} ${noSpinnersClass}`} 
@@ -298,9 +300,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">X [m]</span>
-                <input 
+                <InputField 
                   disabled={isCalculated}
-                  type="number" 
                   value={backsight.x || ''} 
                   onChange={(e) => setBacksight('x', e.target.value)} 
                   className={`w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1 text-xs outline-none focus:border-amber-500 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium bg-transparent border-transparent' : 'text-slate-200 font-bold'} ${noSpinnersClass}`} 
@@ -309,9 +310,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-500 w-8">Y [m]</span>
-                <input 
+                <InputField 
                   disabled={isCalculated}
-                  type="number" 
                   value={backsight.y || ''} 
                   onChange={(e) => setBacksight('y', e.target.value)} 
                   className={`w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1 text-xs outline-none focus:border-amber-500 transition-all font-mono ${isCalculated ? 'text-slate-500 font-medium bg-transparent border-transparent' : 'text-slate-200 font-bold'} ${noSpinnersClass}`} 
@@ -397,7 +397,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
                             type="text"
                             readOnly={scaleMode !== "Χειροκίνητα"}
                             value={scaleFactor}
-                            onChange={(e) => setScaleFactor(e.target.value)}
+                            onChange={(e) => setScaleFactor(e.target.value.replace(/,/g, '.'))}
                             className={`w-16 bg-transparent border-none text-[10px] rounded px-1 outline-none transition-all font-mono text-center ${
                               scaleMode === "Χειροκίνητα" ? "text-amber-300 focus:bg-slate-800" : 
                               scaleMode === "Υπολογισμός" ? "text-emerald-400 cursor-not-allowed" : "text-slate-500 cursor-not-allowed"

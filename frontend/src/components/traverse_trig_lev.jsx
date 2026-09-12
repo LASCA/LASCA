@@ -140,7 +140,7 @@ const TraverseTrigLevel = ({
     }
   };
 
-  const handleObsInputChange = (id, field, value) => updateObsData(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: value } : obs));
+  const handleObsInputChange = (id, field, value) => updateObsData(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: ['s', 'z', 'hi', 'ht'].includes(field) ? value.replace(/,/g, '.') : value } : obs));
   
   const handleObsBlur = (id, field, value) => {
     if (field === 's' || field === 'hi' || field === 'ht') handleObsInputChange(id, field, to3(value));
@@ -221,7 +221,7 @@ const TraverseTrigLevel = ({
               <input 
                 type="text" 
                 value={tolD} 
-                onChange={(e) => setTolD(e.target.value)}
+                onChange={(e) => setTolD(e.target.value.replace(/,/g, '.'))}
                 className="bg-slate-900 border border-slate-700 text-amber-400 text-xs text-center rounded-md w-14 h-7 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all font-mono"
               />
             </div>
@@ -230,7 +230,7 @@ const TraverseTrigLevel = ({
               <input 
                 type="text" 
                 value={tolDH} 
-                onChange={(e) => setTolDH(e.target.value)}
+                onChange={(e) => setTolDH(e.target.value.replace(/,/g, '.'))}
                 className="bg-slate-900 border border-slate-700 text-emerald-400 text-xs text-center rounded-md w-14 h-7 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all font-mono"
               />
             </div>

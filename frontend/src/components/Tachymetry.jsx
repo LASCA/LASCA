@@ -508,7 +508,7 @@ const Tachymetry = ({
                   value={scaleFactor}
                   onChange={(e) => {
                     if (scaleMode === "Χειροκίνητα") {
-                      setScaleFactor(e.target.value);
+                      setScaleFactor(e.target.value.replace(/,/g, '.'));
                     }
                   }}
                   className={`w-[82px] text-center border text-[10px] rounded-md px-2 py-0.5 outline-none transition-all font-mono shadow-inner ${

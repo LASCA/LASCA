@@ -59,7 +59,7 @@ const TraverseHeight = ({
     if (setStations) setStations(finalData);
   };
 
-  const handleStationChange = (id, field, value) => updateStationsData(prev => prev.map(st => st.id === id ? { ...st, [field]: value } : st));
+  const handleStationChange = (id, field, value) => updateStationsData(prev => prev.map(st => st.id === id ? { ...st, [field]: field === 'h' ? value.replace(/,/g, '.') : value } : st));
   const handleStationBlur = (id, field, value) => { if (field === 'h') handleStationChange(id, field, to3(value)); };
   
   const addStationRowAt = (index) => {

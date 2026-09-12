@@ -92,7 +92,8 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   }, [observations, isAdjusted, setObservations]);
 
   const handleInputChange = (id, field, value) => {
-    setObservations(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: value } : obs));
+    const normalizedValue = ['Period', 'Face_I', 'Face_II'].includes(field) ? value.replace(/,/g, '.') : value;
+    setObservations(prev => prev.map(obs => obs.id === id ? { ...obs, [field]: normalizedValue } : obs));
   };
 
   const handleBlur = (id, field, value) => {

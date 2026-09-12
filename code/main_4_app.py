@@ -2911,23 +2911,68 @@ def calc_resect():
 @app.route('/api/basic_calc/scale', methods=['POST'])
 def calc_scale():
     try:
-        data = request.json
+        data = request.json or {}
         
-        # Το input1 από το React αντιστοιχεί στη συντεταγμένη X (Easting)
-        xs = float(data.get('input1', 0))
-        
-        # Το input2 μπορούμε να το αγνοήσουμε ή να το χρησιμοποιήσουμε μελλοντικά
-        # (π.χ. για να δέχεται το m_0 ή το R_0 αν χρειαστεί)
+        raw = data.get('input1')
+        if raw is None or str(raw).strip() == '':
+            return jsonify({"error": "Το πεδίο 'E' είναι κενό."}), 400
+        try:
+            E = float(str(raw).replace(',', '.'))
+        except ValueError:
+            return jsonify({"error": "Το πεδίο 'E' δεν είναι έγκυρος αριθμός."}), 400
 
-        # Κλήση της συνάρτησης υπολογισμού συντελεστή κλίμακας
-        k = dpr.sintelestis_klimakas(xs)
+        m = dpr.sintelestis_klimakas(E)
 
-        # Επιστροφή του αποτελέσματος στο React (το JSON κλειδί πρέπει να είναι "k")
-        return jsonify({"k": k})
-        
+        return jsonify({
+            "k": m,
+            "m": m,
+            "inv_m": 1.0 / m,
+            "ppm": (m - 1.0) * 1e6
+        })
+
     except Exception as e:
         import traceback
         print(f"Σφάλμα στον Συντελεστή Κλίμακας:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/basic_calc/scale_segment', methods=['POST'])
+def calc_scale_segment():
+    """Γραμμικός συντελεστής κλίμακας m_ij για τμήμα i→j (τύπος Simpson)."""
+    try:
+        data = request.json or {}
+
+        def parse_field(key, label, required=True):
+            raw = data.get(key)
+            if raw is None or str(raw).strip() == '':
+                if required:
+                    return None, jsonify({"error": f"Το πεδίο '{label}' είναι κενό."}), 400
+                return None, None, None
+            try:
+                return float(str(raw).replace(',', '.')), None, None
+            except ValueError:
+                return None, jsonify({"error": f"Το πεδίο '{label}' δεν είναι έγκυρος αριθμός."}), 400
+
+        Ei, err, code = parse_field('Ei', 'Ei')
+        if err: return err, code
+        Ej, err, code = parse_field('Ej', 'Ej')
+        if err: return err, code
+        L, err, code = parse_field('L', 'L', required=False)
+        if err: return err, code
+
+        res = dpr.sintelestis_klimakas_segment(Ei, Ej)
+
+        if L is not None:
+            res['dL'] = (res['m_ij'] - 1.0) * L
+            res['L_corr'] = res['m_ij'] * L
+        else:
+            res['dL'] = None
+            res['L_corr'] = None
+
+        return jsonify(res)
+
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα στον Γραμμικό Συντελεστή Κλίμακας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
 # ==========================================

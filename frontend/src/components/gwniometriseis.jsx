@@ -76,7 +76,8 @@ const Goniometry = ({ rows = [], setRows }) => {
   // Handlers για αλλαγή δεδομένων
   const handleInputChange = (id, field, value) => {
     if (setRows) {
-      setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+      const normalizedValue = ['period', 'faceI', 'faceII', 'ZfaceI', 'ZfaceII'].includes(field) ? value.replace(/,/g, '.') : value;
+      setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: normalizedValue } : r));
     }
   };
 

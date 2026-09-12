@@ -156,7 +156,8 @@ const TraverseLeveling = ({
 
   const handleGeoInputChange = (index, field, value) => {
     const newData = [...currentGeoData];
-    newData[index] = { ...newData[index], [field]: value };
+    const normalizedValue = field !== 'point' ? value.replace(/,/g, '.') : value;
+    newData[index] = { ...newData[index], [field]: normalizedValue };
     setGeoCurrentData(newData);
   };
 

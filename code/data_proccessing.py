@@ -1415,6 +1415,47 @@ def sintelestis_klimakas(xs: float, m_0 = 0.9996, R_0 = 6371000.0) -> float:
     
     return mij
 
+def sintelestis_klimakas_segment(Ei: float, Ej: float, m_0=0.9996, R_0=6371000.0) -> dict:
+    """
+    Γραμμικός (μέσος) συντελεστής κλίμακας m_ij για ευθύγραμμο τμήμα i→j,
+    με τον συνδυαστικό τύπο του Simpson:
+
+        1/m_ij = (1/6) * ( 1/m_i + 4/m_m + 1/m_j )
+
+    όπου m_i, m_m, m_j είναι οι σημειακοί συντελεστές στα άκρα και στο μέσο
+    του τμήματος, υπολογισμένοι με τη sintelestis_klimakas().
+
+    Χρησιμοποιείται για αποστάσεις μεγαλύτερες από ~2 km, όπου ο σημειακός
+    συντελεστής ενός μόνο άκρου δεν επαρκεί.
+    """
+    Em = 0.5 * (Ei + Ej)
+
+    mi = sintelestis_klimakas(Ei, m_0, R_0)
+    mm = sintelestis_klimakas(Em, m_0, R_0)
+    mj = sintelestis_klimakas(Ej, m_0, R_0)
+
+    if min(abs(mi), abs(mm), abs(mj)) < 1e-12:
+        raise GeodeticError(
+            "Μη έγκυρος σημειακός συντελεστής κλίμακας. Ελέγξτε τις συνιστώσες E."
+        )
+
+    inv_mij = (1.0 / 6.0) * ((1.0 / mi) + 4.0 * (1.0 / mm) + (1.0 / mj))
+
+    if abs(inv_mij) < 1e-12:
+        raise GeodeticError("Απροσδιοριστία στον υπολογισμό του γραμμικού συντελεστή m_ij.")
+
+    m_ij = 1.0 / inv_mij
+
+    return {
+        "m_ij": m_ij,
+        "inv_m_ij": 1.0 / m_ij,
+        "ppm": (m_ij - 1.0) * 1e6,
+        "Em": Em,
+        "mi": mi,
+        "mm": mm,
+        "mj": mj,
+    }
+
 def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, scale_mode: str = "Χωρίς", scale_factor: float = 1.0) -> dict:
     try:
         xs = float(station.get('x', 0))

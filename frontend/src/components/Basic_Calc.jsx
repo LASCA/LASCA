@@ -6,6 +6,7 @@ import {
   Compass, Crosshair, SlidersHorizontal
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import InputField from './InputField';
 
 // ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: SVG Διάγραμμα Αλληλοτομιών
@@ -106,7 +107,7 @@ const IntersectionDiagram = ({ points, title }) => {
 // ΥΠΟ-COMPONENT: High-End Card Widget
 // ------------------------------------------------------------------
 const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, result, loading, resultLabels, hideActionArea, badge }) => (
-  <div className="group relative bg-slate-900/70 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all duration-300">
+  <div className="h-full group relative bg-slate-900/70 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all duration-300">
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/70">
@@ -154,7 +155,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, resu
           <div className="grid grid-cols-2 gap-2 animate-in fade-in zoom-in-95 duration-200">
             {result.map((res, idx) => (
               <div key={idx} className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center shadow-inner">
-                <p className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase mb-0.5">{resultLabels[idx]}</p>
+                <p className="text-[10px] font-bold text-emerald-400 tracking-wider mb-0.5">{resultLabels[idx]}</p>
                 <p className="text-sm font-mono font-semibold text-emerald-300">{res}</p>
               </div>
             ))}
@@ -183,17 +184,17 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, resu
 const FlipCalcWidget = ({ 
   title, icon, badge, isFlipped, onFlipBack, children, onCalculate, onTrash, loading, result, resultLabels, diagramPoints, diagramTitle 
 }) => (
-  <div style={{ perspective: '1000px' }} className="w-full">
+  <div style={{ perspective: '1000px' }} className="w-full h-full">
     <div 
       style={{
         transformStyle: 'preserve-3d',
         transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
         transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
-      className="relative w-full"
+      className="relative w-full h-full"
     >
       {/* ΜΠΡΟΣΤΙΝΗ ΠΛΕΥΡΑ: INPUTS */}
-      <div style={{ backfaceVisibility: 'hidden' }} className="w-full">
+      <div style={{ backfaceVisibility: 'hidden' }} className="w-full h-full">
         <CalcWidget
           title={title}
           icon={icon}
@@ -255,7 +256,7 @@ const FlipCalcWidget = ({
             <div className="grid grid-cols-2 gap-2">
               {result.map((res, idx) => (
                 <div key={idx} className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center shadow-inner">
-                  <p className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase mb-0.5">{resultLabels[idx]}</p>
+                  <p className="text-[10px] font-bold text-emerald-400 tracking-wider mb-0.5">{resultLabels[idx]}</p>
                   <p className="text-sm font-mono font-semibold text-emerald-300">{res}</p>
                 </div>
               ))}
@@ -264,22 +265,6 @@ const FlipCalcWidget = ({
         )}
       </div>
     </div>
-  </div>
-);
-
-// ------------------------------------------------------------------
-// COMPONENT ΓΙΑ ΤΑ INPUTS
-// ------------------------------------------------------------------
-const InputField = ({ label, value, onChange }) => (
-  <div className="flex flex-col gap-1 w-full">
-    <label className="text-[11px] text-slate-400 ml-1 font-semibold">{label}</label>
-    <input 
-      type="text" 
-      inputMode="decimal"
-      value={value !== undefined ? value : ''}
-      onChange={onChange}
-      className="bg-slate-950/80 border border-slate-800 focus:border-indigo-500/70 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none transition-all w-full font-mono placeholder-slate-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-    />
   </div>
 );
 
@@ -293,7 +278,7 @@ const BasicCalculations = () => {
   // --- STATES & API CALCULATIONS ---
   const [loadings, setLoadings] = useState({});
   const [results, setResults] = useState({
-    prob1: null, prob2: null, prob3: null, scale: null, intersect: null, resect: null
+    prob1: null, prob2: null, prob3: null, scale: null, scaleSeg: null, intersect: null, resect: null
   });
 
   const clearResult = (key) => setResults(prev => ({ ...prev, [key]: null }));
@@ -389,7 +374,7 @@ const BasicCalculations = () => {
     clearResult('prob3');
   };
 
-  // 4. ΣΥΝΤΕΛΕΣΤΗΣ ΚΛΙΜΑΚΑΣ
+  // 4. ΣΥΝΤΕΛΕΣΤΗΣ ΚΛΙΜΑΚΑΣ (ΣΗΜΕΙΑΚΟΣ)
   const [scaleData, setScaleData] = useState({ input1: '' });
   const handleScaleCalculation = async () => {
     if (!scaleData.input1) { toast.error('Παρακαλώ συμπληρώστε το πεδίο!'); return; }
@@ -401,7 +386,14 @@ const BasicCalculations = () => {
       });
       if (!response.ok) throw new Error();
       const data = await response.json();
-      setResults(prev => ({ ...prev, scale: [data.k.toFixed(6)] }));
+      setResults(prev => ({
+        ...prev,
+        scale: [
+          data.m.toFixed(9),
+          data.inv_m.toFixed(9),
+          data.ppm.toFixed(4)
+        ]
+      }));
       toast.success('Επιτυχής υπολογισμός!');
     } catch { toast.error('Αποτυχία επικοινωνίας με το server.'); }
     finally { setLoadings(prev => ({ ...prev, scale: false })); }
@@ -409,6 +401,41 @@ const BasicCalculations = () => {
   const handleClearScale = () => {
     setScaleData({ input1: '' });
     clearResult('scale');
+  };
+
+  // 4Β. ΣΥΝΤΕΛΕΣΤΗΣ ΚΛΙΜΑΚΑΣ (ΓΡΑΜΜΙΚΟΣ)
+  const [scaleSegData, setScaleSegData] = useState({ Ei: '', Ej: '', L: '' });
+  const handleScaleSegCalculation = async () => {
+    setLoadings(prev => ({ ...prev, scaleSeg: true }));
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/basic_calc/scale_segment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scaleSegData)
+      });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+
+      const out = [
+        data.m_ij.toFixed(9),
+        data.inv_m_ij.toFixed(9),
+        data.ppm.toFixed(4)
+      ];
+      if (data.dL !== null && data.dL !== undefined) {
+        out.push(data.dL.toFixed(4));
+        out.push(data.L_corr.toFixed(4));
+      }
+      setResults(prev => ({ ...prev, scaleSeg: out }));
+      toast.success('Ο υπολογισμός ολοκληρώθηκε!');
+    } catch {
+      toast.error('Αποτυχία επικοινωνίας με τον server.');
+    } finally {
+      setLoadings(prev => ({ ...prev, scaleSeg: false }));
+    }
+  };
+  const handleClearScaleSeg = () => {
+    setScaleSegData({ Ei: '', Ej: '', L: '' });
+    clearResult('scaleSeg');
   };
 
   // 5. ΕΜΠΡΟΣΘΟΤΟΜΙΑ
@@ -486,7 +513,7 @@ const BasicCalculations = () => {
     { id: 0, title: 'Μετατροπές', sub: 'rad / grad / deg', icon: <Repeat size={16} /> },
     { id: 1, title: 'Θεμελιώδη', sub: '1ο, 2ο & 3ο Προβλήματα', icon: <Compass size={16} /> },
     { id: 2, title: 'Αλληλοτομίες', sub: 'Εμπροσθοτομία & Οπισθοτομία', icon: <Crosshair size={16} /> },
-    { id: 3, title: 'Συντελεστής Κλίμακας', sub: 'Συντελεστής m_ij', icon: <SlidersHorizontal size={16} /> },
+    { id: 3, title: 'Συντελεστής Κλίμακας', sub: 'Σημειακός & Γραμμικός m_ij', icon: <SlidersHorizontal size={16} /> },
   ];
 
   const getIntersectDiagramPoints = () => {
@@ -698,26 +725,72 @@ const BasicCalculations = () => {
 
           {/* --- SLIDE 3: ΚΛΙΜΑΚΑ --- */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
-            <div className="max-w-xl mx-auto pt-1 pb-16">
-              <CalcWidget 
-                title="Συντελεστής Κλίμακας m" 
-                badge="Υπολογισμός Κλίμακας Προβολής m_ij"
+            <div className="max-w-5xl mx-auto pt-1 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              
+              {/* --- Σημειακός Συντελεστής --- */}
+              <CalcWidget
+                title="Σημειακός Συντελεστής Κλίμακας"
+                badge="Για μεμονωμένο σημείο ή αποστάσεις < 2 km"
                 icon={<SlidersHorizontal size={20} />}
                 loading={loadings.scale}
                 result={results.scale}
-                resultLabels={[<span>m<sub>ij</sub></span>]}
+                resultLabels={[
+                  <span>m</span>,
+                  <span>1 / m</span>,
+                  <span>ppm</span>
+                ]}
                 onCalculate={handleScaleCalculation}
                 onClear={() => clearResult('scale')}
                 onTrash={handleClearScale}
               >
                 <div className="flex flex-col gap-4 py-2">
-                  <InputField 
-                    label={<span>Συνιστώσα E [m]</span>} 
-                    value={scaleData.input1} 
-                    onChange={(e) => setScaleData({...scaleData, input1: e.target.value})} 
+                  <InputField
+                    label={<span>Συνιστώσα E [m]</span>}
+                    value={scaleData.input1}
+                    onChange={(e) => setScaleData({ ...scaleData, input1: e.target.value })}
                   />
                 </div>
               </CalcWidget>
+
+              {/* --- Γραμμικός Συντελεστής --- */}
+              <CalcWidget
+                title="Γραμμικός Συντελεστής Κλίμακας"
+                badge="Συνδυαστικός τύπος (Simpson) — για αποστάσεις > 2 km"
+                icon={<SlidersHorizontal size={20} />}
+                loading={loadings.scaleSeg}
+                result={results.scaleSeg}
+                resultLabels={[
+                  <span>m<sub>ij</sub></span>,
+                  <span>1 / m<sub>ij</sub></span>,
+                  <span>ppm</span>,
+                  <span>ΔL [m]</span>,
+                  <span>L<sub>διορθ</sub> [m]</span>
+                ]}
+                onCalculate={handleScaleSegCalculation}
+                onClear={() => clearResult('scaleSeg')}
+                onTrash={handleClearScaleSeg}
+              >
+                <div className="grid grid-cols-2 gap-x-3 gap-y-4 py-2">
+                  <InputField
+                    label={<span>Συνιστώσα E<sub>i</sub> [m]</span>}
+                    value={scaleSegData.Ei}
+                    onChange={(e) => setScaleSegData({ ...scaleSegData, Ei: e.target.value })}
+                  />
+                  <InputField
+                    label={<span>Συνιστώσα E<sub>j</sub> [m]</span>}
+                    value={scaleSegData.Ej}
+                    onChange={(e) => setScaleSegData({ ...scaleSegData, Ej: e.target.value })}
+                  />
+                  <div className="col-span-2">
+                    <InputField
+                      label={<span>Μήκος L [m] — προαιρετικό</span>}
+                      value={scaleSegData.L}
+                      onChange={(e) => setScaleSegData({ ...scaleSegData, L: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </CalcWidget>
+
             </div>
           </div>
 

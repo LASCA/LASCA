@@ -10,7 +10,7 @@ const TrigonometricHeight = ({
 }) => {
   const [localData, setLocalData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false); // Προσθήκη state για εμφάνιση/απόκρυψη αποτελεσμάτων
+  const [showResults, setShowResults] = useState(false);
   const [calculationInput, setCalculationInput] = useState([]);
 
   const saveBlobFile = async (blob, defaultFileName) => {
@@ -59,16 +59,8 @@ const TrigonometricHeight = ({
   // --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΔΕΔΟΜΕΝΩΝ ---
   useEffect(() => {
     if (data && data.length > 0) {
-      const formatted = data.map(row => ({
-        ...row,
-        s: to3(row.s),
-        z: to4(row.z),
-        hi: to3(row.hi),
-        ht: to3(row.ht),
-        dh: to3(row.dh),
-        dh_avg: to3(row.dh_avg)
-      }));
-      setLocalData(formatted);
+      // Δεν εφαρμόζουμε to3/to4 εδώ ώστε να μην εμποδίζεται η πληκτρολόγηση δεκαδικών
+      setLocalData(data);
     } else if (localData.length === 0) {
       const initialRows = Array.from({ length: 5 }).map((_, index) => ({
         id: Date.now() + index, 
@@ -88,8 +80,9 @@ const TrigonometricHeight = ({
 
   // --- HANDLERS ΕΙΣΑΓΩΓΗΣ ---
   const handleInputChange = (id, field, value) => {
-    updateData(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row));
-    setShowResults(false); // Επιστροφή σε λειτουργία εισαγωγής αν ο χρήστης πληκτρολογήσει κάτι νέο
+    const normalizedValue = ['s', 'z', 'hi', 'ht', 'dh', 'dh_avg'].includes(field) ? value.replace(/,/g, '.') : value;
+    updateData(prev => prev.map(row => row.id === id ? { ...row, [field]: normalizedValue } : row));
+    setShowResults(false);
   };
 
   const handleBlur = (id, field, value) => {
@@ -148,7 +141,7 @@ const TrigonometricHeight = ({
     updateData(localData.filter(row => row.id !== id));
   };
 
-  // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΑΣ (API) ---
+  // --- ΕΠΙΛΥΣΗ ΤΡΙΓΩΝΟΜΕΤΡΙΚΗΣ ΥΨΟΜΕΤΡΙΕΣ (API) ---
   const handleCalculate = async () => {
     setIsLoading(true);
     try {
@@ -178,12 +171,12 @@ const TrigonometricHeight = ({
           ...localData[index], 
           from: row["From"] || localData[index].from,
           to: row["To"] || localData[index].to,
-          dh: row["dh"] !== undefined ? row["dh"] : "",
-          dh_avg: row["dh_mean"] !== undefined ? row["dh_mean"] : "" 
+          dh: row["dh"] !== undefined ? to3(row["dh"]) : "",
+          dh_avg: row["dh_mean"] !== undefined ? to3(row["dh_mean"]) : "" 
         }));
         
         updateData(calculatedData);
-        setShowResults(true); // Εμφάνιση αποτελεσμάτων μετά από επιτυχή υπολογισμό
+        setShowResults(true);
       } else {
         alert(response.data?.error || "Προέκυψε σφάλμα κατά τον υπολογισμό.");
       }
@@ -252,9 +245,7 @@ const TrigonometricHeight = ({
     }
   }
 
-  // Δυναμικός υπολογισμός στηλών για το κουμπί Προσθήκης (+)
-  const inputColumnsCount = 7; // #, From, To, Slope, Z, Hi, Ht
-  const resultColumnsSpan = showResults ? 8 : 7; // Αν δείχνουμε results, φτάνει μέχρι τη στήλη του ΔH (8).
+  const resultColumnsSpan = showResults ? 8 : 7;
 
   return (
     <div className="flex flex-col h-full relative font-sans">
@@ -288,7 +279,6 @@ const TrigonometricHeight = ({
                   <th className="p-3.5 text-[10px] font-black text-slate-400 tracking-widest text-center">H station [m]</th>
                   <th className="p-3.5 text-[10px] font-black text-slate-400 tracking-widest text-center">H target [m]</th>
                   
-                  {/* Εμφάνιση των στηλών αποτελεσμάτων μόνο όταν showResults === true */}
                   {showResults && (
                     <>
                       <th className="p-3.5 text-[10px] font-black text-cyan-400/90 tracking-widest text-center bg-cyan-950/20 whitespace-nowrap">ΔH [m]</th>
@@ -296,7 +286,6 @@ const TrigonometricHeight = ({
                     </>
                   )}
                   
-                  {/* Κουμπιά ελέγχου (Back / Play) */}
                   <th className="p-3 w-20">
                     <div className="flex justify-end pr-2 gap-2">
                       {showResults && (
@@ -416,7 +405,7 @@ const TrigonometricHeight = ({
                           />
                         </td>
 
-                        {/* ΔH (Εμφάνιση μόνο στο showResults) */}
+                        {/* ΔH */}
                         {showResults && (
                           <td className="p-1.5 bg-cyan-950/10">
                             <input 
@@ -431,7 +420,7 @@ const TrigonometricHeight = ({
                           </td>
                         )}
 
-                        {/* ΔH Avg - MERGED CELL (Εμφάνιση μόνο στο showResults) */}
+                        {/* ΔH Avg */}
                         {showResults && row.isFirst && (
                           <td 
                             rowSpan={row.span * 2} 
@@ -465,7 +454,6 @@ const TrigonometricHeight = ({
 
                       {/* INLINE ADD BUTTON */}
                       <tr className="h-0 p-0">
-                        {/* Προσαρμογή colSpan βάσει εμφάνισης αποτελεσμάτων (showResults) */}
                         <td colSpan={resultColumnsSpan} className="p-0 h-0 relative">
                           <button 
                             onClick={() => addRowAt(index)} 
@@ -475,14 +463,12 @@ const TrigonometricHeight = ({
                             <PlusCircle size={15} />
                           </button>
                         </td>
-                        {/* Η στήλη για τα Actions. */}
                         <td colSpan={1} className="p-0 h-0"></td>
                       </tr>
                     </React.Fragment>
                   ))
                 ) : (
                   <tr>
-                    {/* +3 για columns αν εμφανίζονται τα results */}
                     <td colSpan={showResults ? 10 : 8} className="px-4 py-20 text-center text-slate-500">
                       <div className="flex flex-col items-center gap-3">
                         <Table size={32} className="opacity-40 text-slate-600" />

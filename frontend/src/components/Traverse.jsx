@@ -122,7 +122,8 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
   const handleInputChange = (index, field, value) => {
     const newData = [...data];
-    newData[index] = { ...newData[index], [field]: value };
+    const normalizedValue = ['hz', 'sd', 'x', 'y'].includes(field) ? value.replace(/,/g, '.') : value;
+    newData[index] = { ...newData[index], [field]: normalizedValue };
     if (setData) setData(newData); 
   };
 
@@ -420,8 +421,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                     onChange={setTerrain} 
                     options={[
                       { value: "Ομαλό", label: "Ομαλό" },
-                      { value: "Κεκλιμένο", label: "Κεκλιμένο" },
-                      { value: "Ανώμαλο", label: "Ανώμαλο" }
+                      { value: "Κεκλιμένο", label: "Κεκλιμένο" }
                     ]} 
                   />
 
@@ -476,7 +476,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                       value={scaleFactor}
                       onChange={(e) => {
                         if (scaleMode === "Χειροκίνητα") {
-                          setScaleFactor(e.target.value);
+                          setScaleFactor(e.target.value.replace(/,/g, '.'));
                         }
                       }}
                       className={`bg-slate-950/40 border text-[10px] rounded-md px-3 h-[32px] outline-none transition-all font-mono w-full shadow-inner ${
