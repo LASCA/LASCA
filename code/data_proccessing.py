@@ -698,6 +698,8 @@ def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decim
             ])
 
 #Gwniometriseis
+import pandas as pd
+
 def gwn(dataframe):
     # Αντίγραφο για ασφάλεια
     df = dataframe.copy()
@@ -712,30 +714,28 @@ def gwn(dataframe):
     diff = face_II_proj - face_I
     
     # 3. Κανονικοποίηση της διαφοράς στο διάστημα [-200, 200]
-    # Αυτό λύνει ΜΟΝΙΜΑ το πρόβλημα όταν περνάμε το φράγμα του 0 ή 400
     diff_norm = (diff + 200) % 400 - 200
     
     # 4. Τελικός Μέσος Όρος
     df['mesos_oros'] = (face_I + diff_norm / 2) % 400
     
-    # 5. Ανηγμένη Τιμή (αφαίρεση της 1ης μέτρησης κάθε περιόδου)
-    # Χρησιμοποιούμε % 400 αντί για .apply(lambda...) για απόλυτη ασφάλεια και ταχύτητα
-    first_vals = df.groupby('Period')['mesos_oros'].transform('first')
+    # 5. Ανηγμένη Τιμή (αφαίρεση της 1ης μέτρησης κάθε περιόδου ΑΝΑ ΣΤΑΣΗ)
+    # Η ομαδοποίηση γίνεται με βάση και το 'From' και το 'Period'
+    first_vals = df.groupby(['From', 'Period'])['mesos_oros'].transform('first')
     df['anigmeni_timi'] = (df['mesos_oros'] - first_vals) % 400
     
-    # 6. Γενικός Μέσος Όρος ανά σημείο σκόπευσης ("To")
-    genikos_mesos_map = df.groupby('To')['anigmeni_timi'].mean().to_dict()
-    df['genikos_mesos'] = df['To'].map(genikos_mesos_map)
+    # 6. Γενικός Μέσος Όρος ανά σημείο σκόπευσης ("To") ΑΝΑ ΣΤΑΣΗ
+    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'To'
+    df['genikos_mesos'] = df.groupby(['From', 'To'])['anigmeni_timi'].transform('mean')
     
     # 7. Υπολογισμός v_ji = (Γενικός Μέσος - Ανηγμένη Τιμή) σε cc
-    # Υπολογίζουμε ξανά με % 400 (στα [-200, 200]) για να αποφύγουμε wrap-around
     v_m_diff = (df['genikos_mesos'] - df['anigmeni_timi'])
     v_m_diff_norm = (v_m_diff + 200) % 400 - 200
     df['v_m'] = v_m_diff_norm * 10000
     
-    # 8. Υπολογισμός v'_j (Διόρθωση σταθμού ανά περίοδο)
-    v_prime_map = df.groupby('Period')['v_m'].mean().to_dict()
-    df['v_prime'] = df['Period'].map(v_prime_map)
+    # 8. Υπολογισμός v'_j (Διόρθωση σταθμού ανά περίοδο) ΑΝΑ ΣΤΑΣΗ
+    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'Period'
+    df['v_prime'] = df.groupby(['From', 'Period'])['v_m'].transform('mean')
     
     # 9. Υπολογισμός v_ji'' = v_ji - v'_j
     df['v_ji'] = df['v_m'] - df['v_prime']
