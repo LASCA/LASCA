@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
 import { API_BASE_URL } from '../config';
+
 import { 
   Calculator, MapPin, Target, Navigation, Repeat, 
   Play, RotateCcw, Trash2, Plus, Minus,
   Compass, Crosshair, SlidersHorizontal
 } from 'lucide-react';
+
+import {
+  Themeliodes1Icon,
+  Themeliodes2Icon,
+  Themeliodes3Icon,
+  EmprosthotomiaIcon,
+  OpisthotomiaIcon,
+  SyntelestisKlimakasMIcon,
+  ThemeliodiIcon,
+  AllilotomiesIcon,
+  SyntelestisKlimakasIcon
+} from './icons';
+
 import { toast } from 'react-hot-toast';
 import InputField from './InputField';
 
@@ -511,9 +525,9 @@ const BasicCalculations = () => {
   // 4 ΟΡΙΣΜΕΝΕΣ ΚΑΤΗΓΟΡΙΕΣ (SLIDES)
   const slidesMeta = [
     { id: 0, title: 'Μετατροπές', sub: 'rad / grad / deg', icon: <Repeat size={16} /> },
-    { id: 1, title: 'Θεμελιώδη', sub: '1ο, 2ο & 3ο Προβλήματα', icon: <Compass size={16} /> },
-    { id: 2, title: 'Αλληλοτομίες', sub: 'Εμπροσθοτομία & Οπισθοτομία', icon: <Crosshair size={16} /> },
-    { id: 3, title: 'Συντελεστής Κλίμακας', sub: 'Σημειακός & Γραμμικός m_ij', icon: <SlidersHorizontal size={16} /> },
+    { id: 1, title: 'Θεμελιώδη', sub: '1ο, 2ο & 3ο Προβλήματα', icon: <ThemeliodiIcon size={16} color="currentColor" /> },
+    { id: 2, title: 'Αλληλοτομίες', sub: 'Εμπροσθοτομία & Οπισθοτομία', icon: <AllilotomiesIcon size={16} color="currentColor" /> },
+    { id: 3, title: 'Συντελεστής Κλίμακας', sub: <>Σημειακός & Γραμμικός m<sub>ij</sub></>, icon: <SyntelestisKlimakasIcon size={16} color="currentColor" /> },
   ];
 
   const getIntersectDiagramPoints = () => {
@@ -575,7 +589,7 @@ const BasicCalculations = () => {
               <CalcWidget 
                 title="1ο Θεμελιώδες" 
                 badge="Υπολογισμός Συντεταγμένων"
-                icon={<Navigation size={18} />}
+                icon={<Themeliodes1Icon size={18} color="currentColor" />}
                 loading={loadings.prob1}
                 result={results.prob1}
                 resultLabels={[<span>X<sub>B</sub> [m]</span>, <span>Y<sub>B</sub> [m]</span>]}
@@ -595,7 +609,7 @@ const BasicCalculations = () => {
               <CalcWidget 
                 title="2ο Θεμελιώδες" 
                 badge="Απόσταση & Γωνία Διεύθυνσης"
-                icon={<MapPin size={18} />}
+                icon={<Themeliodes2Icon size={18} color="currentColor" />}
                 loading={loadings.prob2}
                 result={results.prob2}
                 resultLabels={[<span>D<sub>AB</sub> [m]</span>, <span>G<sub>AB</sub> [grad]</span>]}
@@ -615,7 +629,7 @@ const BasicCalculations = () => {
               <CalcWidget 
                 title="3ο Θεμελιώδες" 
                 badge="Πολλαπλές Γωνίες Θλάσης"
-                icon={<Calculator size={18} />}
+                icon={<Themeliodes3Icon size={18} color="currentColor" />}
                 loading={loadings.prob3}
                 result={results.prob3}
                 resultLabels={[<span>G<sub>τελική</sub> [grad]</span>]}
@@ -663,7 +677,7 @@ const BasicCalculations = () => {
               <FlipCalcWidget 
                 title="Εμπροσθοτομία" 
                 badge="Υπολογισμός Σημείου E"
-                icon={<Target size={18} />}
+                icon={<EmprosthotomiaIcon size={18} color="currentColor" />}
                 loading={loadings.intersect}
                 result={results.intersect}
                 resultLabels={[<span>X<sub>E</sub> [m]</span>, <span>Y<sub>E</sub> [m]</span>]}
@@ -692,7 +706,7 @@ const BasicCalculations = () => {
               <FlipCalcWidget 
                 title="Οπισθοτομία" 
                 badge="Υπολογισμός Σημείου O"
-                icon={<Target size={18} className="rotate-180" />}
+                icon={<OpisthotomiaIcon size={18} color="currentColor" />}
                 loading={loadings.resect}
                 result={results.resect}
                 resultLabels={[<span>X<sub>O</sub> [m]</span>, <span>Y<sub>O</sub> [m]</span>]}
@@ -731,7 +745,7 @@ const BasicCalculations = () => {
               <CalcWidget
                 title="Σημειακός Συντελεστής Κλίμακας"
                 badge="Για μεμονωμένο σημείο ή αποστάσεις < 2 km"
-                icon={<SlidersHorizontal size={20} />}
+                icon={<SyntelestisKlimakasMIcon size={20} color="currentColor" />}
                 loading={loadings.scale}
                 result={results.scale}
                 resultLabels={[
@@ -756,7 +770,7 @@ const BasicCalculations = () => {
               <CalcWidget
                 title="Γραμμικός Συντελεστής Κλίμακας"
                 badge="Συνδυαστικός τύπος (Simpson) — για αποστάσεις > 2 km"
-                icon={<SlidersHorizontal size={20} />}
+                icon={<SyntelestisKlimakasMIcon size={20} color="currentColor" />}
                 loading={loadings.scaleSeg}
                 result={results.scaleSeg}
                 resultLabels={[

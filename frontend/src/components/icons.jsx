@@ -29,7 +29,6 @@ export const DashboardIcon = forwardRef(function DashboardIcon(
   );
 });
 
-
 export const MetriseisStathmouIcon = forwardRef(function MetriseisStathmouIcon(
   { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
   ref
@@ -74,15 +73,15 @@ export const GoniometriseisIcon = forwardRef(function GoniometriseisIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M4 19h16" />
-      <path d="M4 19 17 7" />
-      <path d="M11 19a7 7 0 0 0-1.9-4.8" />
+      <path d="M3 20h17" />
+      <path d="M3 20 15.5 3" />
+      <path d="M9 20a7 7 0 0 0-2.3-5.6" />
     </svg>
   );
 });
 
 export const SynorthosiStathmouIcon = forwardRef(function SynorthosiStathmouIcon(
-  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
   ref
 ) {
   return (
@@ -99,17 +98,11 @@ export const SynorthosiStathmouIcon = forwardRef(function SynorthosiStathmouIcon
       strokeLinejoin="round"
       {...props}
     >
-      {/* Περιστραμμένη Έλλειψη Σφάλματος */}
-      <ellipse cx="12" cy="12" rx="8" ry="4" transform="rotate(-30 12 12)" strokeDasharray="2 2" />
-      
-      {/* Κεντρικό συνορθωμένο σημείο */}
-      <circle cx="12" cy="12" r="2" fill={color} />
-      
-      {/* Άξονες ακρίβειας */}
-      <path d="M12 4v3" />
-      <path d="M12 17v3" />
-      <path d="M4 12h3" />
-      <path d="M17 12h3" />
+      <ellipse cx="12" cy="12" rx="10" ry="6" transform="rotate(45 12 12)" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="13.6" cy="5.6" r="1.3" />
+      <circle cx="5.6" cy="13.6" r="1.3" />
+      <circle cx="19.1" cy="19.1" r="1.3" />
     </svg>
   );
 });
@@ -132,10 +125,9 @@ export const TrigonometrikiYpsometriaIcon = forwardRef(function TrigonometrikiYp
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M4 19h16" />
-      <path d="M20 19V6" />
-      <path d="M4 19 20 6" />
-      <path d="M10 19a6 6 0 0 0-1.1-3.5" />
+      <path d="M4 20h16" strokeDasharray="2 1.8" />
+      <path d="M4 20 20 4" strokeDasharray="2 1.8" />
+      <path d="M20 20V4" />
     </svg>
   );
 });
@@ -211,11 +203,11 @@ export const OdefsiIcon = forwardRef(function OdefsiIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M4 20 9 11 15 15 20 5" />
-      <circle cx="4" cy="20" r="1.5" />
-      <circle cx="9" cy="11" r="1.5" />
-      <circle cx="15" cy="15" r="1.5" />
-      <path d="M17.6 5.9 20 5l.9 2.4" />
+      <path d="M1.7 19 4 15 6.3 19Z" />
+      <path d="M21.2 7 19 3 16.8 7Z" />
+      <path d="M4.5 17 9.33 8.63" />
+      <path d="M9.33 8.63 14.17 15.37" />
+      <path d="M14.17 15.37 19 7" />
     </svg>
   );
 });
@@ -238,16 +230,17 @@ export const OrizontiografiaXYIcon = forwardRef(function OrizontiografiaXYIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M4 3v17h17" />
-      <circle cx="14" cy="10" r="1.8" />
-      <path d="M14 11.8V20" />
-      <path d="M12.2 10H4" />
+      <path d="M4 20h17" />
+      <path d="M4 20V3" />
+      <circle cx="15" cy="9" r="1.5" />
+      <path d="M15 10.5V20" strokeDasharray="2 1.8" />
+      <path d="M4 9h8.5" strokeDasharray="2 1.8" />
     </svg>
   );
 });
 
 export const YpsometriaHIcon = forwardRef(function YpsometriaHIcon(
-  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
   ref
 ) {
   return (
@@ -264,21 +257,11 @@ export const YpsometriaHIcon = forwardRef(function YpsometriaHIcon(
       strokeLinejoin="round"
       {...props}
     >
-      {/* Σταθμοί & Όδευση */}
-      <circle cx="5" cy="18" r="1.5" fill={color} />
-      <circle cx="13" cy="6" r="1.5" fill={color} />
-      <path d="M 5 18 L 13 6" />
-
-      {/* Οριζόντιες προβολές (πιο αραιό dash για αποφυγή οπτικού θορύβου) */}
-      <path d="M 15 6 H 20" strokeDasharray="2 3" />
-      <path d="M 7 18 H 20" strokeDasharray="2 3" />
-
-      {/* Κάθετη γραμμή διάστασης */}
-      <path d="M 19 6 V 18" />
-      
-      {/* Ticks διάστασης (Αντί για βέλη) */}
-      <path d="M 17.5 6 H 20.5" />
-      <path d="M 17.5 18 H 20.5" />
+      <circle cx="5" cy="14.2" r="1.5" />
+      <path d="M2.9 21 5 13 7.1 21" />
+      <circle cx="19" cy="4.2" r="1.5" />
+      <path d="M16.9 11 19 3 21.1 11" />
+      <path d="M6.5 13.2 17.5 5.3" />
     </svg>
   );
 });
@@ -330,17 +313,258 @@ export const CharaxiIcon = forwardRef(function CharaxiIcon(
       strokeLinejoin="round"
       {...props}
     >
-      {/* Σημαία Χάραξης / Σηματόσημο */}
-      <path d="M12 3l7 3.5-7 3.5" />
+      <path d="M5 19V3" />
+      <path d="M3.2 4.8 5 3l1.8 1.8" />
+      <path d="M5 19 7.2 16.9" />
+      <path d="M9.6 14.6 12.4 11.9" />
+      <path d="M14.8 9.6 17 7.5" />
+      <path d="M18 12V1" />
+      <path d="M18 1.3 24.5 4 18 6.7" />
+      <path d="M5 13a6 6 0 0 1 4.3 1.8" />
+    </svg>
+  );
+});
 
-      {/* Κορμός Πασσάλου */}
-      <path d="M12 3v14" />
+// Υπολογισμοί — θεμελιώδη προβλήματα icon set.
+export const Themeliodes1Icon = forwardRef(function Themeliodes1Icon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="4" cy="22" r="1.6" fill="#ffffff" />
+      <path d="M4 22V6" strokeDasharray="0.1 2.6" />
+      <path d="M4 22 20 5" />
+      <circle cx="20" cy="5" r="1.6" />
+      <path d="M4 15 A7 7 0 0 1 8.8 16.9" />
+    </svg>
+  );
+});
 
-      {/* Μυτερή Άκρη Πασσάλου */}
-      <path d="M10.5 17l1.5 3.5 1.5-3.5" />
+export const Themeliodes2Icon = forwardRef(function Themeliodes2Icon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="4" cy="22" r="1.6" fill="#ffffff" />
+      <path d="M4 22V6" strokeDasharray="0.1 2.6" />
+      <path d="M4 22 20 5" strokeDasharray="0.1 2.6" />
+      <circle cx="20" cy="5" r="1.6" fill="#ffffff" />
+      <path d="M4 15 A7 7 0 0 1 8.8 16.9" />
+    </svg>
+  );
+});
 
-      {/* Γραμμή Εδάφους */}
-      <path d="M5 20.5h14" />
+export const Themeliodes3Icon = forwardRef(function Themeliodes3Icon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="2" cy="22" r="1" fill="#ffffff" />
+      <path d="M2 22V7" strokeDasharray="0.1 2.2" />
+      <path d="M2 22 10.5 13.5" />
+      <circle cx="10.5" cy="13.5" r="1" />
+      <circle cx="10.5" cy="13.5" r="1" fill="#ffffff" />
+      <path d="M10.5 13.5V4" strokeDasharray="0.1 2.2" />
+      <path d="M10.5 13.5 19 5" />
+      <circle cx="19" cy="5" r="1" />
+    </svg>
+  );
+});
+
+export const EmprosthotomiaIcon = forwardRef(function EmprosthotomiaIcon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M3.5 5.1 21.7 10.1 8.4 21.8Z" />
+      <circle cx="3.5" cy="5.1" r="1.5" fill="#ffffff" />
+      <circle cx="21.7" cy="10.1" r="1.5" fill="#ffffff" />
+      <circle cx="8.4" cy="21.8" r="1.5" />
+    </svg>
+  );
+});
+
+export const OpisthotomiaIcon = forwardRef(function OpisthotomiaIcon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M3.5 5.1 21.7 10.1 8.4 21.8Z" />
+      <circle cx="3.5" cy="5.1" r="1.5" fill="#ffffff" />
+      <circle cx="21.7" cy="10.1" r="1.5" fill="#ffffff" />
+      <circle cx="8.4" cy="21.8" r="1.5" fill="#ffffff" />
+      <circle cx="11.2" cy="12.3" r="1.4" />
+    </svg>
+  );
+});
+
+export const SyntelestisKlimakasMIcon = forwardRef(function SyntelestisKlimakasMIcon(
+  { size = 24, color = "currentColor", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21.54 15H17a2 2 0 0 0-2 2v4.54" />
+      <path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17" />
+      <path d="M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  );
+});
+
+// Bottom-nav icon set — Θεμελιώδη, Αλληλοτομίες, Συντελεστής Κλίμακας.
+export const ThemeliodiIcon = forwardRef(function ThemeliodiIcon(
+  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5.5" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+});
+
+export const AllilotomiesIcon = forwardRef(function AllilotomiesIcon(
+  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <path d="M12 2v3.5" />
+      <path d="M12 18.5V22" />
+      <path d="M2 12h3.5" />
+      <path d="M18.5 12H22" />
+    </svg>
+  );
+});
+
+export const SyntelestisKlimakasIcon = forwardRef(function SyntelestisKlimakasIcon(
+  { size = 24, color = "#ffffff", strokeWidth = 2, ...props },
+  ref
+) {
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21.54 15H17a2 2 0 0 0-2 2v4.54" />
+      <path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17" />
+      <path d="M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05" />
+      <circle cx="12" cy="12" r="10" />
     </svg>
   );
 });
