@@ -499,6 +499,12 @@ function App() {
               <Goniometry 
                 rows={goniometryData}      
                 setRows={setGoniometryData} 
+                projectInfo={{
+                  projectName: currentProject,
+                  designer: globalSettings.designer,
+                  employer: globalSettings.employer,
+                  location: globalSettings.location
+                }}
               />
             )}
 

@@ -580,6 +580,270 @@ def run_goniometry():
         print(f"Σφάλμα κατά τον υπολογισμό Γωνιομετρήσεων:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/goniometry/report', methods=['POST'])
+def export_goniometry_report():
+    try:
+        data = request.json or {}
+        rows = data.get('rows', [])
+        
+        # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ (PROJECT INFO) ---
+        raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
+        
+        sources_to_check = []
+        if isinstance(raw_proj, dict) and raw_proj:
+            sources_to_check.append(raw_proj)
+            if isinstance(raw_proj.get('settings'), dict):
+                sources_to_check.append(raw_proj.get('settings'))
+        sources_to_check.append(data)
+
+        def extract_field(keys):
+            """Αναζητά το πρώτο μη κενό πεδίο σε όλες τις πιθανές πηγές δεδομένων"""
+            for src in sources_to_check:
+                if isinstance(src, dict):
+                    for key in keys:
+                        val = src.get(key)
+                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                            return str(val).strip()
+            return 'Μη διαθέσιμο'
+
+        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
+        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
+        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
+        proj_location = extract_field(['location', 'place', 'address'])
+
+        # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        try:
+            pdfmetrics.registerFont(TTFont('GreekFont', font_path))
+            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
+            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
+            my_font = 'GreekFont'
+            my_font_bold = 'GreekFont-Bold'
+        except Exception:
+            my_font = 'Helvetica'
+            my_font_bold = 'Helvetica-Bold'
+
+        # Δυναμική μορφοποίηση δεκαδικών ψηφίων
+        def format_num(val, decimals=4):
+            if val is None or val == "": return "-"
+            try: return f"{float(val):.{decimals}f}"
+            except (ValueError, TypeError): return str(val)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4, 
+            leftMargin=30, rightMargin=30, topMargin=55, bottomMargin=45
+        )
+        elements = []
+        
+        HEADER_BG = colors.HexColor('#0f172a')     
+        ROW_BG_1 = colors.HexColor('#ffffff')      
+        ROW_BG_2 = colors.HexColor('#f8fafc')      
+        GRID_COLOR = colors.HexColor('#cbd5e1')    
+        TEXT_MAIN = colors.HexColor('#0f172a')     
+        ACCENT_TITLE = colors.HexColor('#0284c7')  
+        BRIGHT_GREEN = colors.HexColor('#15803d') 
+        MATCHING_CYAN = colors.HexColor('#0369a1') 
+
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'TopoTitle', parent=styles['Title'], fontName=my_font_bold,
+            fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0
+        )
+        h2_style = ParagraphStyle(
+            'TopoSecH', fontName=my_font_bold, fontSize=14, leading=14, textColor=HEADER_BG
+        )
+        header_style = ParagraphStyle('TableHead', fontName=my_font_bold, fontSize=8, textColor=colors.white, alignment=1)
+        
+        modern_label_style = ParagraphStyle(
+            'ModernLabel', 
+            fontName=my_font_bold, 
+            fontSize=7.5, 
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=2,
+            textTransform='uppercase'
+        )
+        
+        modern_value_style = ParagraphStyle(
+            'ModernValue', 
+            fontName=my_font_bold, 
+            fontSize=11, 
+            textColor=TEXT_MAIN,
+            spaceAfter=8
+        )
+
+        # ========================================================
+        # 1. ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ (MODERN DASHBOARD STYLE)
+        # ========================================================
+        def make_info_cell(label, value):
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style)
+            ]
+
+        project_data = [
+            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
+            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+        ]
+        
+        col_width = (A4[0] - 60) / 2
+        info_table = Table(project_data, colWidths=[col_width, col_width])
+        
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
+            ('TOPPADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 15),
+            ('RIGHTPADDING', (0,0), (-1,-1), 15),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ]))
+        
+        elements.append(info_table)
+        elements.append(Spacer(1, 25))
+
+        elements.append(Paragraph("Αναφορά Γωνιομετρήσεων", title_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========================================================
+        # Πίνακας 1: Αποτελέσματα Οριζόντιων Γωνιών
+        # ========================================================
+        has_hz_results = any(r.get('mesos_oros') is not None and str(r.get('mesos_oros')).strip() != '' for r in rows)
+        
+        if has_hz_results:
+            elements.append(Paragraph("1. Αποτελέσματα Υπολογισμού Οριζόντιων Γωνιών", h2_style))
+            elements.append(Spacer(1, 10))
+            
+            t1_headers = [
+                Paragraph("Από", header_style),
+                Paragraph("Προς", header_style),
+                Paragraph("Μέσος Όρος", header_style),
+                Paragraph("Ανηγμένη Τιμή", header_style),
+                Paragraph("Γενικός Μέσος Όρος", header_style),
+                Paragraph("υ'<sub>ji</sub> (cc)", header_style),
+                Paragraph("υ<sup>ο</sup><sub>j</sub> (cc)", header_style),
+                Paragraph("υ<sub>ji</sub> (cc)", header_style),
+                Paragraph("υυ", header_style)  
+            ]
+            
+            t1_data = [t1_headers]
+            for row in rows:
+                if row.get('mesos_oros') is not None and str(row.get('mesos_oros')).strip() != '':
+                    t1_data.append([
+                        str(row.get('from', '')),
+                        str(row.get('to', '')),
+                        format_num(row.get('mesos_oros'), 4),
+                        format_num(row.get('anigmeni_timi'), 4),
+                        format_num(row.get('genikos_mesos'), 4),
+                        format_num(row.get('v_m'), 0),
+                        format_num(row.get('v_prime'), 1),
+                        format_num(row.get('v_ji'), 1),
+                        format_num(row.get('vv'), 2)
+                    ])
+                
+            t1 = Table(t1_data, colWidths=[45, 45, 70, 70, 70, 60, 60, 60, 55]) # Σύνολο 535 pt (Πλήρες πλάτος A4)
+            t1_cmds = [
+                ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('FONTSIZE', (0,0), (-1,-1), 8),
+                ('FONTNAME', (0,1), (-1,-1), my_font),
+                ('FONTNAME', (2,1), (4,-1), my_font_bold),
+                ('TEXTCOLOR', (0,1), (-1,-1), TEXT_MAIN),
+                ('TEXTCOLOR', (2,1), (3,-1), MATCHING_CYAN), 
+                ('TEXTCOLOR', (4,1), (4,-1), BRIGHT_GREEN),
+                ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
+                ('TOPPADDING', (0,0), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ]
+            for i in range(1, len(t1_data)):
+                bg = ROW_BG_1 if i % 2 == 1 else ROW_BG_2
+                t1_cmds.append(('BACKGROUND', (0, i), (-1, i), bg))
+                
+            t1.setStyle(TableStyle(t1_cmds))
+            elements.append(t1)
+            elements.append(Spacer(1, 25))
+
+        # ========================================================
+        # Πίνακας 2: Πρωτογενείς Παρατηρήσεις (Μόνο Οριζόντιες)
+        # ========================================================
+        elements.append(Paragraph("2. Πρωτογενείς Παρατηρήσεις", h2_style))
+        elements.append(Spacer(1, 10))
+        
+        t2_headers = [
+            Paragraph("Από", header_style),
+            Paragraph("Προς", header_style),
+            Paragraph("Περίοδος", header_style),
+            Paragraph("Οριζ. Θέση Ι", header_style),
+            Paragraph("Οριζ. Θέση ΙΙ", header_style)
+        ]
+        
+        t2_data = [t2_headers]
+        for row in rows:
+            # Προσθήκη γραμμής αν έχει οριζόντια παρατήρηση
+            if (row.get('faceI') is not None and str(row.get('faceI')).strip() != '') or \
+               (row.get('faceII') is not None and str(row.get('faceII')).strip() != ''):
+                t2_data.append([
+                    str(row.get('from', '')),
+                    str(row.get('to', '')),
+                    str(row.get('period', '')),
+                    format_num(row.get('faceI'), 4),
+                    format_num(row.get('faceII'), 4)
+                ])
+            
+        t2 = Table(t2_data, colWidths=[70, 70, 75, 160, 160]) # Σύνολο 535 pt (Πλήρες πλάτος A4)
+        t2_cmds = [
+            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('FONTNAME', (0,1), (-1,-1), my_font),
+            ('TEXTCOLOR', (0,1), (-1,-1), TEXT_MAIN),
+            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ]
+        for i in range(1, len(t2_data)):
+            bg = ROW_BG_1 if i % 2 == 1 else ROW_BG_2
+            t2_cmds.append(('BACKGROUND', (0, i), (-1, i), bg))
+
+        t2.setStyle(TableStyle(t2_cmds))
+        elements.append(t2)
+
+        # ========================================================
+        # ΔΗΜΙΟΥΡΓΙΑ PDF
+        # ========================================================
+        current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        doc.build(
+            elements, 
+            canvasmaker=partial(
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά",
+                font_name=my_font, 
+                font_bold_name=my_font_bold, 
+                timestamp_str=current_timestamp, 
+                logo_path=str(LOGO_PATH) if 'LOGO_PATH' in globals() else None
+            )
+        )
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name='Goniometry_Report.pdf',
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"Σφάλμα κατά τη δημιουργία Goniometry Report:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==========================================
 # 1. ENDPOINT ΓΙΑ ΣΥΝΟΡΘΩΣΗ (ADJUSTMENT)
 # ==========================================

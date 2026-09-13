@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
-import { Trash2, PlusCircle, Play, Cpu, ArrowLeft } from 'lucide-react';
+import { Trash2, PlusCircle, Play, Cpu, ArrowLeft, FileText } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
-const Goniometry = ({ rows = [], setRows }) => {
+const Goniometry = ({ rows = [], setRows, projectInfo }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showZenithResults, setShowZenithResults] = useState(false);
 
-  // Αρχικοποίηση κενών γραμμών αν δεν υπάρχουν δεδομένα (όπως στο Adjustment)
+  // Αρχικοποίηση κενών γραμμών αν δεν υπάρχουν δεδομένα
   useEffect(() => {
     if (rows && rows.length === 0 && setRows) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
@@ -219,6 +220,82 @@ const Goniometry = ({ rows = [], setRows }) => {
     setShowZenithResults(true);
   };
 
+  const saveBlobFile = async (blob, defaultFileName) => {
+    try {
+      if (window.showSaveFilePicker) {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
+      } else {
+        console.info('Save dialog canceled by user, using fallback download flow.');
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // ---------------------------------------------------------
+  // EXPORT REPORT HANDLER (Σύνδεση με το Backend Endpoint)
+  // ---------------------------------------------------------
+  const handleExportReport = async () => {
+    if (!rows || rows.length === 0) {
+      toast.error('Δεν υπάρχουν δεδομένα για εξαγωγή.');
+      return;
+    }
+
+    const toastId = toast.loading('Δημιουργία PDF Report...');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/goniometry/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows, projectInfo })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας Report.');
+      }
+
+      const blob = await response.blob();
+      const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
+      const sanitizedProjectName = projectName
+        .replace(/\s+/g, '_')
+        .replace(/[<>:"/\\|?*]/g, '')
+        .split('')
+        .filter(character => character.charCodeAt(0) >= 32)
+        .join('');
+      const fileName = sanitizedProjectName
+        ? `${sanitizedProjectName}_Goniometry_Report.pdf`
+        : 'Goniometry_Report.pdf';
+
+      await saveBlobFile(blob, fileName);
+      toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });
+    } catch (error) {
+      console.error('Export Report Error:', error);
+      toast.error(error.message || 'Σφάλμα κατά τη δημιουργία του Report.', { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const totalColumns = showResults ? 14 : 7;
   const totalZenithColumns = showZenithResults ? 9 : 7;
 
@@ -250,16 +327,16 @@ const Goniometry = ({ rows = [], setRows }) => {
                   {showResults && (
                     <>
                       <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Μέσος Όρος</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Ανηγμένη</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-emerald-400 tracking-widest whitespace-nowrap">Γεν. Μέσος</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_m (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v'_j (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">v_ji (cc)</th>
-                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">vv</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-blue-400 tracking-widest whitespace-nowrap">Ανηγμένη τιμή</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-emerald-400 tracking-widest whitespace-nowrap">Γενικός Μέσος Όρος</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">υ<sup>ο</sup><sub>j</sub> (cc)</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">υ'<sub>ji</sub> (cc)</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">υ<sub>ji</sub> (cc)</th>
+                      <th className="px-2 py-3 text-[10px] font-black text-purple-400 tracking-widest whitespace-nowrap">υυ</th>
                     </>
                   )}
 
-                  <th className="px-2 py-3 w-20 text-right sticky right-0 bg-[#0f172a]">
+                  <th className="px-2 py-3 w-28 text-right sticky right-0 bg-[#0f172a]">
                     <div className="flex justify-end gap-2 pr-1">
                       {showResults && (
                         <button 
@@ -270,6 +347,7 @@ const Goniometry = ({ rows = [], setRows }) => {
                           <ArrowLeft size={14} />
                         </button>
                       )}
+                      
                       <button 
                         onClick={handleCalculate}
                         disabled={isLoading || !rows || rows.length === 0}
@@ -280,6 +358,18 @@ const Goniometry = ({ rows = [], setRows }) => {
                       >
                         {isLoading ? <Cpu size={14} className="animate-spin text-emerald-500" /> : <Play size={14} fill="currentColor" className="text-emerald-500 ml-0.5" />}
                       </button>
+
+                      {showResults && (
+                        <button
+                          type="button"
+                          onClick={handleExportReport}
+                          disabled={isLoading}
+                          title="Εξαγωγή Report"
+                          className={`group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] border border-pink-500/30 ${isLoading ? 'opacity-50 bg-slate-800 cursor-not-allowed' : 'bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer'}`}
+                        >
+                          {isLoading ? <Cpu size={14} className="animate-spin text-pink-500" /> : <FileText size={14} className="text-pink-500 group-hover:text-purple-400 transition-colors" />}
+                        </button>
+                      )}
                     </div>
                   </th>
                 </tr>
