@@ -834,13 +834,13 @@ def export_goniometry_report():
         return send_file(
             buffer,
             as_attachment=True,
-            download_name='Goniometry_Report.pdf',
+            download_name='Angle_Measurements_Report.pdf',
             mimetype='application/pdf'
         )
         
     except Exception as e:
         import traceback
-        print(f"Σφάλμα κατά τη δημιουργία Goniometry Report:\n{traceback.format_exc()}")
+        print(f"Σφάλμα κατά τη δημιουργία Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
