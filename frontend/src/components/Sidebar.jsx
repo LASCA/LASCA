@@ -215,20 +215,6 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
             )}
           </button>
 
-          {/* Κουμπί Ρυθμίσεις */}
-          <button 
-            className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
-          >
-            <Settings size={20} className="shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:text-blue-400" />
-            {isOpen && <span className="font-medium text-sm whitespace-nowrap">Ρυθμίσεις</span>}
-
-            {!isOpen && (
-              <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
-                Ρυθμίσεις
-                <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
-              </div>
-            )}
-          </button>
         </div>
       </aside>
 

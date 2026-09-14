@@ -86,7 +86,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
 
   const getPlaceholder = () => {
     switch(formData.type) {
-      case 'bug': return "Περιγράψτε το σφάλμα και πώς να το αναπαράγουμε...";
+      case 'bug': return "Περιγράψτε το σφάλμα...";
       case 'feature': return "Τι θα θέλατε να δείτε σε επόμενη έκδοση του LASCA;";
       case 'general': return "Μοιραστείτε τις σκέψεις ή τα σχόλιά σας μαζί μας...";
       default: return "Γράψτε το μήνυμά σας...";

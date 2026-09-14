@@ -284,13 +284,9 @@ export const TachymetriaIcon = forwardRef(function TachymetriaIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M5 19V3" />
-      <path d="M3.2 4.8 5 3l1.8 1.8" />
-      <path d="M5 19 7.2 16.9" />
-      <path d="M9.6 14.6 12.4 11.9" />
-      <path d="M14.8 9.6 17 7.5" />
-      <circle cx="18.4" cy="6.2" r="1.6" />
-      <path d="M5 13a6 6 0 0 1 4.3 1.8" />
+      <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+      <path d="M15 5.764v15.472" />
+      <path d="M9 3.236v15.472" />
     </svg>
   );
 });
@@ -313,14 +309,11 @@ export const CharaxiIcon = forwardRef(function CharaxiIcon(
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M5 19V3" />
-      <path d="M3.2 4.8 5 3l1.8 1.8" />
-      <path d="M5 19 7.2 16.9" />
-      <path d="M9.6 14.6 12.4 11.9" />
-      <path d="M14.8 9.6 17 7.5" />
-      <path d="M18 12V1" />
-      <path d="M18 1.3 24.5 4 18 6.7" />
-      <path d="M5 13a6 6 0 0 1 4.3 1.8" />
+      <path d="M2.65 18.27 21.35 18.27" />
+      <path d="M9.25 1.50 14.75 1.50 14.75 15.48 12.00 23.00 9.25 15.48Z" />
+      <path d="M9.25 11.82 14.75 11.82 14.75 15.48 12.00 23.00 9.25 15.48Z" fill={color} stroke="none" />
+      <path d="M9.25 10.32 14.75 11.86" />
+      <path d="M9.25 12.64 14.75 14.19" />
     </svg>
   );
 });
