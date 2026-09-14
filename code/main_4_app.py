@@ -2119,7 +2119,7 @@ def run_traverse_height():
                 "H_target": float(ht_val) if ht_val else 0.0
             })
 
-        updated_json, tolerance_report = dpr.traverse_level_calc2(
+        updated_json, tolerance_report = dpr.traverse_level_calc(
             measurements_json, 
             tol_dh=tol_dh, 
             tol_s=tol_s

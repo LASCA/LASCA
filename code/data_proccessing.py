@@ -37,16 +37,6 @@ def proto_themeliodes(xa, ya, d, gab):
     return xb, yb
 
 #2o
-    # Helper function
-    #mpoylo
-def deutero_aux_gwnia(dx, dy):
-    if abs(dy) < 1e-15:
-        return 100.0 if dx > 0 else 300.0
-    arad = math.atan(abs(dx / dy))
-    agrad = arad * 200 / math.pi
-    return agrad
-
-#azimuth_from_xy
 def deutero_them(xa: float, ya: float, xb: float, yb: float) -> Optional[float]:
     """Compute azimuth (grads) from point A to point B."""
     Dx = xb - xa 
@@ -98,6 +88,7 @@ def calculate_azimuths_from_station_angles(start_azimuth_g, station_angles_g):
     final_azimuth_g = all_azimuths[-1]
     return all_azimuths, final_azimuth_g, log_output
 
+#allilotomies
 def empros(xa, ya, xb, yb, a, b):
     """
     Εμπροσθοτομία: υπολογισμός σημείου P από τα γνωστά A, B και τις γωνίες a, b.
@@ -255,6 +246,7 @@ def tienstra(xa, ya, xb, yb, xc, yc, a, b, c):
     ym = (k1 * ya + k2 * yb + k3 * yc) / sk
     return xm, ym, warnings
 
+#apotiposi
 def tachymetry(data_meas, data_st=None, target_station=None, target_orientation=None, apply_scale=False, scale_factor=1.0):
     # 1. Φόρτωση: Αν περάσουμε path διαβάζει Excel (παλιός τρόπος). Αν περάσουμε DataFrame, τα παίρνει κατευθείαν (νέος τρόπος API).
     if isinstance(data_meas, str):
@@ -374,7 +366,7 @@ def small_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:
 def dx_dy(S: float, G: float) -> Tuple[float,float]: 
     return S * math.sin(g2r(G)), S * math.cos(g2r(G))
 
-    # Constants for traverse error limits
+# Constants for traverse error limits
 
 SCALES = ["1:200", "1:500", "1:1000", "1:2000", "1:5000", "1:10000"]
 
@@ -382,8 +374,8 @@ SCALES = ["1:200", "1:500", "1:1000", "1:2000", "1:5000", "1:10000"]
 WB_COEFF = {
     ("Ομαλό", "Πρωτεύουσα"):      [1, 1, 2, 2, 3, 3],
     ("Ομαλό", "Δευτερεύουσα"):    [1.5, 3, 5, 5, 5, 5],
-    ("Έντονα κεκλιμένο", "Πρωτεύουσα"):   [2, 3, 5, 5, 5, 5],
-    ("Έντονα κεκλιμένο", "Δευτερεύουσα"): [3, 5, 8, 8, 8, 8],
+    ("Κεκλιμένο", "Πρωτεύουσα"):   [2, 3, 5, 5, 5, 5],
+    ("Κεκλιμένο", "Δευτερεύουσα"): [3, 5, 8, 8, 8, 8],
 }
 
 # Linear error coefficients (δsmax)
@@ -394,10 +386,10 @@ DS_COEFF = {
     ("Ομαλό", "Δευτερεύουσα"): [
         (0.01, 0.05), (0.01, 0.05), (0.02, 0.10), (0.04, 0.10), (0.06, 0.20), (0.15, 0.30)
     ],
-    ("Έντονα κεκλιμένο", "Πρωτεύουσα"): [
+    ("Κεκλιμένο", "Πρωτεύουσα"): [
         (0.01, 0.10), (0.01, 0.10), (0.02, 0.20), (0.04, 0.20), (0.06, 0.40), (0.15, 0.30)
     ],
-    ("Έντονα κεκλιμένο", "Δευτερεύουσα"): [
+    ("Κεκλιμένο", "Δευτερεύουσα"): [
         (0.02, 0.10), (0.02, 0.10), (0.04, 0.20), (0.08, 0.20), (0.08, 0.40), (0.20, 0.30)
     ],
 }
@@ -424,16 +416,6 @@ class RR:
     corr_dY: Optional[float]
     X: Optional[float]
     Y: Optional[float]
-
-# Αν δεν έχεις ορίσει ήδη την κλάση TraversePoint, βάλε και αυτό:
-from dataclasses import dataclass
-@dataclass
-class TraversePoint:
-    name: str
-    angle: float = None
-    dist: float = None
-    X: float = None
-    Y: float = None
 
 def load_traverse_from_dataframe(df) -> list:
     """
@@ -640,386 +622,7 @@ def traverse(points: List[TraversePoint], ori_start: bool = True, ori_end: bool 
 
     return results, {"metrics": metrics}
 
-# OPTIONAL: CSV LOADER
-def load_traverse_from_csv(filepath: str) -> List[TraversePoint]:
-    """
-    Load points from a semicolon-separated CSV with columns:
-    Point;θ(g);S(m);X;Y
-    Missing values allowed.
-    """
-    points = []
-    with open(filepath, "r", encoding="utf-8") as f:
-        reader = csv.reader(f, delimiter=';')
-        for row in reader:
-            if len(row) < 5:
-                continue
-            def parse_float(s):
-                s = s.strip()
-                return None if s == "" else float(s.replace(',', '.'))
-            name = row[0].strip()
-            angle = parse_float(row[1])
-            dist = parse_float(row[2])
-            X = parse_float(row[3])
-            Y = parse_float(row[4])
-            points.append(TraversePoint(name, angle, dist, X, Y))
-    if len(points) < 4:
-        raise ValueError("Το αρχείο πρέπει να περιέχει τουλάχιστον 4 σημεία (T1,T2,T3,T4).")
-    return points
-
-# OPTIONAL: CSV EXPORTER
-def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decimals: int = 4, linear_decimals: int = 3):
-    """
-    Export results to CSV (semicolon separated).
-    """
-    with open(filepath, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f, delimiter=';')
-        writer.writerow(["Point", "θ(g)", "θcorr(g)", "G(g)", "S(m)", "ΔX", "ΔY", "corr ΔX", "corr ΔY", "X", "Y"])
-        for r in results:
-            def fmt_angle(v):
-                if v is None:
-                    return ""
-                return f"{v:.{angle_decimals}f}"
-            def fmt_linear(v):
-                if v is None:
-                    return ""
-                return f"{v:.{linear_decimals}f}"
-            writer.writerow([
-                r.name,
-                fmt_angle(r.theta),
-                fmt_angle(r.theta_corr),
-                fmt_angle(r.G),
-                fmt_linear(r.S),
-                fmt_linear(r.dX),
-                fmt_linear(r.dY),
-                fmt_linear(r.corr_dX),
-                fmt_linear(r.corr_dY),
-                fmt_linear(r.X),
-                fmt_linear(r.Y)
-            ])
-
-#Gwniometriseis
-import pandas as pd
-
-def gwn(dataframe):
-    # Αντίγραφο για ασφάλεια
-    df = dataframe.copy()
-    
-    face_I = df['Face I']
-    face_II = df['Face II']
-    
-    # 1. Προβολή της Θέσης ΙΙ στο ίδιο "επίπεδο" με τη Θέση Ι
-    face_II_proj = (face_II + 200) % 400
-    
-    # 2. Εύρεση της μικρής διαφοράς (σφάλμα στόχευσης / collimation)
-    diff = face_II_proj - face_I
-    
-    # 3. Κανονικοποίηση της διαφοράς στο διάστημα [-200, 200]
-    diff_norm = (diff + 200) % 400 - 200
-    
-    # 4. Τελικός Μέσος Όρος
-    df['mesos_oros'] = (face_I + diff_norm / 2) % 400
-    
-    # 5. Ανηγμένη Τιμή (αφαίρεση της 1ης μέτρησης κάθε περιόδου ΑΝΑ ΣΤΑΣΗ)
-    # Η ομαδοποίηση γίνεται με βάση και το 'From' και το 'Period'
-    first_vals = df.groupby(['From', 'Period'])['mesos_oros'].transform('first')
-    df['anigmeni_timi'] = (df['mesos_oros'] - first_vals) % 400
-    
-    # 6. Γενικός Μέσος Όρος ανά σημείο σκόπευσης ("To") ΑΝΑ ΣΤΑΣΗ
-    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'To'
-    df['genikos_mesos'] = df.groupby(['From', 'To'])['anigmeni_timi'].transform('mean')
-    
-    # 7. Υπολογισμός v_ji = (Γενικός Μέσος - Ανηγμένη Τιμή) σε cc
-    v_m_diff = (df['genikos_mesos'] - df['anigmeni_timi'])
-    v_m_diff_norm = (v_m_diff + 200) % 400 - 200
-    df['v_m'] = v_m_diff_norm * 10000
-    
-    # 8. Υπολογισμός v'_j (Διόρθωση σταθμού ανά περίοδο) ΑΝΑ ΣΤΑΣΗ
-    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'Period'
-    df['v_prime'] = df.groupby(['From', 'Period'])['v_m'].transform('mean')
-    
-    # 9. Υπολογισμός v_ji'' = v_ji - v'_j
-    df['v_ji'] = df['v_m'] - df['v_prime']
-    
-    # 10. Υπολογισμός vv = (v_ji'')^2
-    df['vv'] = df['v_ji'] ** 2
-    
-    return df
-
-# SYNORTHOSI STATHMOY
-
-# 1. Η ΔΙΟΡΘΩΜΕΝΗ solve_lsa_detailed
-# Πρόσθεσα το st_name="Unknown" ως δεύτερη παράμετρο!
-def solve_lsa_detailed(observations, st_name="Unknown"):
-    """
-    Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
-    Διατηρεί τον πραγματικό προσανατολισμό του 1ου σημείου χωρίς να αλλοιώνει τα σφάλματα.
-    """
-    df = pd.DataFrame(observations)
-    points = df['to'].unique().tolist()
-    periods = df['per'].unique().tolist()
-    m, r_count = len(points), len(periods)
-    
-    # 1. Μέσοι όροι (πάντα υπολογίζονται γύρω από το 0 για ασφάλεια πινάκων)
-    reduced_matrix = np.zeros((m, r_count))
-    for k, per in enumerate(periods):
-        p_obs = df[df['per'] == per].groupby('to')['val'].mean()
-        base_val = p_obs.loc[points[0]]
-        for i, pt in enumerate(points):
-            diff = p_obs.loc[pt] - base_val
-            reduced_matrix[i, k] = (diff + 200) % 400 - 200
-
-    # Αυτό παραμένει κεντραρισμένο στο 0, ώστε να δουλέψουν σωστά τα theta_k και v_val
-    final_means_array = np.mean(reduced_matrix, axis=1)
-
-    # ---- Η ΛΥΣΗ: ΣΤΡΟΦΗ ΣΤΟ ΤΕΛΟΣ ----
-    # Βρίσκουμε τον αρχικό προσανατολισμό (π.χ. 50 gon) του 1ου σημείου από την 1η περίοδο.
-    ref_angle = df[df['per'] == periods[0]].groupby('to')['val'].mean().loc[points[0]]
-    
-    # Μεταφέρουμε τα τελικά αποτελέσματα στο σωστό σύστημα (αναγωγή στο ref_angle αντί για 0).
-    final_means = [(val + ref_angle) % 400.0 for val in final_means_array]
-    # ----------------------------------
-
-    # 2. Έλεγχος Βαθμών Ελευθερίας
-    # Από εδώ και κάτω δεν αλλάζει ΤΙΠΟΤΑ. Όλη η LSA χρησιμοποιεί το 0-centered final_means_array.
-    f = (m - 1) * (r_count - 1)
-    
-    v_matrix = np.zeros((m, r_count))
-    total_vv = 0.0
-    sigma_0 = 0.0
-    sv_calculated = 0.0
-    
-    # Υπολογισμός σφαλμάτων ΜΟΝΟ αν f > 0
-    if f > 0:
-        for k in range(r_count):
-            theta_k = np.mean(reduced_matrix[:, k] - final_means_array)
-            for i in range(m):
-                v_val = reduced_matrix[i, k] - final_means_array[i] - theta_k
-                v_matrix[i, k] = v_val
-                total_vv += (v_val * 10000.0)**2
-        
-        sigma_sq = total_vv / f
-        sigma_0 = np.sqrt(sigma_sq)
-        q_vv_ii = ((m * r_count) - m - r_count + 5) / (m * r_count)
-        sv_calculated = sigma_0 * np.sqrt(q_vv_ii)
-
-    # 3. Δημιουργία γραμμών αποτελεσμάτων (Αναλυτικά στοιχεία)
-    section_3_rows = []
-    for k, per in enumerate(periods):
-        p_orig = df[df['per'] == per].groupby('to').first()
-        for i, pt in enumerate(points):
-            v_cc = v_matrix[i, k] * 10000.0
-            
-            # tik υπολογισμός μόνο αν sv > 0
-            t_ik = 0.0
-            if sv_calculated > 0:
-                r_ik = v_cc / sv_calculated
-                if f > 1 and (f - r_ik**2) > 0:
-                    t_ik = r_ik * np.sqrt((f - 1) / (f - r_ik**2))
-                else:
-                    t_ik = r_ik
-
-            section_3_rows.append({
-                'to': pt, 'f1': p_orig.loc[pt, 'f1'], 'f2': p_orig.loc[pt, 'f2'],
-                'val': p_orig.loc[pt, 'val'], 'v': v_cc, 
-                'sv': sv_calculated, 'ext_v': t_ik
-            })
-            
-    # Τυπική απόκλιση μέσου όρου
-    std_mean = (sigma_0 / np.sqrt(r_count)) if r_count > 1 else 0.0
-    std_display = f"{std_mean:.2f}" if r_count > 1 else "--"
-    
-    # Εδώ τροφοδοτείται ο πίνακας του frontend με τα σωστά στραμμένα final_means!
-    results = [[pt, f"{final_means[i]:.5f}", std_display] for i, pt in enumerate(points)]
-    
-    # ΤΟ ΣΦΑΛΜΑ ΛΥΘΗΚΕ: Το st_name έρχεται πλέον από την αρχή της συνάρτησης!
-    stats = {
-        'station': st_name, 
-        'var': total_vv/f if f > 0 else 0, 
-        'std': sigma_0, 
-        'f': f, 
-        'vv': total_vv
-    }
-    
-    return results, stats, section_3_rows
-
-def process_network_data(raw_data):
-    """
-    Δέχεται το αρχικό DataFrame, ομαδοποιεί ανά Στάση, υπολογίζει τους μέσους όρους I/II 
-    και τρέχει τη συνόρθωση για όλο το δίκτυο.
-    """
-    all_results = []
-    detailed_analysis_data = {}
-    
-    # Ομαδοποίηση ανά σταθμό
-    for st_name, group in raw_data.groupby('From'):
-        st_name_str = str(st_name).replace('.0', '')
-        observations = []
-        
-        # Υπολογισμός (Face I + Face II) / 2
-        for _, row in group.iterrows():
-            l2_corr = row['Face II'] - 200.0 if row['Face II'] >= 200.0 else row['Face II'] + 200.0
-            l_avg = (row['Face I'] + l2_corr) / 2.0
-            observations.append({
-                'to': str(row['To']), 
-                'per': str(row['Period']), 
-                'val': l_avg, 
-                'f1': row['Face I'], 
-                'f2': row['Face II']
-            })
-        
-        # Κλήση του πυρήνα συνόρθωσης
-        res, stats, s3 = solve_lsa_detailed(observations)
-        
-        # Προσθήκη του ονόματος της στάσης στα τελικά αποτελέσματα
-        all_results.extend([[st_name_str] + r for r in res])
-        
-        # Αποθήκευση των αναλυτικών στατιστικών για μελλοντικό Report
-        detailed_analysis_data[st_name_str] = {'stats': stats, 'rows': s3}
-        
-    results_df = pd.DataFrame(all_results, columns=["Στάση", "Στόχος", "Διεύθυνση", "σ (cc)"])
-    
-    return results_df, detailed_analysis_data
-
-#trigonometriki ypsometria
-def trig_leveling(dataframe):
-    # Ορίζω τις μεταβλητές που συμμετέχουν (με τα ακριβή ονόματα από το Excel)
-    h_station = dataframe['H_station']
-    h_target = dataframe['H_target']
-    z_grad = dataframe['Z[grad]']  # Διορθώθηκε εδώ βάσει της εικόνας σου!
-    slope = dataframe['Slope_D']
-
-    # Μετατρέπω ζενίθια απο grad σε rad
-    z_rad = g2r(z_grad)
-    
-    # Υπολογίζω ΔΗ
-    dataframe['dh'] = (slope * np.cos(z_rad)) + h_station - h_target
-    dataframe['dh'] = dataframe['dh'].round(3)
-    
-    # Ομαδοποίηση ανά From/To και υπολογισμός μέσου όρου στο dh
-    mean_values = dataframe.groupby(['From', 'To'])['dh'].transform('mean')
-    
-    # Το μετατρέπουμε σε κείμενο "κλειδώνοντας" 3 δεκαδικά
-    dataframe['dh_mean'] = mean_values.apply(lambda x: f"{x:.3f}")
-    
-    # Βρίσκουμε τις γραμμές που ΔΕΝ είναι οι τελευταίες
-    duplicates = dataframe.duplicated(subset=['From', 'To'], keep='last')
-    
-    # Βάζουμε κενό στις διπλότυπες
-    dataframe.loc[duplicates, 'dh_mean'] = ""
-    
-    return dataframe
-
-# μαλλον θ αβγει εκτος
-def traverse_level_calc(measurements_json):
-    """
-    Δέχεται τα δεδομένα (JSON) απευθείας από το UI, 
-    εκτελεί τον αλυσιδωτό υπολογισμό της τριγωνομετρικής υψομετρίας
-    και επιστρέφει την ίδια λίστα, αλλά με τα 'h' (Υψόμετρα) συμπληρωμένα!
-    """
-    if not measurements_json:
-        return []
-        
-    # Μετατρέπουμε το JSON σε DataFrame
-    df_raw = pd.DataFrame(measurements_json)
-    
-    # Το UI στέλνει τους Σταθμούς ως 'name' και το Υψόμετρο ως 'h'
-    df_stations = pd.DataFrame({
-        'Stations': df_raw.get('name', pd.Series(dtype=str)),
-        'H_m': df_raw.get('h', pd.Series(dtype=float))
-    })
-    df_stations['Stations'] = df_stations['Stations'].astype(str).str.strip()
-    df_stations['H_m'] = pd.to_numeric(df_stations['H_m'], errors='coerce')
-
-    # Απομονώνουμε τα κρυφά πεδία των μετρήσεων που ήρθαν από το UI
-    # Προνοούμε μήπως το κλειδί λέγεται Z_grad ή Z[grad]
-    z_col = 'Z[grad]' if 'Z[grad]' in df_raw.columns else ('Z_grad' if 'Z_grad' in df_raw.columns else None)
-    slope_col = 'Slope_D [m]' if 'Slope_D [m]' in df_raw.columns else ('Slope_D' if 'Slope_D' in df_raw.columns else None)
-    
-    if not z_col or not slope_col or 'From' not in df_raw.columns:
-        return measurements_json # Αν λείπουν τα πεδία επιστρέφει τα δεδομένα ως έχουν
-
-    df_measurements = df_raw[['From', 'To', slope_col, z_col, 'H_station', 'H_target']].copy()
-    
-    # Μετονομασία για ευκολία
-    df_measurements.rename(columns={slope_col: 'Slope_D', z_col: 'Z_grad'}, inplace=True)
-    df_measurements['From'] = df_measurements['From'].astype(str).str.strip().replace('nan', '')
-    df_measurements['To'] = df_measurements['To'].astype(str).str.strip().replace('nan', '')
-
-    # Φιλτράρισμα: κρατάμε μόνο τις γραμμές που έχουν τιμές 'From' και 'To'
-    mask = (df_measurements['From'] != '') & (df_measurements['To'] != '')
-    df_meas_clean = df_measurements[mask].copy()
-
-    if not df_meas_clean.empty:
-        for col in ['Slope_D', 'Z_grad', 'H_station', 'H_target']:
-            df_meas_clean[col] = pd.to_numeric(df_meas_clean[col], errors='coerce').fillna(0.0)
-
-        # 4. Υπολογισμός dh ανά γραμμή
-        z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
-        df_meas_clean['dh'] = (df_meas_clean['Slope_D'] * np.cos(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
-        df_meas_clean['dh'] = df_meas_clean['dh'].round(3)
-
-        # 5 & 6. Δυναμική ενοποίηση περιόδων (Mean dh) με απόλυτη ασφάλεια
-        pair_dict = {}
-        for _, row in df_meas_clean.iterrows():
-            start = row['From']
-            end = row['To']
-            dh = row['dh']
-            
-            pair = (start, end)
-            rev_pair = (end, start)
-            
-            # Αν υπάρχει ήδη το ζευγάρι, προσθέτουμε το dh.
-            if pair in pair_dict:
-                pair_dict[pair].append(dh)
-            # Αν υπάρχει το ανάποδο (backward), προσθέτουμε το dh με ΑΝΤΙΘΕΤΟ πρόσημο
-            elif rev_pair in pair_dict:
-                pair_dict[rev_pair].append(-dh) 
-            # Διαφορετικά, είναι η πρώτη φορά που βλέπουμε αυτή τη μετάβαση
-            else:
-                pair_dict[pair] = [dh]
-                
-        # Φτιάχνουμε τα τελικά vectors με τους μέσους όρους
-        final_vectors = []
-        for (start, end), dh_list in pair_dict.items():
-            dh_mean = sum(dh_list) / len(dh_list)
-            final_vectors.append({'From': start, 'To': end, 'dh_mean': dh_mean})
-            
-        df_final_vectors = pd.DataFrame(final_vectors)
-
-        # 7. Αλυσιδωτός (Δυναμικός) υπολογισμός των υψομέτρων
-        known_heights = df_stations.dropna(subset=['H_m']).set_index('Stations')['H_m'].to_dict()
-        
-        # Επαναλαμβάνουμε μέχρι να μην προστεθεί καμία νέα στάση (κλασικός network solver)
-        added_new = True
-        while added_new:
-            added_new = False
-            for _, vector in df_final_vectors.iterrows():
-                start_node = vector['From']
-                end_node = vector['To']
-                dh = vector['dh_mean']
-                
-                # Συνθήκη 1: Ξέρουμε την αρχή, ψάχνουμε το τέλος
-                if start_node in known_heights and end_node not in known_heights:
-                    if end_node.startswith('S') or end_node.isdigit():
-                        known_heights[end_node] = round(known_heights[start_node] + dh, 3)
-                        added_new = True
-                
-                # Συνθήκη 2 (Έξτρα ασφάλεια): Ξέρουμε το τέλος, ψάχνουμε την αρχή
-                elif end_node in known_heights and start_node not in known_heights:
-                    if start_node.startswith('S') or start_node.isdigit():
-                        known_heights[start_node] = round(known_heights[end_node] - dh, 3)
-                        added_new = True
-                        
-        # 8. Περνάμε τα συμπληρωμένα H πίσω στο αρχικό JSON που ήρθε από το UI
-        for row in measurements_json:
-            st_name = str(row.get('name', '')).strip()
-            h_val = row.get('h')
-            # Αν η στάση έχει υπολογισμένο υψόμετρο και στο UI είναι κενό, το συμπληρώνουμε
-            if st_name in known_heights and (pd.isna(h_val) or h_val == "" or h_val is None):
-                row['h'] = known_heights[st_name]
-
-    return measurements_json
-
+#trigonometriki ypsometria odeusis
 def normalize_node(name):
     """
     Διατηρεί αυτούσιο το όνομα του σταθμού όπως το έδωσε ο χρήστης,
@@ -1029,7 +632,7 @@ def normalize_node(name):
         return ""
     return str(name).strip()
 
-def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
+def traverse_level_calc(measurements_json, tol_dh=0.020, tol_s=0.050):
     if not measurements_json:
         return measurements_json
         
@@ -1263,6 +866,271 @@ def traverse_level_calc2(measurements_json, tol_dh=0.020, tol_s=0.050):
     # Επιστρέφουμε ΠΛΕΟΝ TUPLE: (τα δεδομένα, το report)
     return measurements_json, tolerance_report
 
+# OPTIONAL: CSV LOADER
+def load_traverse_from_csv(filepath: str) -> List[TraversePoint]:
+    """
+    Load points from a semicolon-separated CSV with columns:
+    Point;θ(g);S(m);X;Y
+    Missing values allowed.
+    """
+    points = []
+    with open(filepath, "r", encoding="utf-8") as f:
+        reader = csv.reader(f, delimiter=';')
+        for row in reader:
+            if len(row) < 5:
+                continue
+            def parse_float(s):
+                s = s.strip()
+                return None if s == "" else float(s.replace(',', '.'))
+            name = row[0].strip()
+            angle = parse_float(row[1])
+            dist = parse_float(row[2])
+            X = parse_float(row[3])
+            Y = parse_float(row[4])
+            points.append(TraversePoint(name, angle, dist, X, Y))
+    if len(points) < 4:
+        raise ValueError("Το αρχείο πρέπει να περιέχει τουλάχιστον 4 σημεία (T1,T2,T3,T4).")
+    return points
+
+# OPTIONAL: CSV EXPORTER
+def export_traverse_results_to_csv(results: List[RR], filepath: str, angle_decimals: int = 4, linear_decimals: int = 3):
+    """
+    Export results to CSV (semicolon separated).
+    """
+    with open(filepath, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow(["Point", "θ(g)", "θcorr(g)", "G(g)", "S(m)", "ΔX", "ΔY", "corr ΔX", "corr ΔY", "X", "Y"])
+        for r in results:
+            def fmt_angle(v):
+                if v is None:
+                    return ""
+                return f"{v:.{angle_decimals}f}"
+            def fmt_linear(v):
+                if v is None:
+                    return ""
+                return f"{v:.{linear_decimals}f}"
+            writer.writerow([
+                r.name,
+                fmt_angle(r.theta),
+                fmt_angle(r.theta_corr),
+                fmt_angle(r.G),
+                fmt_linear(r.S),
+                fmt_linear(r.dX),
+                fmt_linear(r.dY),
+                fmt_linear(r.corr_dX),
+                fmt_linear(r.corr_dY),
+                fmt_linear(r.X),
+                fmt_linear(r.Y)
+            ])
+
+#Gwniometriseis
+def gwn(dataframe):
+    # Αντίγραφο για ασφάλεια
+    df = dataframe.copy()
+    
+    face_I = df['Face I']
+    face_II = df['Face II']
+    
+    # 1. Προβολή της Θέσης ΙΙ στο ίδιο "επίπεδο" με τη Θέση Ι
+    face_II_proj = (face_II + 200) % 400
+    
+    # 2. Εύρεση της μικρής διαφοράς (σφάλμα στόχευσης / collimation)
+    diff = face_II_proj - face_I
+    
+    # 3. Κανονικοποίηση της διαφοράς στο διάστημα [-200, 200]
+    diff_norm = (diff + 200) % 400 - 200
+    
+    # 4. Τελικός Μέσος Όρος
+    df['mesos_oros'] = (face_I + diff_norm / 2) % 400
+    
+    # 5. Ανηγμένη Τιμή (αφαίρεση της 1ης μέτρησης κάθε περιόδου ΑΝΑ ΣΤΑΣΗ)
+    # Η ομαδοποίηση γίνεται με βάση και το 'From' και το 'Period'
+    first_vals = df.groupby(['From', 'Period'])['mesos_oros'].transform('first')
+    df['anigmeni_timi'] = (df['mesos_oros'] - first_vals) % 400
+    
+    # 6. Γενικός Μέσος Όρος ανά σημείο σκόπευσης ("To") ΑΝΑ ΣΤΑΣΗ
+    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'To'
+    df['genikos_mesos'] = df.groupby(['From', 'To'])['anigmeni_timi'].transform('mean')
+    
+    # 7. Υπολογισμός v_ji = (Γενικός Μέσος - Ανηγμένη Τιμή) σε cc
+    v_m_diff = (df['genikos_mesos'] - df['anigmeni_timi'])
+    v_m_diff_norm = (v_m_diff + 200) % 400 - 200
+    df['v_m'] = v_m_diff_norm * 10000
+    
+    # 8. Υπολογισμός v'_j (Διόρθωση σταθμού ανά περίοδο) ΑΝΑ ΣΤΑΣΗ
+    # Η ομαδοποίηση γίνεται με βάση το 'From' και το 'Period'
+    df['v_prime'] = df.groupby(['From', 'Period'])['v_m'].transform('mean')
+    
+    # 9. Υπολογισμός v_ji'' = v_ji - v'_j
+    df['v_ji'] = df['v_m'] - df['v_prime']
+    
+    # 10. Υπολογισμός vv = (v_ji'')^2
+    df['vv'] = df['v_ji'] ** 2
+    
+    return df
+
+# SYNORTHOSI STATHMOY
+def solve_lsa_detailed(observations, st_name="Unknown"):
+    """
+    Εκτελεί τη συνόρθωση ελαχίστων τετραγώνων (LSA) για μία στάση.
+    Διατηρεί τον πραγματικό προσανατολισμό του 1ου σημείου χωρίς να αλλοιώνει τα σφάλματα.
+    """
+    df = pd.DataFrame(observations)
+    points = df['to'].unique().tolist()
+    periods = df['per'].unique().tolist()
+    m, r_count = len(points), len(periods)
+    
+    # 1. Μέσοι όροι (πάντα υπολογίζονται γύρω από το 0 για ασφάλεια πινάκων)
+    reduced_matrix = np.zeros((m, r_count))
+    for k, per in enumerate(periods):
+        p_obs = df[df['per'] == per].groupby('to')['val'].mean()
+        base_val = p_obs.loc[points[0]]
+        for i, pt in enumerate(points):
+            diff = p_obs.loc[pt] - base_val
+            reduced_matrix[i, k] = (diff + 200) % 400 - 200
+
+    # Αυτό παραμένει κεντραρισμένο στο 0, ώστε να δουλέψουν σωστά τα theta_k και v_val
+    final_means_array = np.mean(reduced_matrix, axis=1)
+
+    # ---- Η ΛΥΣΗ: ΣΤΡΟΦΗ ΣΤΟ ΤΕΛΟΣ ----
+    # Βρίσκουμε τον αρχικό προσανατολισμό (π.χ. 50 gon) του 1ου σημείου από την 1η περίοδο.
+    ref_angle = df[df['per'] == periods[0]].groupby('to')['val'].mean().loc[points[0]]
+    
+    # Μεταφέρουμε τα τελικά αποτελέσματα στο σωστό σύστημα (αναγωγή στο ref_angle αντί για 0).
+    final_means = [(val + ref_angle) % 400.0 for val in final_means_array]
+    # ----------------------------------
+
+    # 2. Έλεγχος Βαθμών Ελευθερίας
+    # Από εδώ και κάτω δεν αλλάζει ΤΙΠΟΤΑ. Όλη η LSA χρησιμοποιεί το 0-centered final_means_array.
+    f = (m - 1) * (r_count - 1)
+    
+    v_matrix = np.zeros((m, r_count))
+    total_vv = 0.0
+    sigma_0 = 0.0
+    sv_calculated = 0.0
+    
+    # Υπολογισμός σφαλμάτων ΜΟΝΟ αν f > 0
+    if f > 0:
+        for k in range(r_count):
+            theta_k = np.mean(reduced_matrix[:, k] - final_means_array)
+            for i in range(m):
+                v_val = reduced_matrix[i, k] - final_means_array[i] - theta_k
+                v_matrix[i, k] = v_val
+                total_vv += (v_val * 10000.0)**2
+        
+        sigma_sq = total_vv / f
+        sigma_0 = np.sqrt(sigma_sq)
+        q_vv_ii = ((m * r_count) - m - r_count + 5) / (m * r_count)
+        sv_calculated = sigma_0 * np.sqrt(q_vv_ii)
+
+    # 3. Δημιουργία γραμμών αποτελεσμάτων (Αναλυτικά στοιχεία)
+    section_3_rows = []
+    for k, per in enumerate(periods):
+        p_orig = df[df['per'] == per].groupby('to').first()
+        for i, pt in enumerate(points):
+            v_cc = v_matrix[i, k] * 10000.0
+            
+            # tik υπολογισμός μόνο αν sv > 0
+            t_ik = 0.0
+            if sv_calculated > 0:
+                r_ik = v_cc / sv_calculated
+                if f > 1 and (f - r_ik**2) > 0:
+                    t_ik = r_ik * np.sqrt((f - 1) / (f - r_ik**2))
+                else:
+                    t_ik = r_ik
+
+            section_3_rows.append({
+                'to': pt, 'f1': p_orig.loc[pt, 'f1'], 'f2': p_orig.loc[pt, 'f2'],
+                'val': p_orig.loc[pt, 'val'], 'v': v_cc, 
+                'sv': sv_calculated, 'ext_v': t_ik
+            })
+            
+    # Τυπική απόκλιση μέσου όρου
+    std_mean = (sigma_0 / np.sqrt(r_count)) if r_count > 1 else 0.0
+    std_display = f"{std_mean:.2f}" if r_count > 1 else "--"
+    
+    # Εδώ τροφοδοτείται ο πίνακας του frontend με τα σωστά στραμμένα final_means!
+    results = [[pt, f"{final_means[i]:.5f}", std_display] for i, pt in enumerate(points)]
+    
+    # ΤΟ ΣΦΑΛΜΑ ΛΥΘΗΚΕ: Το st_name έρχεται πλέον από την αρχή της συνάρτησης!
+    stats = {
+        'station': st_name, 
+        'var': total_vv/f if f > 0 else 0, 
+        'std': sigma_0, 
+        'f': f, 
+        'vv': total_vv
+    }
+    
+    return results, stats, section_3_rows
+
+def process_network_data(raw_data):
+    """
+    Δέχεται το αρχικό DataFrame, ομαδοποιεί ανά Στάση, υπολογίζει τους μέσους όρους I/II 
+    και τρέχει τη συνόρθωση για όλο το δίκτυο.
+    """
+    all_results = []
+    detailed_analysis_data = {}
+    
+    # Ομαδοποίηση ανά σταθμό
+    for st_name, group in raw_data.groupby('From'):
+        st_name_str = str(st_name).replace('.0', '')
+        observations = []
+        
+        # Υπολογισμός (Face I + Face II) / 2
+        for _, row in group.iterrows():
+            l2_corr = row['Face II'] - 200.0 if row['Face II'] >= 200.0 else row['Face II'] + 200.0
+            l_avg = (row['Face I'] + l2_corr) / 2.0
+            observations.append({
+                'to': str(row['To']), 
+                'per': str(row['Period']), 
+                'val': l_avg, 
+                'f1': row['Face I'], 
+                'f2': row['Face II']
+            })
+        
+        # Κλήση του πυρήνα συνόρθωσης
+        res, stats, s3 = solve_lsa_detailed(observations)
+        
+        # Προσθήκη του ονόματος της στάσης στα τελικά αποτελέσματα
+        all_results.extend([[st_name_str] + r for r in res])
+        
+        # Αποθήκευση των αναλυτικών στατιστικών για μελλοντικό Report
+        detailed_analysis_data[st_name_str] = {'stats': stats, 'rows': s3}
+        
+    results_df = pd.DataFrame(all_results, columns=["Στάση", "Στόχος", "Διεύθυνση", "σ (cc)"])
+    
+    return results_df, detailed_analysis_data
+
+#trigonometriki ypsometria
+def trig_leveling(dataframe):
+    # Ορίζω τις μεταβλητές που συμμετέχουν (με τα ακριβή ονόματα από το Excel)
+    h_station = dataframe['H_station']
+    h_target = dataframe['H_target']
+    z_grad = dataframe['Z[grad]']  # Διορθώθηκε εδώ βάσει της εικόνας σου!
+    slope = dataframe['Slope_D']
+
+    # Μετατρέπω ζενίθια απο grad σε rad
+    z_rad = g2r(z_grad)
+    
+    # Υπολογίζω ΔΗ
+    dataframe['dh'] = (slope * np.cos(z_rad)) + h_station - h_target
+    dataframe['dh'] = dataframe['dh'].round(3)
+    
+    # Ομαδοποίηση ανά From/To και υπολογισμός μέσου όρου στο dh
+    mean_values = dataframe.groupby(['From', 'To'])['dh'].transform('mean')
+    
+    # Το μετατρέπουμε σε κείμενο "κλειδώνοντας" 3 δεκαδικά
+    dataframe['dh_mean'] = mean_values.apply(lambda x: f"{x:.3f}")
+    
+    # Βρίσκουμε τις γραμμές που ΔΕΝ είναι οι τελευταίες
+    duplicates = dataframe.duplicated(subset=['From', 'To'], keep='last')
+    
+    # Βάζουμε κενό στις διπλότυπες
+    dataframe.loc[duplicates, 'dh_mean'] = ""
+    
+    return dataframe
+
+
 def traverse_spirit_leveling(forward_data, backward_data, start_elevation=0.0):
     """
     Υπολογίζει τη χωροστάθμιση για Μετάβαση και Επιστροφή:
@@ -1456,6 +1324,7 @@ def sintelestis_klimakas_segment(Ei: float, Ej: float, m_0=0.9996, R_0=6371000.0
         "mj": mj,
     }
 
+#xaraxi
 def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, scale_mode: str = "Χωρίς", scale_factor: float = 1.0) -> dict:
     try:
         xs = float(station.get('x', 0))
@@ -1507,7 +1376,8 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, sc
 
     except Exception as e:
         raise RuntimeError(f"Σφάλμα κατά τον υπολογισμό της χάραξης: {str(e)}")
-    
+
+#geom xorostathmisi
 def calculate_leveling(forward_data, backward_data):
     """
     Υπολογίζει τα αθροίσματα και τις διαφορές για τη χωροστάθμιση (Μετάβαση & Επιστροφή).
