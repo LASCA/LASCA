@@ -23,57 +23,6 @@ import {
 import { toast } from 'react-hot-toast';
 import InputField from './InputField';
 
-// Helper για μετατροπή SVG element σε Base64 PNG Data URL
-const convertSvgToBase64Png = (svgElement) => {
-  return new Promise((resolve) => {
-    try {
-      if (!svgElement) return resolve(null);
-
-      const serializer = new XMLSerializer();
-      let svgString = serializer.serializeToString(svgElement);
-
-      if (!svgString.includes('xmlns="http://www.w3.org/2000/svg"')) {
-        svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-      }
-
-      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = 2; // Υψηλή ανάλυση 2x για το PDF
-        const width = (svgElement.clientWidth || 280) * scale;
-        const height = (svgElement.clientHeight || 150) * scale;
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-
-        // Σκούρο υπόβαθρο matching με το UI
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, width, height);
-
-        ctx.drawImage(img, 0, 0, width, height);
-        URL.revokeObjectURL(url);
-        
-        resolve(canvas.toDataURL('image/png'));
-      };
-
-      img.onerror = (err) => {
-        console.warn('SVG to PNG error:', err);
-        URL.revokeObjectURL(url);
-        resolve(null);
-      };
-
-      img.src = url;
-    } catch (err) {
-      console.warn('SVG conversion exception:', err);
-      resolve(null);
-    }
-  });
-};
-
 // Helper για την ασφαλή αποθήκευση/κατέβασμα αρχείων PDF
 const saveBlobFile = async (blob, defaultFileName) => {
   try {
@@ -562,9 +511,6 @@ const BasicCalculations = ({ projectInfo }) => {
   const handleExportIntersectReport = async () => {
     if (!results.intersect) return;
     try {
-      const svgEl = document.getElementById('intersect-diagram-svg');
-      const plotImage = await convertSvgToBase64Png(svgEl);
-
       const payload = {
         projectInfo: projectInfo,
         inputData: [
@@ -573,8 +519,7 @@ const BasicCalculations = ({ projectInfo }) => {
         ],
         resultData: [
           { pointName: 'E', x: parseFloat(results.intersect[0]), y: parseFloat(results.intersect[1]) }
-        ],
-        plotImage: plotImage
+        ]
       };
       
       const response = await axios.post(`${API_BASE_URL}/api/intersection/report`, payload, {
@@ -636,9 +581,6 @@ const BasicCalculations = ({ projectInfo }) => {
   const handleExportResectReport = async () => {
     if (!results.resect) return;
     try {
-      const svgEl = document.getElementById('resect-diagram-svg');
-      const plotImage = await convertSvgToBase64Png(svgEl);
-
       const payload = {
         projectInfo: projectInfo,
         inputData: [
@@ -648,8 +590,7 @@ const BasicCalculations = ({ projectInfo }) => {
         ],
         resultData: [
           { pointName: 'O', x: parseFloat(results.resect[0]), y: parseFloat(results.resect[1]) }
-        ],
-        plotImage: plotImage
+        ]
       };
       
       const response = await axios.post(`${API_BASE_URL}/api/resection/report`, payload, {

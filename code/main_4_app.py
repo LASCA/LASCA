@@ -51,6 +51,118 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from functools import partial 
 from reportlab.platypus import  Image as RLImage
+from reportlab.graphics.shapes import Drawing, Line, Polygon, Circle, Rect, String
+
+
+def create_survey_cad_drawing(
+    input_rows: list[dict],
+    result_rows: list[dict],
+    width: float = 480,
+    height: float = 260,
+) -> Drawing:
+    """Create a scale-preserving vector CAD sketch for survey reports."""
+    known_points = []
+    calculated_points = []
+
+    def extract_point(row: dict, fallback_name: str):
+        if not isinstance(row, dict):
+            return None
+        try:
+            x_value = row.get('x', row.get('X'))
+            y_value = row.get('y', row.get('Y'))
+            x_value = float(x_value)
+            y_value = float(y_value)
+            if not (math.isfinite(x_value) and math.isfinite(y_value)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        name = row.get('pointName') or row.get('name') or fallback_name
+        return str(name), x_value, y_value
+
+    for index, row in enumerate(input_rows or []):
+        point = extract_point(row, f'K{index + 1}')
+        if point is not None:
+            known_points.append(point)
+    for index, row in enumerate(result_rows or []):
+        point = extract_point(row, f'P{index + 1}')
+        if point is not None:
+            calculated_points.append(point)
+
+    drawing = Drawing(float(width), float(height))
+    drawing.add(Rect(0, 0, float(width), float(height), fillColor=colors.white, strokeColor=colors.HexColor('#cbd5e1'), strokeWidth=0.5))
+
+    all_points = known_points + calculated_points
+    if all_points:
+        x_values = [point[1] for point in all_points]
+        y_values = [point[2] for point in all_points]
+        min_x, max_x = min(x_values), max(x_values)
+        min_y, max_y = min(y_values), max(y_values)
+        padding = max(max_x - min_x, max_y - min_y, 1.0) * 0.15
+        min_x -= padding
+        max_x += padding
+        min_y -= padding
+        max_y += padding
+
+        plot_left, plot_bottom = 28.0, 22.0
+        plot_width = max(float(width) - 44.0, 1.0)
+        plot_height = max(float(height) - 42.0, 1.0)
+        scale = min(
+            plot_width / max(max_x - min_x, 1e-12),
+            plot_height / max(max_y - min_y, 1e-12),
+        )
+        used_width = (max_x - min_x) * scale
+        used_height = (max_y - min_y) * scale
+        offset_x = plot_left + (plot_width - used_width) / 2.0
+        offset_y = plot_bottom + (plot_height - used_height) / 2.0
+
+        def project(point):
+            return (
+                offset_x + (point[1] - min_x) * scale,
+                offset_y + (point[2] - min_y) * scale,
+            )
+
+        known_screen = [project(point) for point in known_points]
+        calculated_screen = [project(point) for point in calculated_points]
+        slate = colors.HexColor('#475569')
+        dark_slate = colors.HexColor('#1e293b')
+        blue = colors.HexColor('#0284c7')
+
+        for (first_x, first_y), (second_x, second_y) in zip(known_screen, known_screen[1:]):
+            drawing.add(Line(
+                first_x,
+                first_y,
+                second_x,
+                second_y,
+                strokeColor=colors.HexColor('#64748b'),
+                strokeWidth=0.75,
+                strokeDashArray=[4, 4],
+            ))
+
+        for known_x, known_y in known_screen:
+            for calculated_x, calculated_y in calculated_screen:
+                drawing.add(Line(known_x, known_y, calculated_x, calculated_y, strokeColor=slate, strokeWidth=0.75))
+
+        for (name, _, _), (cx, cy) in zip(known_points, known_screen):
+            radius = 5.5
+            drawing.add(Polygon(
+                [cx, cy + radius, cx - radius * 0.866, cy - radius / 2, cx + radius * 0.866, cy - radius / 2],
+                fillColor=dark_slate,
+                strokeColor=dark_slate,
+                strokeWidth=0.75,
+            ))
+            drawing.add(String(cx, cy - 13, name, fontName='Helvetica-Bold', fontSize=9, textAnchor='middle', fillColor=dark_slate))
+
+        for (name, _, _), (cx, cy) in zip(calculated_points, calculated_screen):
+            drawing.add(Circle(cx, cy, 5.5, fillColor=colors.white, strokeColor=blue, strokeWidth=1.2))
+            drawing.add(Circle(cx, cy, 2.5, fillColor=None, strokeColor=blue, strokeWidth=0.8))
+            drawing.add(Line(cx - 8, cy, cx + 8, cy, strokeColor=blue, strokeWidth=0.75))
+            drawing.add(Line(cx, cy - 8, cx, cy + 8, strokeColor=blue, strokeWidth=0.75))
+            drawing.add(String(cx, cy - 13, name, fontName='Helvetica-Bold', fontSize=9, textAnchor='middle', fillColor=blue))
+
+    drawing.add(Line(width - 25, height - 36, width - 25, height - 14, strokeColor=colors.HexColor('#475569'), strokeWidth=0.9))
+    drawing.add(Polygon([width - 25, height - 10, width - 29, height - 17, width - 21, height - 17], fillColor=colors.HexColor('#475569'), strokeColor=colors.HexColor('#475569')))
+    drawing.add(String(width - 25, height - 7, 'N', fontName='Helvetica-Bold', fontSize=9, textAnchor='middle', fillColor=colors.HexColor('#475569')))
+    return drawing
 
 try:
     pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf'))
@@ -3141,10 +3253,8 @@ def calc_intersect():
 def export_intersection_report():
     try:
         data = request.json or {}
-        # Αναμένουμε τα αρχικά δεδομένα, τα αποτελέσματα και το διάγραμμα (base64)
         input_rows = data.get('inputData', [])
         result_rows = data.get('resultData', [])
-        plot_image_b64 = data.get('plotImage', None)
         
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ ---
         raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
@@ -3235,15 +3345,14 @@ def export_intersection_report():
         elements.append(Paragraph("Αναφορά Εμπροσθοτομίας", title_style))
         elements.append(Spacer(1, 20))
 
-        # 2. ΑΡΧΙΚΑ ΔΕΔΟΜΕΝΑ
-        elements.append(Paragraph("1. Αρχικά Δεδομένα (Γνωστά Σημεία & Γωνίες/Αποστάσεις)", h2_style))
+        # 2. ΑΡΧΙΚΑ ΔΕΔΟΜΕΝΑ (4 ΣΤΗΛΕΣ)
+        elements.append(Paragraph("1. Αρχικά Δεδομένα (Γνωστά Σημεία & Γωνίες)", h2_style))
         elements.append(Spacer(1, 10))
         t1_headers = [
             Paragraph("Σημείο", header_style),
             Paragraph("X (m)", header_style),
             Paragraph("Y (m)", header_style),
-            Paragraph("Γωνία (cc)", header_style),
-            Paragraph("Απόσταση (m)", header_style)
+            Paragraph("Γωνία (g)", header_style)
         ]
         t1_data = [t1_headers]
         for row in input_rows:
@@ -3251,11 +3360,11 @@ def export_intersection_report():
                 str(row.get('pointName', '')),
                 format_num(row.get('x'), 3),
                 format_num(row.get('y'), 3),
-                format_num(row.get('angle'), 4),
-                format_num(row.get('distance'), 3)
+                format_num(row.get('angle'), 4)
             ])
         
-        t1 = Table(t1_data, colWidths=[100, 110, 110, 110, 105])
+        # Κατανεμημένο πλάτος 535pt ανάμεσα στις 4 στήλες
+        t1 = Table(t1_data, colWidths=[120, 138, 138, 139])
         t1_cmds = [
             ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -3296,17 +3405,9 @@ def export_intersection_report():
         elements.append(Spacer(1, 25))
 
         # 4. ΔΙΑΓΡΑΜΜΑ
-        if plot_image_b64:
-            elements.append(Paragraph("3. Διάγραμμα Εμπροσθοτομίας", h2_style))
-            elements.append(Spacer(1, 10))
-            # Αφαίρεση του header αν υπάρχει (π.χ. "data:image/png;base64,...")
-            if "," in plot_image_b64:
-                plot_image_b64 = plot_image_b64.split(",")[1]
-            img_data = base64.b64decode(plot_image_b64)
-            img_stream = BytesIO(img_data)
-            # Προσαρμογή μεγέθους διαγράμματος
-            img = RLImage(img_stream, width=450, height=300)
-            elements.append(img)
+        elements.append(Paragraph("3. Διάγραμμα Εμπροσθοτομίας", h2_style))
+        elements.append(Spacer(1, 10))
+        elements.append(create_survey_cad_drawing(input_rows, result_rows))
 
         # ΔΗΜΙΟΥΡΓΙΑ PDF
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -3371,10 +3472,8 @@ def calc_resect():
 def export_resection_report():
     try:
         data = request.json or {}
-        # Αναμένουμε τα αρχικά δεδομένα, τα αποτελέσματα και το διάγραμμα (base64)
         input_rows = data.get('inputData', [])
         result_rows = data.get('resultData', [])
-        plot_image_b64 = data.get('plotImage', None)
         
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ ---
         raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
@@ -3524,15 +3623,9 @@ def export_resection_report():
         elements.append(Spacer(1, 25))
 
         # 4. ΔΙΑΓΡΑΜΜΑ
-        if plot_image_b64:
-            elements.append(Paragraph("3. Διάγραμμα Οπισθοτομίας", h2_style))
-            elements.append(Spacer(1, 10))
-            if "," in plot_image_b64:
-                plot_image_b64 = plot_image_b64.split(",")[1]
-            img_data = base64.b64decode(plot_image_b64)
-            img_stream = BytesIO(img_data)
-            img = RLImage(img_stream, width=450, height=300)
-            elements.append(img)
+        elements.append(Paragraph("3. Διάγραμμα Οπισθοτομίας", h2_style))
+        elements.append(Spacer(1, 10))
+        elements.append(create_survey_cad_drawing(input_rows, result_rows))
 
         # ΔΗΜΙΟΥΡΓΙΑ PDF
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
