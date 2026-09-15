@@ -419,7 +419,14 @@ function App() {
             )}
 
             {activeTab === 'basic_calc' && (
-              <BasicCalculations />
+              <BasicCalculations 
+                projectInfo={{
+                  projectName: currentProject,
+                  designer: globalSettings.designer,
+                  employer: globalSettings.employer,
+                  location: globalSettings.location
+                }}
+              />
             )}
             
             {activeTab === 'adjustment' && (

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
 import { 
   Calculator, MapPin, Target, Navigation, Repeat, 
   Play, RotateCcw, Trash2, Plus, Minus,
-  Compass, Crosshair, SlidersHorizontal
+  Compass, Crosshair, SlidersHorizontal, FileText
 } from 'lucide-react';
 
 import {
@@ -22,10 +23,92 @@ import {
 import { toast } from 'react-hot-toast';
 import InputField from './InputField';
 
+// Helper για μετατροπή SVG element σε Base64 PNG Data URL
+const convertSvgToBase64Png = (svgElement) => {
+  return new Promise((resolve) => {
+    try {
+      if (!svgElement) return resolve(null);
+
+      const serializer = new XMLSerializer();
+      let svgString = serializer.serializeToString(svgElement);
+
+      if (!svgString.includes('xmlns="http://www.w3.org/2000/svg"')) {
+        svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = 2; // Υψηλή ανάλυση 2x για το PDF
+        const width = (svgElement.clientWidth || 280) * scale;
+        const height = (svgElement.clientHeight || 150) * scale;
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // Σκούρο υπόβαθρο matching με το UI
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        
+        resolve(canvas.toDataURL('image/png'));
+      };
+
+      img.onerror = (err) => {
+        console.warn('SVG to PNG error:', err);
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+
+      img.src = url;
+    } catch (err) {
+      console.warn('SVG conversion exception:', err);
+      resolve(null);
+    }
+  });
+};
+
+// Helper για την ασφαλή αποθήκευση/κατέβασμα αρχείων PDF
+const saveBlobFile = async (blob, defaultFileName) => {
+  try {
+    if (window.showSaveFilePicker) {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: defaultFileName,
+        types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }]
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    }
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.warn('showSaveFilePicker failed, falling back to browser download:', error);
+    } else {
+      return;
+    }
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = defaultFileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 // ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: SVG Διάγραμμα Αλληλοτομιών
 // ------------------------------------------------------------------
-const IntersectionDiagram = ({ points, title }) => {
+const IntersectionDiagram = ({ points, title, id }) => {
   if (!points || points.length === 0) return null;
 
   const xs = points.map(p => p.x);
@@ -38,7 +121,6 @@ const IntersectionDiagram = ({ points, title }) => {
   let rangeX = maxX - minX || 1;
   let rangeY = maxY - minY || 1;
   
-  // Padding 18% γύρω από το γράφημα για να χωράνε τα labels
   const padX = rangeX * 0.18;
   const padY = rangeY * 0.18;
   minX -= padX; maxX += padX;
@@ -50,7 +132,6 @@ const IntersectionDiagram = ({ points, title }) => {
   const height = 150;
   const margin = 20;
 
-  // Μετατροπή Τοπογραφικών Συντεταγμένων σε SVG Canvas coordinates (Y-flip)
   const mapCoord = (x, y) => {
     const cx = margin + ((x - minX) / rangeX) * (width - 2 * margin);
     const cy = height - (margin + ((y - minY) / rangeY) * (height - 2 * margin));
@@ -68,11 +149,10 @@ const IntersectionDiagram = ({ points, title }) => {
   return (
     <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 flex flex-col items-center shadow-inner">
       <span className="text-[10px] font-bold text-indigo-400 tracking-wider uppercase mb-1">{title}</span>
-      <svg width="100%" height="150" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
-        {/* Διακεκομμένες γραμμές μεταξύ γνωστών σημείων */}
+      <svg id={id} width="100%" height="150" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
         {basePts.map((pt, idx) => {
-          if (idx === basePts.length - 1) return null;
-          const nextPt = basePts[idx + 1];
+          const nextPt = basePts[(idx + 1) % basePts.length];
+          if (basePts.length === 2 && idx === 1) return null;
           return (
             <line
               key={`base-${idx}`}
@@ -83,7 +163,6 @@ const IntersectionDiagram = ({ points, title }) => {
           );
         })}
 
-        {/* Ευθείες σκοπεύσεων προς το άγνωστο σημείο */}
         {targetPt && basePts.map((pt, idx) => (
           <line
             key={`ray-${idx}`}
@@ -93,7 +172,6 @@ const IntersectionDiagram = ({ points, title }) => {
           />
         ))}
 
-        {/* Σημεία & Labels */}
         {mappedPoints.map((pt) => (
           <g key={pt.id}>
             <circle
@@ -123,7 +201,6 @@ const IntersectionDiagram = ({ points, title }) => {
 const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, result, loading, resultLabels, hideActionArea, badge }) => (
   <div className="h-full group relative bg-slate-900/70 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all duration-300">
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/70">
         <div className="flex items-center gap-2.5">
           <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-105 group-hover:bg-indigo-500/20 transition-all">
@@ -156,13 +233,11 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, resu
         </div>
       </div>
 
-      {/* Body Inputs */}
       <div className="flex flex-col gap-3">
         {children}
       </div>
     </div>
 
-    {/* Footer / Results */}
     {!hideActionArea && (
       <div className="mt-5 pt-4 border-t border-slate-800/70 flex flex-col gap-3">
         {result ? (
@@ -178,7 +253,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, resu
           <button 
             onClick={onCalculate}
             disabled={loading}
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] shadow-lg shadow-indigo-600/25 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] shadow-lg shadow-indigo-600/25 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
           >
             {loading ? (
               <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -196,7 +271,7 @@ const CalcWidget = ({ title, icon, children, onCalculate, onClear, onTrash, resu
 // ΥΠΟ-COMPONENT: 3D Flip Card Widget για τις Αλληλοτομίες
 // ------------------------------------------------------------------
 const FlipCalcWidget = ({ 
-  title, icon, badge, isFlipped, onFlipBack, children, onCalculate, onTrash, loading, result, resultLabels, diagramPoints, diagramTitle 
+  title, icon, badge, isFlipped, onFlipBack, children, onCalculate, onTrash, onExportReport, loading, result, resultLabels, diagramPoints, diagramTitle, diagramId 
 }) => (
   <div style={{ perspective: '1000px' }} className="w-full h-full">
     <div 
@@ -207,7 +282,6 @@ const FlipCalcWidget = ({
       }}
       className="relative w-full h-full"
     >
-      {/* ΜΠΡΟΣΤΙΝΗ ΠΛΕΥΡΑ: INPUTS */}
       <div style={{ backfaceVisibility: 'hidden' }} className="w-full h-full">
         <CalcWidget
           title={title}
@@ -223,7 +297,6 @@ const FlipCalcWidget = ({
         </CalcWidget>
       </div>
 
-      {/* ΠΙΣΩ ΠΛΕΥΡΑ: ΔΙΑΓΡΑΜΜΑ & ΑΠΟΤΕΛΕΣΜΑΤΑ */}
       <div 
         style={{ 
           backfaceVisibility: 'hidden',
@@ -232,7 +305,6 @@ const FlipCalcWidget = ({
         className="absolute inset-0 w-full h-full bg-slate-900/90 backdrop-blur-2xl rounded-2xl border border-slate-800/80 p-5 flex flex-col justify-between shadow-2xl"
       >
         <div>
-          {/* Header Πίσω Πλευράς με Κάδο και Κουμπί Επαναφοράς */}
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/70">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
@@ -240,11 +312,21 @@ const FlipCalcWidget = ({
               </div>
               <h3 className="text-xs font-bold text-slate-100 tracking-wide">{title} — Διάγραμμα</h3>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              {isFlipped && onExportReport && (
+                <button
+                  type="button"
+                  onClick={onExportReport}
+                  title="Εξαγωγή Report"
+                  className="group flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
+                >
+                  <FileText size={14} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                </button>
+              )}
               {onTrash && (
                 <button 
                   onClick={onTrash} 
-                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all" 
+                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer" 
                   title="Καθαρισμός όλων των πεδίων"
                 >
                   <Trash2 size={14} />
@@ -252,7 +334,7 @@ const FlipCalcWidget = ({
               )}
               <button 
                 onClick={onFlipBack} 
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-lg transition-all" 
+                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-lg transition-all cursor-pointer" 
                 title="Επαναφορά (Επιστροφή εισαγωγής)"
               >
                 <RotateCcw size={14} />
@@ -260,11 +342,9 @@ const FlipCalcWidget = ({
             </div>
           </div>
 
-          {/* SVG Διάγραμμα */}
-          <IntersectionDiagram points={diagramPoints} title={diagramTitle} />
+          <IntersectionDiagram id={diagramId} points={diagramPoints} title={diagramTitle} />
         </div>
 
-        {/* Κάτω μέρος: Μόνο τα Αποτελέσματα */}
         {result && (
           <div className="mt-3 pt-3 border-t border-slate-800/70">
             <div className="grid grid-cols-2 gap-2">
@@ -282,14 +362,12 @@ const FlipCalcWidget = ({
   </div>
 );
 
-const BasicCalculations = () => {
+const BasicCalculations = ({ projectInfo }) => {
   const [activeSlide, setActiveSlide] = useState(0);
 
-  // --- STATES FLIP ΓΙΑ ΑΛΛΗΛΟΤΟΜΙΕΣ ---
   const [intersectFlipped, setIntersectFlipped] = useState(false);
   const [resectFlipped, setResectFlipped] = useState(false);
 
-  // --- STATES & API CALCULATIONS ---
   const [loadings, setLoadings] = useState({});
   const [results, setResults] = useState({
     prob1: null, prob2: null, prob3: null, scale: null, scaleSeg: null, intersect: null, resect: null
@@ -481,6 +559,39 @@ const BasicCalculations = () => {
     setIntersectFlipped(false);
   };
 
+  const handleExportIntersectReport = async () => {
+    if (!results.intersect) return;
+    try {
+      const svgEl = document.getElementById('intersect-diagram-svg');
+      const plotImage = await convertSvgToBase64Png(svgEl);
+
+      const payload = {
+        projectInfo: projectInfo,
+        inputData: [
+          { pointName: 'A', x: parseFloat(intersectData.xa), y: parseFloat(intersectData.ya), angle: parseFloat(intersectData.a) },
+          { pointName: 'B', x: parseFloat(intersectData.xb), y: parseFloat(intersectData.yb), angle: parseFloat(intersectData.b) }
+        ],
+        resultData: [
+          { pointName: 'E', x: parseFloat(results.intersect[0]), y: parseFloat(results.intersect[1]) }
+        ],
+        plotImage: plotImage
+      };
+      
+      const response = await axios.post(`${API_BASE_URL}/api/intersection/report`, payload, {
+        responseType: 'blob'
+      });
+
+      const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
+      const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
+      const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Forward_Intersection_Report.pdf` : 'Forward_Intersection_Report.pdf';
+
+      await saveBlobFile(response.data, fileName);
+    } catch (error) {
+      console.error('Σφάλμα κατά την εξαγωγή του Report Εμπροσθοτομίας:', error);
+      toast.error('Αποτυχία δημιουργίας PDF Report.');
+    }
+  };
+
   // 6. ΟΠΙΣΘΟΤΟΜΙΑ
   const [resectData, setResectData] = useState({ xa: '', ya: '', xb: '', yb: '', xc: '', yc: '', a: '', b: '', c: '' });
   const handleResectCalculation = async () => {
@@ -522,7 +633,41 @@ const BasicCalculations = () => {
     setResectFlipped(false);
   };
 
-  // 4 ΟΡΙΣΜΕΝΕΣ ΚΑΤΗΓΟΡΙΕΣ (SLIDES)
+  const handleExportResectReport = async () => {
+    if (!results.resect) return;
+    try {
+      const svgEl = document.getElementById('resect-diagram-svg');
+      const plotImage = await convertSvgToBase64Png(svgEl);
+
+      const payload = {
+        projectInfo: projectInfo,
+        inputData: [
+          { pointName: 'A', x: parseFloat(resectData.xa), y: parseFloat(resectData.ya), angle: parseFloat(resectData.a) },
+          { pointName: 'B', x: parseFloat(resectData.xb), y: parseFloat(resectData.yb), angle: parseFloat(resectData.b) },
+          { pointName: 'C', x: parseFloat(resectData.xc), y: parseFloat(resectData.yc), angle: parseFloat(resectData.c) }
+        ],
+        resultData: [
+          { pointName: 'O', x: parseFloat(results.resect[0]), y: parseFloat(results.resect[1]) }
+        ],
+        plotImage: plotImage
+      };
+      
+      const response = await axios.post(`${API_BASE_URL}/api/resection/report`, payload, {
+        responseType: 'blob'
+      });
+
+      const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
+      const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
+      const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Resection_Report.pdf` : 'Resection_Report.pdf';
+
+      await saveBlobFile(response.data, fileName);
+    } catch (error) {
+      console.error('Σφάλμα κατά την εξαγωγή του Report Οπισθοτομίας:', error);
+      toast.error('Αποτυχία δημιουργίας PDF Report.');
+    }
+  };
+
+  // SLIDES META
   const slidesMeta = [
     { id: 0, title: 'Μετατροπές', sub: 'rad / grad / deg', icon: <Repeat size={16} /> },
     { id: 1, title: 'Θεμελιώδη', sub: '1ο, 2ο & 3ο Προβλήματα', icon: <ThemeliodiIcon size={16} color="currentColor" /> },
@@ -562,7 +707,7 @@ const BasicCalculations = () => {
           style={{ transform: `translateX(-${activeSlide * 100}%)` }}
         >
           
-          {/* --- SLIDE 0: ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ --- */}
+          {/* SLIDE 0: ΜΕΤΑΤΡΟΠΕΣ ΓΩΝΙΩΝ */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
             <div className="max-w-xl mx-auto pt-1 pb-16">
               <CalcWidget 
@@ -581,7 +726,7 @@ const BasicCalculations = () => {
             </div>
           </div>
 
-          {/* --- SLIDE 1: 3 ΘΕΜΕΛΙΩΔΗ --- */}
+          {/* SLIDE 1: 3 ΘΕΜΕΛΙΩΔΗ */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1 pb-16">
               
@@ -651,12 +796,12 @@ const BasicCalculations = () => {
                       </div>
                       <div className="flex gap-1 mb-[1px]">
                         {prob3Data.b_angles.length > 1 && (
-                          <button type="button" onClick={() => { const newAngles = prob3Data.b_angles.filter((_, i) => i !== index); setProb3Data({...prob3Data, b_angles: newAngles}); }} className="h-8 w-8 flex items-center justify-center text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all">
+                          <button type="button" onClick={() => { const newAngles = prob3Data.b_angles.filter((_, i) => i !== index); setProb3Data({...prob3Data, b_angles: newAngles}); }} className="h-8 w-8 flex items-center justify-center text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all cursor-pointer">
                             <Minus size={16} />
                           </button>
                         )}
                         {index === prob3Data.b_angles.length - 1 && (
-                          <button type="button" onClick={() => setProb3Data({...prob3Data, b_angles: [...prob3Data.b_angles, '']})} className="h-8 w-8 flex items-center justify-center text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-lg hover:bg-indigo-500/20 transition-all">
+                          <button type="button" onClick={() => setProb3Data({...prob3Data, b_angles: [...prob3Data.b_angles, '']})} className="h-8 w-8 flex items-center justify-center text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-lg hover:bg-indigo-500/20 transition-all cursor-pointer">
                             <Plus size={16} />
                           </button>
                         )}
@@ -669,7 +814,7 @@ const BasicCalculations = () => {
             </div>
           </div>
 
-          {/* --- SLIDE 2: ΤΟΜΕΣ (3D FLIP CARDS) --- */}
+          {/* SLIDE 2: ΤΟΜΕΣ (3D FLIP CARDS) */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1 pb-16 max-w-5xl mx-auto">
               
@@ -685,8 +830,10 @@ const BasicCalculations = () => {
                 onFlipBack={() => { setIntersectFlipped(false); clearResult('intersect'); }}
                 onCalculate={handleIntersectCalculation}
                 onTrash={handleClearIntersect}
+                onExportReport={handleExportIntersectReport}
                 diagramPoints={getIntersectDiagramPoints()}
                 diagramTitle="Εμπροσθοτομία A, B → E"
+                diagramId="intersect-diagram-svg"
               >
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2 flex gap-3">
@@ -714,8 +861,10 @@ const BasicCalculations = () => {
                 onFlipBack={() => { setResectFlipped(false); clearResult('resect'); }}
                 onCalculate={handleResectCalculation}
                 onTrash={handleClearResect}
+                onExportReport={handleExportResectReport}
                 diagramPoints={getResectDiagramPoints()}
                 diagramTitle="Οπισθοτομία A, B, C → O"
+                diagramId="resect-diagram-svg"
               >
                 <div className="grid grid-cols-3 gap-2">
                   <InputField label={<span>X<sub>A</sub></span>} value={resectData.xa} onChange={(e) => setResectData({...resectData, xa: e.target.value})} />
@@ -737,11 +886,11 @@ const BasicCalculations = () => {
             </div>
           </div>
 
-          {/* --- SLIDE 3: ΚΛΙΜΑΚΑ --- */}
+          {/* SLIDE 3: ΚΛΙΜΑΚΑ */}
           <div className="w-full h-full flex-shrink-0 px-1 overflow-y-auto custom-scrollbar">
             <div className="max-w-5xl mx-auto pt-1 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               
-              {/* --- Σημειακός Συντελεστής --- */}
+              {/* Σημειακός Συντελεστής */}
               <CalcWidget
                 title="Σημειακός Συντελεστής Κλίμακας"
                 badge="Για μεμονωμένο σημείο ή αποστάσεις < 2 km"
@@ -766,7 +915,7 @@ const BasicCalculations = () => {
                 </div>
               </CalcWidget>
 
-              {/* --- Γραμμικός Συντελεστής --- */}
+              {/* Γραμμικός Συντελεστής */}
               <CalcWidget
                 title="Γραμμικός Συντελεστής Κλίμακας"
                 badge="Συνδυαστικός τύπος (Simpson) — για αποστάσεις > 2 km"
@@ -811,7 +960,7 @@ const BasicCalculations = () => {
         </div>
       </div>
 
-      {/* NAVIGATION DOCK (ΚΑΤΩ & ΚΕΝΤΡΑΡΙΣΜΕΝΟ) */}
+      {/* NAVIGATION DOCK */}
       <div className="relative z-10 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-2xl p-2 mt-2 shadow-2xl flex justify-center max-w-fit mx-auto">
         <div className="flex items-center gap-1.5 overflow-x-auto p-1 scrollbar-none">
           {slidesMeta.map((slide) => {
@@ -820,7 +969,7 @@ const BasicCalculations = () => {
               <button
                 key={slide.id}
                 onClick={() => setActiveSlide(slide.id)}
-                className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
+                className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap cursor-pointer ${
                   isActive 
                     ? 'text-white bg-indigo-600 shadow-lg shadow-indigo-600/35 border border-indigo-400/30' 
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'

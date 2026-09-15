@@ -579,8 +579,8 @@ const Tachymetry = ({
               <thead className="bg-[#0f172a] sticky top-0 z-20 shadow-sm">
                 <tr className="border-b border-slate-800/50">
                   <th className="w-[10%] p-3 text-[9px] font-black text-slate-500 tracking-widest">P.ID</th>
-                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [gon]</th>
-                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [gon]</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
+                  <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [grad]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">
                     SD [m] {scaleMode !== "Χωρίς" && <span className="text-[8px] text-amber-400/80 font-normal"></span>}
                   </th>
