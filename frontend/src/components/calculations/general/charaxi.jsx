@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cpu, Play, ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import InputField from './InputField';
+import InputField from '../../InputField';
 
 const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const { station, backsight, points, mij } = stakeoutData;

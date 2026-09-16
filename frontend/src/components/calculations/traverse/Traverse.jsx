@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";

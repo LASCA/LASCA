@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 import axios from 'axios';
 import { Target, Database, PlusCircle, Trash2, Play, Cpu, ArrowLeft, Settings2, AlertTriangle, CheckCircle } from 'lucide-react';
 

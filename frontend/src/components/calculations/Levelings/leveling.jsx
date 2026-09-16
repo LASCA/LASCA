@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 import axios from 'axios';
 import { 
   Database, Activity, Target, Ruler, Play, Cpu, Info, Trash2, PlusCircle 

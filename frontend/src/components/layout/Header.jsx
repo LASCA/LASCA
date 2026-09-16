@@ -13,7 +13,7 @@ import {
   TachymetriaIcon,
   CharaxiIcon,
   VasikoiYpologismoiIcon
-} from './icons';
+} from '../icons';
 
 const Header = ({ activeTab }) => {
   // Ενημερωμένο configuration με τα νέα custom εικονίδια

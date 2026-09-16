@@ -24,10 +24,10 @@ import {
   YpsometriaHIcon,
   TachymetriaIcon,
   CharaxiIcon
-} from './icons'; 
+} from '../icons'; 
 
-import About from './about'; 
-import FeedbackModal from './FeedbackModal'; // Εισαγωγή του νέου Modal
+import About from '../about'; 
+import FeedbackModal from '../FeedbackModal'; // Εισαγωγή του νέου Modal
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);

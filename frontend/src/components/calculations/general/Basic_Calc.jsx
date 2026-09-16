@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 
 import { 
   Calculator, MapPin, Target, Navigation, Repeat, 
@@ -18,10 +18,10 @@ import {
   ThemeliodiIcon,
   AllilotomiesIcon,
   SyntelestisKlimakasIcon
-} from './icons';
+} from '../../icons';
 
 import { toast } from 'react-hot-toast';
-import InputField from './InputField';
+import InputField from '../../InputField';
 
 // Helper για την ασφαλή αποθήκευση/κατέβασμα αρχείων PDF
 const saveBlobFile = async (blob, defaultFileName) => {
