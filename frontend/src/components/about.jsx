@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Code2, Mail, User } from 'lucide-react';
+import { X, Code2, Mail, User, FileText } from 'lucide-react';
 
 // Το αυθεντικό SVG "βιβλιαράκι" (Repository Icon) του GitHub
 const RepoIcon = ({ size = 16, className = "" }) => (
@@ -50,6 +50,45 @@ const About = ({ isOpen, onClose }) => {
     }
   ];
 
+  // Συνάρτηση για άνοιγμα παραθύρου επιλογής φάκελου αποθήκευσης
+  const handleDownloadManual = async () => {
+    try {
+      const response = await fetch('/LASCA_Manual.pdf');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const blob = await response.blob();
+
+      // Αν υποστηρίζεται το Native Save File Picker API
+      if ('showSaveFilePicker' in window) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: 'LASCA_Manual.pdf',
+          types: [
+            {
+              description: 'PDF Document',
+              accept: { 'application/pdf': ['.pdf'] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        // Fallback λήψη μέσω Blob URL
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'LASCA_Manual.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Σφάλμα κατά την αποθήκευση του εγχειριδίου:', err);
+      }
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
@@ -73,6 +112,16 @@ const About = ({ isOpen, onClose }) => {
           </div>
           
           <div className="flex items-center gap-1.5">
+            {/* Manual Download Button */}
+            <button 
+              onClick={handleDownloadManual}
+              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors group"
+              title="Εγχειρίδιο Χρήσης (PDF)"
+            >
+              <FileText size={17} className="group-hover:scale-105 transition-transform" />
+            </button>
+
+            {/* GitHub Repository Link */}
             <a 
               href={PROJECT_REPO_URL}
               target="_blank"
@@ -83,6 +132,7 @@ const About = ({ isOpen, onClose }) => {
               <RepoIcon size={17} className="group-hover:scale-105 transition-transform" />
             </a>
             
+            {/* Close Modal Button */}
             <button 
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
@@ -109,7 +159,7 @@ const About = ({ isOpen, onClose }) => {
             
             {/* Ultra-Modern Dark Section Header */}
             <div className="relative flex items-center gap-3 pb-1">
-              {/* Background ambient glow (απαλός φωτισμός πίσω από τον τίτλο) */}
+              {/* Background ambient glow */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-48 h-8 bg-blue-500/5 blur-xl rounded-full pointer-events-none"></div>
               
               {/* Dark Icon Container */}
