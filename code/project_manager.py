@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -10,17 +11,49 @@ def get_safe_workspace_dir(app_folder="Topo_Workspace"):
     workspace_path.mkdir(parents=True, exist_ok=True)
     return workspace_path
 
+
+def resolve_project_dir(workspace_dir, project_name: str) -> Path:
+    """Return a project directory that is strictly contained in the workspace."""
+    if not isinstance(project_name, str) or not project_name.strip():
+        raise ValueError("Το όνομα του project είναι υποχρεωτικό")
+    if ".." in project_name or "/" in project_name or "\\" in project_name:
+        raise ValueError("Μη έγκυρο όνομα project")
+
+    workspace_path = Path(workspace_dir).resolve()
+    project_path = (workspace_path / project_name.strip()).resolve()
+    try:
+        project_path.relative_to(workspace_path)
+    except ValueError as exc:
+        raise ValueError("Μη έγκυρο όνομα project") from exc
+    return project_path
+
+
+def atomic_write_json(target_path: Path, data: dict) -> None:
+    """Persist JSON without exposing a partially written target file."""
+    target_path = Path(target_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = Path(f"{target_path}.tmp")
+    try:
+        with temp_path.open('w', encoding='utf-8') as file_handle:
+            json.dump(data, file_handle, indent=4, ensure_ascii=False)
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        os.replace(temp_path, target_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
 class TopoProject:
     def __init__(self, workspace_dir, project_name: str):
-        self.project_name = project_name
+        self.project_name = str(project_name).strip()
         
         # Αν δεν δοθεί φάκελος ή δοθεί κενός, παίρνει τον ασφαλή φάκελο
         if not workspace_dir:
             self.workspace_dir = get_safe_workspace_dir()
         else:
-            self.workspace_dir = Path(workspace_dir)
+            self.workspace_dir = Path(workspace_dir).resolve()
             
-        self.project_dir = self.workspace_dir / project_name
+        self.project_dir = resolve_project_dir(self.workspace_dir, self.project_name)
         
         # Κεντρικοί Φάκελοι δομής
         self.data_dir = self.project_dir / "data"
@@ -86,8 +119,7 @@ class TopoProject:
     def save_state(self, data: dict):
         """Αποθηκεύει τα δεδομένα στο JSON, ενημερώνοντας την ημερομηνία τροποποίησης"""
         data["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(self.json_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+        atomic_write_json(self.json_file, data)
 
     def load_state(self) -> dict:
         """Διαβάζει και επιστρέφει τα δεδομένα από το JSON"""

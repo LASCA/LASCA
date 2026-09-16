@@ -83,7 +83,7 @@ const Dashboard = ({
   // Επεξεργασία δεδομένων για τον χάρτη
   const mapData = useMemo(() => {
     const stations = traverseData
-      .filter(pt => pt.x && pt.y && !isNaN(pt.x) && !isNaN(pt.y))
+      .filter(pt => pt.x !== null && pt.x !== undefined && pt.x !== '' && pt.y !== null && pt.y !== undefined && pt.y !== '' && !isNaN(pt.x) && !isNaN(pt.y))
       .map(pt => ({
         name: pt.name || 'Στάση',
         x: Number(pt.x),
@@ -92,11 +92,10 @@ const Dashboard = ({
       }));
 
     const details = (tachymetryData?.measurements || [])
-      .filter(pt => (pt['E[m]'] || pt.x) && (pt['N[m]'] || pt.y))
       .map(pt => ({
         name: pt['Point'] || pt.name || 'Σημείο',
-        x: Number(pt['E[m]'] || pt.x),
-        y: Number(pt['N[m]'] || pt.y),
+        x: Number(pt['E[m]'] !== null && pt['E[m]'] !== undefined && pt['E[m]'] !== '' ? pt['E[m]'] : pt.x),
+        y: Number(pt['N[m]'] !== null && pt['N[m]'] !== undefined && pt['N[m]'] !== '' ? pt['N[m]'] : pt.y),
         type: 'detail'
       })).filter(pt => !isNaN(pt.x) && !isNaN(pt.y));
 
@@ -164,8 +163,8 @@ const Dashboard = ({
             name: row['Stations'] || row['Station'] || "",
             hz: row['Hz [grad]'] || "",
             sd: row['D [m]'] || "", 
-            x: row['X [m]'] || "",
-            y: row['Y [m]'] || "",
+            x: row['X [m]'] !== null && row['X [m]'] !== undefined ? row['X [m]'] : "",
+            y: row['Y [m]'] !== null && row['Y [m]'] !== undefined ? row['Y [m]'] : "",
             h: row['H [m]'] || ""
           }));
           

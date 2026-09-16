@@ -283,8 +283,8 @@ const Goniometry = ({ rows = [], setRows, projectInfo }) => {
         .filter(character => character.charCodeAt(0) >= 32)
         .join('');
       const fileName = sanitizedProjectName
-        ? `${sanitizedProjectName}_Goniometry_Report.pdf`
-        : 'Goniometry_Report.pdf';
+        ? `${sanitizedProjectName}_Angle_Measurements_Report.pdf`
+        : 'Angle_Measurements_Report.pdf';
 
       await saveBlobFile(blob, fileName);
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });

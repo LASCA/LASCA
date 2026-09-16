@@ -33,7 +33,7 @@ except ImportError:
     resend = None
 
 from datetime import datetime
-from project_manager import TopoProject, get_safe_workspace_dir
+from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
@@ -573,6 +573,13 @@ def get_active_project_name():
 
 # Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects στον home φάκελο
 WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
+
+
+def get_request_project_dir(project_name):
+    """Resolve an optional request project without allowing workspace escape."""
+    if not project_name:
+        return None
+    return resolve_project_dir(WORKSPACE_DIR, str(project_name))
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -1495,12 +1502,12 @@ def run_traverse():
         project_name = get_active_project_name()
         print(f"DEBUG TRAVERSE: Το backend διάβασε project_name = '{project_name}'")
         
-        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-        project_dir.mkdir(parents=True, exist_ok=True)
+        project_dir = get_request_project_dir(project_name)
         
         try:
-            with open(project_dir / "latest_traverse.json", "w", encoding="utf-8") as f:
-                json.dump(calculated_stations_export, f, ensure_ascii=False, indent=4)
+            if project_dir is None:
+                raise ValueError("Δεν ορίστηκε έγκυρο ενεργό project")
+            atomic_write_json(project_dir / "latest_traverse.json", calculated_stations_export)
             print(f"SUCCESS: Οι στάσεις αποθηκεύτηκαν στο: '{project_dir / 'latest_traverse.json'}'")
         except Exception as e:
             print(f"WARNING: Δεν ήταν δυνατή η αποθήκευση των στάσεων όδευσης: {e}")
@@ -2265,7 +2272,7 @@ def run_traverse_height():
         # Ενημέρωση latest_traverse.json
         try:
             project_name = get_active_project_name() if 'get_active_project_name' in globals() else None
-            project_dir = WORKSPACE_DIR / project_name if (project_name and 'WORKSPACE_DIR' in globals()) else None
+            project_dir = get_request_project_dir(project_name) if 'WORKSPACE_DIR' in globals() else None
             if project_dir:
                 json_path = project_dir / "latest_traverse.json"
                 if json_path.exists():
@@ -2286,8 +2293,7 @@ def run_traverse_height():
                             file_updated = True
 
                     if file_updated:
-                        with open(json_path, 'w', encoding='utf-8') as f:
-                            json.dump(traverse_data, f, ensure_ascii=False, indent=4)
+                        atomic_write_json(json_path, traverse_data)
         except Exception as e:
             print(f"DEBUG WARNING: Σφάλμα αποθήκευσης ZS: {e}")
 
@@ -2329,7 +2335,7 @@ def run_traverse_spirit_level():
             project_name = request.headers.get('Active-Project') or (
                 get_active_project_name() if 'get_active_project_name' in globals() else None
             )
-            project_dir = WORKSPACE_DIR / project_name if (project_name and 'WORKSPACE_DIR' in globals()) else None
+            project_dir = get_request_project_dir(project_name) if 'WORKSPACE_DIR' in globals() else None
 
             if project_dir:
                 json_path = project_dir / "latest_traverse.json"
@@ -2354,8 +2360,7 @@ def run_traverse_spirit_level():
                             file_updated = True
 
                     if file_updated:
-                        with open(json_path, 'w', encoding='utf-8') as f:
-                            json.dump(traverse_data, f, ensure_ascii=False, indent=4)
+                        atomic_write_json(json_path, traverse_data)
         except Exception as e:
             print(f"DEBUG WARNING: Σφάλμα αποθήκευσης ZS από Χωροστάθμιση: {e}")
 
@@ -2406,14 +2411,14 @@ def run_tachymetry():
 
     # 3. ΕΥΡΕΣΗ ΦΑΚΕΛΟΥ PROJECT & ΑΝΑΓΝΩΣΗ ΔΕΔΟΜΕΝΩΝ ΑΠΟ .JSON
     project_name = get_active_project_name()
-    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-    traverse_file = project_dir / "latest_traverse.json"
-    project_state_file = project_dir / "project_state.json"
+    project_dir = get_request_project_dir(project_name)
+    traverse_file = project_dir / "latest_traverse.json" if project_dir else None
+    project_state_file = project_dir / "project_state.json" if project_dir else None
     
     traverse_stations = []
     
     # 1η Προσπάθεια: Ανάγνωση από το latest_traverse.json
-    if traverse_file.exists():
+    if traverse_file and traverse_file.exists():
         try:
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
@@ -2421,7 +2426,7 @@ def run_tachymetry():
             print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
     # 2η Προσπάθεια (Fallback): Ανάγνωση από το project_state.json
-    elif project_state_file.exists():
+    elif project_state_file and project_state_file.exists():
         try:
             with open(project_state_file, 'r', encoding='utf-8') as f:
                 p_state = json.load(f)
@@ -2510,20 +2515,20 @@ def export_tachymetry_txt():
 
     # 2. Ανάγνωση στάσεων από τα αρχεία του project (latest_traverse / project_state)
     project_name = get_active_project_name()
-    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-    traverse_file = project_dir / "latest_traverse.json"
-    project_state_file = project_dir / "project_state.json"
+    project_dir = get_request_project_dir(project_name)
+    traverse_file = project_dir / "latest_traverse.json" if project_dir else None
+    project_state_file = project_dir / "project_state.json" if project_dir else None
     
     traverse_stations = []
     
-    if traverse_file.exists():
+    if traverse_file and traverse_file.exists():
         try:
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
         except Exception as e:
             print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
-    elif project_state_file.exists():
+    elif project_state_file and project_state_file.exists():
         try:
             with open(project_state_file, 'r', encoding='utf-8') as f:
                 p_state = json.load(f)
@@ -2652,20 +2657,20 @@ def export_tachymetry_dxf():
 
     # 2. Ανάγνωση στάσεων από τα αρχεία του project (ΟΛΟ ΙΔΙΟ ΜΕ TXT)
     project_name = get_active_project_name()
-    project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
-    traverse_file = project_dir / "latest_traverse.json"
-    project_state_file = project_dir / "project_state.json"
+    project_dir = get_request_project_dir(project_name)
+    traverse_file = project_dir / "latest_traverse.json" if project_dir else None
+    project_state_file = project_dir / "project_state.json" if project_dir else None
     
     traverse_stations = []
     
-    if traverse_file.exists():
+    if traverse_file and traverse_file.exists():
         try:
             with open(traverse_file, 'r', encoding='utf-8') as f:
                 traverse_stations = json.load(f)
         except Exception as e:
             print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
             
-    elif project_state_file.exists():
+    elif project_state_file and project_state_file.exists():
         try:
             with open(project_state_file, 'r', encoding='utf-8') as f:
                 p_state = json.load(f)
@@ -2800,7 +2805,11 @@ def run_stakeout():
         scale_mode = data.get('scale_mode', 'Χωρίς')
         scale_factor = float(data.get('scale_factor', 1.0))
 
-        if not station.get('x') or not station.get('y') or not backsight.get('x') or not backsight.get('y'):
+        coordinate_values = (
+            station.get('x'), station.get('y'),
+            backsight.get('x'), backsight.get('y'),
+        )
+        if any(value is None or value == '' for value in coordinate_values):
             return jsonify({"error": "Συμπληρώστε πρώτα τα δεδομένα Στάσης (X, Y) και Προσανατολισμού (X, Y)!"}), 400
 
         # Πέρασμα των νέων παραμέτρων στη συνάρτηση
@@ -3732,7 +3741,9 @@ def run_leveling():
         
         # 2. Εύρεση του ενεργού Project
         project_name = get_active_project_name()
-        project_dir = WORKSPACE_DIR / project_name if project_name else WORKSPACE_DIR
+        project_dir = get_request_project_dir(project_name)
+        if project_dir is None:
+            raise ValueError("Δεν ορίστηκε έγκυρο ενεργό project")
         project_dir.mkdir(parents=True, exist_ok=True)
         
         # 3. Αποθήκευση Δεδομένων ΚΑΙ Αποτελεσμάτων στο Project
@@ -3748,8 +3759,7 @@ def run_leveling():
             }
         }
         
-        with open(save_path, "w", encoding="utf-8") as f:
-            json.dump(response_data, f, ensure_ascii=False, indent=4)
+        atomic_write_json(save_path, response_data)
             
         print(f"SUCCESS: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
 

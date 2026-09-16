@@ -430,8 +430,8 @@ def load_traverse_from_dataframe(df) -> list:
         # Ασφαλής ανάγνωση και καθαρισμός των αριθμητικών τιμών
         ang_val  = row.get('Hz [grad]') or row.get('Hz')
         dist_val = row.get('Slope_D [m]') or row.get('Slope_D')
-        x_val    = row.get('X [m]') or row.get('X')
-        y_val    = row.get('Y [m]') or row.get('Y')
+        x_val    = row.get('X [m]') if row.get('X [m]') is not None and not pd.isna(row.get('X [m]')) else row.get('X')
+        y_val    = row.get('Y [m]') if row.get('Y [m]') is not None and not pd.isna(row.get('Y [m]')) else row.get('Y')
 
         angle = safe_float(ang_val)
         dist  = safe_float(dist_val)
@@ -662,6 +662,8 @@ def traverse_level_calc(measurements_json, tol_dh=0.020, tol_s=0.050):
 
     # 3. Υπολογισμός dh κάθε γραμμής μέτρησης
     z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
+    if bool((np.abs(np.sin(z_rad)) < 1e-7).any()):
+        raise ValueError("Η ζενίθια γωνία είναι πολύ κοντά σε 0g, 200g ή 400g.")
     df_meas_clean['dh_row'] = (df_meas_clean['Dist'] / np.tan(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
     df_meas_clean['L_horiz'] = df_meas_clean['Dist']
 
@@ -1323,7 +1325,7 @@ def calculate_stakeout(station: dict, backsight: dict, points_to_stake: list, sc
         updated_points = []
 
         for pt in points_to_stake:
-            if not pt.get('x') or not pt.get('y'):
+            if pt.get('x') is None or pt.get('x') == '' or pt.get('y') is None or pt.get('y') == '':
                 updated_pt = pt.copy()
                 updated_pt['hz_stake'] = '---'
                 updated_pt['dist_stake'] = '---'
