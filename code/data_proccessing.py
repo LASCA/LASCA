@@ -104,7 +104,7 @@ def empros(xa, ya, xb, yb, a, b):
 
     # Εύρος γωνιών
     for name, val in (("a", a), ("b", b)):
-        if not (0.0 < val < 400.0):
+        if not (0 < val < 400.0):
             raise GeodeticError(
                 f"Η γωνία {name} = {val:.4f}g είναι εκτός εύρους (0g – 400g)."
             )

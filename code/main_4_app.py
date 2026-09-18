@@ -1398,7 +1398,6 @@ def export_adjustment_report():
         print(f"Σφάλμα κατά τη δημιουργία Adjustment Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
     
-
 # ==========================================
 # 2. ENDPOINT ΓΙΑ ΟΔΕΥΣΗ (TRAVERSE)
 # ==========================================
@@ -1532,7 +1531,6 @@ def run_traverse():
 # ==========================================
 # 2B. ENDPOINT ΓΙΑ ΕΞΑΓΩΓΗ PDF REPORT (TRAVERSE - CUSTOM STYLING)
 # ==========================================
-
 @app.route('/api/traverse/report', methods=['POST'])
 def export_traverse_report():
     try:
@@ -3255,24 +3253,28 @@ def calc_intersect():
         import traceback
         print(f"Σφάλμα στην Εμπροσθοτομία:\n{traceback.format_exc()}")
         return jsonify({"error": f"Προέκυψε σφάλμα: {str(e)}"}), 500
-#report
 
-
-@app.route('/api/intersection/report', methods=['POST'])
+@app.route("/api/intersection/report", methods=["POST"])
 def export_intersection_report():
     try:
         data = request.json or {}
-        input_rows = data.get('inputData', [])
-        result_rows = data.get('resultData', [])
-        
+        input_rows = data.get("inputData", [])
+        result_rows = data.get("resultData", [])
+
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ ---
-        raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
-        
+        raw_proj = (
+            data.get("projectInfo")
+            or data.get("projectSettings")
+            or data.get("project_info")
+            or data.get("project")
+            or {}
+        )
+
         sources_to_check = []
         if isinstance(raw_proj, dict) and raw_proj:
             sources_to_check.append(raw_proj)
-            if isinstance(raw_proj.get('settings'), dict):
-                sources_to_check.append(raw_proj.get('settings'))
+            if isinstance(raw_proj.get("settings"), dict):
+                sources_to_check.append(raw_proj.get("settings"))
         sources_to_check.append(data)
 
         def extract_field(keys):
@@ -3280,166 +3282,299 @@ def export_intersection_report():
                 if isinstance(src, dict):
                     for key in keys:
                         val = src.get(key)
-                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                        if (
+                            val is not None
+                            and str(val).strip() != ""
+                            and str(val).strip().lower()
+                            not in ["none", "null", "undefined"]
+                        ):
                             return str(val).strip()
-            return 'Μη διαθέσιμο'
+            return "Μη διαθέσιμο"
 
-        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
-        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
-        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
-        proj_location = extract_field(['location', 'place', 'address'])
+        proj_name = extract_field(
+            ["name", "projectName", "project_name", "title"]
+        )
+        proj_engineer = extract_field(
+            [
+                "designer",
+                "engineer",
+                "designerName",
+                "engineerName",
+                "author",
+            ]
+        )
+        proj_client = extract_field(
+            ["employer", "client", "employerName", "clientName", "owner"]
+        )
+        proj_location = extract_field(["location", "place", "address"])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
         try:
-            pdfmetrics.registerFont(TTFont('GreekFont', font_path))
-            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
-            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
-            my_font = 'GreekFont'
-            my_font_bold = 'GreekFont-Bold'
+            pdfmetrics.registerFont(TTFont("GreekFont", font_path))
+            pdfmetrics.registerFont(TTFont("GreekFont-Bold", font_bold_path))
+            registerFontFamily(
+                "GreekFont", normal="GreekFont", bold="GreekFont-Bold"
+            )
+            my_font = "GreekFont"
+            my_font_bold = "GreekFont-Bold"
         except Exception:
-            my_font = 'Helvetica'
-            my_font_bold = 'Helvetica-Bold'
+            my_font = "Helvetica"
+            my_font_bold = "Helvetica-Bold"
 
         def format_num(val, decimals=4):
-            if val is None or val == "": return "-"
-            try: return f"{float(val):.{decimals}f}"
-            except (ValueError, TypeError): return str(val)
+            if val is None or val == "":
+                return "-"
+            try:
+                return f"{float(val):.{decimals}f}"
+            except (ValueError, TypeError):
+                return str(val)
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(
-            buffer, pagesize=A4, 
-            leftMargin=30, rightMargin=30, topMargin=55, bottomMargin=45
+            buffer,
+            pagesize=A4,
+            leftMargin=30,
+            rightMargin=30,
+            topMargin=55,
+            bottomMargin=45,
         )
         elements = []
-        
+
         # --- ΧΡΩΜΑΤΑ & ΣΤΥΛ ---
-        HEADER_BG = colors.HexColor('#0f172a')     
-        ROW_BG_1 = colors.HexColor('#ffffff')      
-        ROW_BG_2 = colors.HexColor('#f8fafc')      
-        GRID_COLOR = colors.HexColor('#cbd5e1')    
-        TEXT_MAIN = colors.HexColor('#0f172a')     
-        ACCENT_TITLE = colors.HexColor('#0284c7')  
-        BRIGHT_GREEN = colors.HexColor('#15803d') 
+        HEADER_BG = colors.HexColor("#0f172a")
+        ROW_BG_1 = colors.HexColor("#ffffff")
+        ROW_BG_2 = colors.HexColor("#f8fafc")
+        GRID_COLOR = colors.HexColor("#cbd5e1")
+        TEXT_MAIN = colors.HexColor("#0f172a")
+        ACCENT_TITLE = colors.HexColor("#0284c7")
+        BRIGHT_GREEN = colors.HexColor("#15803d")
 
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle('TopoTitle', parent=styles['Title'], fontName=my_font_bold, fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0)
-        h2_style = ParagraphStyle('TopoSecH', fontName=my_font_bold, fontSize=14, leading=14, textColor=HEADER_BG)
-        header_style = ParagraphStyle('TableHead', fontName=my_font_bold, fontSize=10, textColor=colors.white, alignment=1)
-        modern_label_style = ParagraphStyle('ModernLabel', fontName=my_font_bold, fontSize=7.5, textColor=colors.HexColor('#64748b'), spaceAfter=2, textTransform='uppercase')
-        modern_value_style = ParagraphStyle('ModernValue', fontName=my_font_bold, fontSize=11, textColor=TEXT_MAIN, spaceAfter=8)
+        title_style = ParagraphStyle(
+            "TopoTitle",
+            parent=styles["Title"],
+            fontName=my_font_bold,
+            fontSize=24,
+            leading=22,
+            textColor=ACCENT_TITLE,
+            alignment=0,
+        )
+        h2_style = ParagraphStyle(
+            "TopoSecH",
+            fontName=my_font_bold,
+            fontSize=14,
+            leading=14,
+            textColor=HEADER_BG,
+            keepWithNext=True,
+        )
+        header_style = ParagraphStyle(
+            "TableHead",
+            fontName=my_font_bold,
+            fontSize=10,
+            textColor=colors.white,
+            alignment=1,
+        )
+        modern_label_style = ParagraphStyle(
+            "ModernLabel",
+            fontName=my_font_bold,
+            fontSize=7.5,
+            textColor=colors.HexColor("#64748b"),
+            spaceAfter=2,
+            textTransform="uppercase",
+        )
+        modern_value_style = ParagraphStyle(
+            "ModernValue",
+            fontName=my_font_bold,
+            fontSize=11,
+            textColor=TEXT_MAIN,
+            spaceAfter=8,
+        )
 
         # 1. ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ
         def make_info_cell(label, value):
-            return [Paragraph(label, modern_label_style), Paragraph(value, modern_value_style)]
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style),
+            ]
 
         project_data = [
-            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
-            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+            [
+                make_info_cell("ΕΡΓΟ", proj_name),
+                make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client),
+            ],
+            [
+                make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer),
+                make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location),
+            ],
         ]
         col_width = (A4[0] - 60) / 2
         info_table = Table(project_data, colWidths=[col_width, col_width])
-        info_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
-            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
-            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
-            ('TOPPADDING', (0,0), (-1,-1), 12), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('LEFTPADDING', (0,0), (-1,-1), 15), ('RIGHTPADDING', (0,0), (-1,-1), 15),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
+        info_table.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("LINEBEFORE", (0, 0), (0, -1), 4, ACCENT_TITLE),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 15),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 15),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ])
+        )
         elements.append(info_table)
         elements.append(Spacer(1, 25))
-        
+
         elements.append(Paragraph("Αναφορά Εμπροσθοτομίας", title_style))
         elements.append(Spacer(1, 20))
 
-        # 2. ΑΡΧΙΚΑ ΔΕΔΟΜΕΝΑ (4 ΣΤΗΛΕΣ)
-        elements.append(Paragraph("1. Αρχικά Δεδομένα (Γνωστά Σημεία & Γωνίες)", h2_style))
+        # 2. ΑΠΟΤΕΛΕΣΜΑΤΑ ΥΠΟΛΟΓΙΣΜΟΥ (Πρώτα στη σειρά)
+        elements.append(Paragraph("1. Αποτελέσματα Υπολογισμού", h2_style))
         elements.append(Spacer(1, 10))
-        t1_headers = [
-            Paragraph("Σημείο", header_style),
+        t2_headers = [
+            Paragraph("Υπολογισμένο Σημείο", header_style),
             Paragraph("X (m)", header_style),
             Paragraph("Y (m)", header_style),
-            Paragraph("Γωνία (g)", header_style)
         ]
-        t1_data = [t1_headers]
-        for row in input_rows:
-            t1_data.append([
-                str(row.get('pointName', '')),
-                format_num(row.get('x'), 3),
-                format_num(row.get('y'), 3),
-                format_num(row.get('angle'), 4)
-            ])
-        
-        # Κατανεμημένο πλάτος 535pt ανάμεσα στις 4 στήλες
-        t1 = Table(t1_data, colWidths=[120, 138, 138, 139])
-        t1_cmds = [
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,1), (-1,-1), my_font),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ]
-        for i in range(1, len(t1_data)):
-            t1_cmds.append(('BACKGROUND', (0, i), (-1, i), ROW_BG_1 if i % 2 == 1 else ROW_BG_2))
-        t1.setStyle(TableStyle(t1_cmds))
-        elements.append(t1)
-        elements.append(Spacer(1, 25))
-
-        # 3. ΤΕΛΙΚΑ ΑΠΟΤΕΛΕΣΜΑΤΑ
-        elements.append(Paragraph("2. Τελικά Αποτελέσματα Υπολογισμού", h2_style))
-        elements.append(Spacer(1, 10))
-        t2_headers = [Paragraph("Νέο Σημείο", header_style), Paragraph("Τελικό X (m)", header_style), Paragraph("Τελικό Y (m)", header_style)]
         t2_data = [t2_headers]
         for row in result_rows:
             t2_data.append([
-                str(row.get('pointName', 'P')),
-                format_num(row.get('x'), 3),
-                format_num(row.get('y'), 3)
+                str(row.get("pointName", "P")),
+                format_num(row.get("x"), 3),
+                format_num(row.get("y"), 3),
             ])
         t2 = Table(t2_data, colWidths=[150, 192.5, 192.5])
         t2_cmds = [
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,1), (-1,-1), my_font_bold),
-            ('TEXTCOLOR', (1,1), (2,-1), BRIGHT_GREEN),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 8), ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font_bold),
+            ("TEXTCOLOR", (1, 1), (2, -1), BRIGHT_GREEN),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ]
         for i in range(1, len(t2_data)):
-            t2_cmds.append(('BACKGROUND', (0, i), (-1, i), ROW_BG_1 if i % 2 == 1 else ROW_BG_2))
+            t2_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
         t2.setStyle(TableStyle(t2_cmds))
         elements.append(t2)
         elements.append(Spacer(1, 25))
 
-        # 4. ΔΙΑΓΡΑΜΜΑ
-        elements.append(Paragraph("3. Διάγραμμα Εμπροσθοτομίας", h2_style))
+        # 3. ΓΝΩΣΤΑ ΣΗΜΕΙΑ (Χωρίς τη στήλη γωνίας)
+        elements.append(
+            Paragraph("2. Γνωστά Σημεία", h2_style)
+        )
         elements.append(Spacer(1, 10))
-        elements.append(create_survey_cad_drawing(input_rows, result_rows))
+        t1_headers = [
+            Paragraph("Στάση", header_style),
+            Paragraph("X (m)", header_style),
+            Paragraph("Y (m)", header_style),
+        ]
+        t1_data = [t1_headers]
+        for row in input_rows:
+            t1_data.append([
+                str(row.get("pointName", "")),
+                format_num(row.get("x"), 3),
+                format_num(row.get("y"), 3),
+            ])
+
+        t1 = Table(t1_data, colWidths=[150, 192.5, 192.5])
+        t1_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]
+        for i in range(1, len(t1_data)):
+            t1_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
+        t1.setStyle(TableStyle(t1_cmds))
+        elements.append(t1)
+        elements.append(Spacer(1, 25))
+
+        # 4. ΠΑΡΑΤΗΡΗΣΕΙΣ ΓΩΝΙΩΝ (Νέος Πίνακας)
+        elements.append(Paragraph("3. Παρατηρήσεις Γωνιών", h2_style))
+        elements.append(Spacer(1, 10))
+        t_angles_headers = [
+            Paragraph("#", header_style),
+            Paragraph("Γωνία (grad)", header_style),
+        ]
+        t_angles_data = [t_angles_headers]
+        for row in input_rows:
+            t_angles_data.append([
+                str(row.get("pointName", "")),
+                format_num(row.get("angle"), 4),
+            ])
+
+        t_angles = Table(t_angles_data, colWidths=[250, 285])
+        t_angles_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]
+        for i in range(1, len(t_angles_data)):
+            t_angles_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
+        t_angles.setStyle(TableStyle(t_angles_cmds))
+        elements.append(t_angles)
+        elements.append(Spacer(1, 25))
+
+        # 5. ΔΙΑΓΡΑΜΜΑ (ΕΝΩΜΕΝΟ ΜΕ ΤΟΝ ΤΙΤΛΟ)
+        diagram_block = KeepTogether([
+            Paragraph("4. Διάγραμμα Εμπροσθοτομίας", h2_style),
+            Spacer(1, 10),
+            create_survey_cad_drawing(input_rows, result_rows),
+        ])
+        elements.append(diagram_block)
 
         # ΔΗΜΙΟΥΡΓΙΑ PDF
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         doc.build(
-            elements, 
+            elements,
             canvasmaker=partial(
-                UniversalNumberedCanvas, doc_title="Αυτοματοποιημένη Αναφορά",
-                font_name=my_font, font_bold_name=my_font_bold, 
-                timestamp_str=current_timestamp, logo_path=str(LOGO_PATH) if 'LOGO_PATH' in globals() else None
-            )
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά",
+                font_name=my_font,
+                font_bold_name=my_font_bold,
+                timestamp_str=current_timestamp,
+                logo_path=str(LOGO_PATH) if "LOGO_PATH" in globals() else None,
+            ),
         )
         buffer.seek(0)
-        
+
         return send_file(
-            buffer, as_attachment=True,
-            download_name='Intersection_Report.pdf', mimetype='application/pdf'
+            buffer,
+            as_attachment=True,
+            download_name="Intersection_Report.pdf",
+            mimetype="application/pdf",
         )
-        
+
     except Exception as e:
         import traceback
+
         print(f"Σφάλμα κατά τη δημιουργία Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/basic_calc/resect', methods=['POST'])
 def calc_resect():
@@ -3476,22 +3611,28 @@ def calc_resect():
         import traceback
         print(f"Σφάλμα στην Οπισθοτομία:\n{traceback.format_exc()}")
         return jsonify({"error": f"Προέκυψε σφάλμα: {str(e)}"}), 500
-#report
-@app.route('/api/resection/report', methods=['POST'])
+
+@app.route("/api/resection/report", methods=["POST"])
 def export_resection_report():
     try:
         data = request.json or {}
-        input_rows = data.get('inputData', [])
-        result_rows = data.get('resultData', [])
-        
+        input_rows = data.get("inputData", [])
+        result_rows = data.get("resultData", [])
+
         # --- ΠΛΗΡΗΣ ΚΑΙ ΑΣΦΑΛΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΟΥ ---
-        raw_proj = data.get('projectInfo') or data.get('projectSettings') or data.get('project_info') or data.get('project') or {}
-        
+        raw_proj = (
+            data.get("projectInfo")
+            or data.get("projectSettings")
+            or data.get("project_info")
+            or data.get("project")
+            or {}
+        )
+
         sources_to_check = []
         if isinstance(raw_proj, dict) and raw_proj:
             sources_to_check.append(raw_proj)
-            if isinstance(raw_proj.get('settings'), dict):
-                sources_to_check.append(raw_proj.get('settings'))
+            if isinstance(raw_proj.get("settings"), dict):
+                sources_to_check.append(raw_proj.get("settings"))
         sources_to_check.append(data)
 
         def extract_field(keys):
@@ -3499,165 +3640,299 @@ def export_resection_report():
                 if isinstance(src, dict):
                     for key in keys:
                         val = src.get(key)
-                        if val is not None and str(val).strip() != '' and str(val).strip().lower() not in ['none', 'null', 'undefined']:
+                        if (
+                            val is not None
+                            and str(val).strip() != ""
+                            and str(val).strip().lower()
+                            not in ["none", "null", "undefined"]
+                        ):
                             return str(val).strip()
-            return 'Μη διαθέσιμο'
+            return "Μη διαθέσιμο"
 
-        proj_name = extract_field(['name', 'projectName', 'project_name', 'title'])
-        proj_engineer = extract_field(['designer', 'engineer', 'designerName', 'engineerName', 'author'])
-        proj_client = extract_field(['employer', 'client', 'employerName', 'clientName', 'owner'])
-        proj_location = extract_field(['location', 'place', 'address'])
+        proj_name = extract_field(
+            ["name", "projectName", "project_name", "title"]
+        )
+        proj_engineer = extract_field(
+            [
+                "designer",
+                "engineer",
+                "designerName",
+                "engineerName",
+                "author",
+            ]
+        )
+        proj_client = extract_field(
+            ["employer", "client", "employerName", "clientName", "owner"]
+        )
+        proj_location = extract_field(["location", "place", "address"])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         font_path = "C:/Windows/Fonts/arial.ttf"
         font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
         try:
-            pdfmetrics.registerFont(TTFont('GreekFont', font_path))
-            pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
-            registerFontFamily('GreekFont', normal='GreekFont', bold='GreekFont-Bold')
-            my_font = 'GreekFont'
-            my_font_bold = 'GreekFont-Bold'
+            pdfmetrics.registerFont(TTFont("GreekFont", font_path))
+            pdfmetrics.registerFont(TTFont("GreekFont-Bold", font_bold_path))
+            registerFontFamily(
+                "GreekFont", normal="GreekFont", bold="GreekFont-Bold"
+            )
+            my_font = "GreekFont"
+            my_font_bold = "GreekFont-Bold"
         except Exception:
-            my_font = 'Helvetica'
-            my_font_bold = 'Helvetica-Bold'
+            my_font = "Helvetica"
+            my_font_bold = "Helvetica-Bold"
 
         def format_num(val, decimals=4):
-            if val is None or val == "": return "-"
-            try: return f"{float(val):.{decimals}f}"
-            except (ValueError, TypeError): return str(val)
+            if val is None or val == "":
+                return "-"
+            try:
+                return f"{float(val):.{decimals}f}"
+            except (ValueError, TypeError):
+                return str(val)
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(
-            buffer, pagesize=A4, 
-            leftMargin=30, rightMargin=30, topMargin=55, bottomMargin=45
+            buffer,
+            pagesize=A4,
+            leftMargin=30,
+            rightMargin=30,
+            topMargin=55,
+            bottomMargin=45,
         )
         elements = []
-        
+
         # --- ΧΡΩΜΑΤΑ & ΣΤΥΛ ---
-        HEADER_BG = colors.HexColor('#0f172a')     
-        ROW_BG_1 = colors.HexColor('#ffffff')      
-        ROW_BG_2 = colors.HexColor('#f8fafc')      
-        GRID_COLOR = colors.HexColor('#cbd5e1')    
-        TEXT_MAIN = colors.HexColor('#0f172a')     
-        ACCENT_TITLE = colors.HexColor('#0284c7')  
-        BRIGHT_GREEN = colors.HexColor('#15803d') 
+        HEADER_BG = colors.HexColor("#0f172a")
+        ROW_BG_1 = colors.HexColor("#ffffff")
+        ROW_BG_2 = colors.HexColor("#f8fafc")
+        GRID_COLOR = colors.HexColor("#cbd5e1")
+        TEXT_MAIN = colors.HexColor("#0f172a")
+        ACCENT_TITLE = colors.HexColor("#0284c7")
+        BRIGHT_GREEN = colors.HexColor("#15803d")
 
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle('TopoTitle', parent=styles['Title'], fontName=my_font_bold, fontSize=24, leading=22, textColor=ACCENT_TITLE, alignment=0)
-        h2_style = ParagraphStyle('TopoSecH', fontName=my_font_bold, fontSize=14, leading=14, textColor=HEADER_BG)
-        header_style = ParagraphStyle('TableHead', fontName=my_font_bold, fontSize=10, textColor=colors.white, alignment=1)
-        modern_label_style = ParagraphStyle('ModernLabel', fontName=my_font_bold, fontSize=7.5, textColor=colors.HexColor('#64748b'), spaceAfter=2, textTransform='uppercase')
-        modern_value_style = ParagraphStyle('ModernValue', fontName=my_font_bold, fontSize=11, textColor=TEXT_MAIN, spaceAfter=8)
+        title_style = ParagraphStyle(
+            "TopoTitle",
+            parent=styles["Title"],
+            fontName=my_font_bold,
+            fontSize=24,
+            leading=22,
+            textColor=ACCENT_TITLE,
+            alignment=0,
+        )
+        h2_style = ParagraphStyle(
+            "TopoSecH",
+            fontName=my_font_bold,
+            fontSize=14,
+            leading=14,
+            textColor=HEADER_BG,
+            keepWithNext=True,  # Επιπλέον προστασία για να μην ορφανεύει ο τίτλος
+        )
+        header_style = ParagraphStyle(
+            "TableHead",
+            fontName=my_font_bold,
+            fontSize=10,
+            textColor=colors.white,
+            alignment=1,
+        )
+        modern_label_style = ParagraphStyle(
+            "ModernLabel",
+            fontName=my_font_bold,
+            fontSize=7.5,
+            textColor=colors.HexColor("#64748b"),
+            spaceAfter=2,
+            textTransform="uppercase",
+        )
+        modern_value_style = ParagraphStyle(
+            "ModernValue",
+            fontName=my_font_bold,
+            fontSize=11,
+            textColor=TEXT_MAIN,
+            spaceAfter=8,
+        )
 
         # 1. ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ
         def make_info_cell(label, value):
-            return [Paragraph(label, modern_label_style), Paragraph(value, modern_value_style)]
+            return [
+                Paragraph(label, modern_label_style),
+                Paragraph(value, modern_value_style),
+            ]
 
         project_data = [
-            [make_info_cell("ΕΡΓΟ", proj_name), make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client)],
-            [make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer), make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location)]
+            [
+                make_info_cell("ΕΡΓΟ", proj_name),
+                make_info_cell("ΕΡΓΟΔΟΤΗΣ", proj_client),
+            ],
+            [
+                make_info_cell("ΜΕΛΕΤΗΤΗΣ", proj_engineer),
+                make_info_cell("ΤΟΠΟΘΕΣΙΑ", proj_location),
+            ],
         ]
         col_width = (A4[0] - 60) / 2
         info_table = Table(project_data, colWidths=[col_width, col_width])
-        info_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
-            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
-            ('LINEBEFORE', (0,0), (0,-1), 4, ACCENT_TITLE),
-            ('TOPPADDING', (0,0), (-1,-1), 12), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('LEFTPADDING', (0,0), (-1,-1), 15), ('RIGHTPADDING', (0,0), (-1,-1), 15),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
+        info_table.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("LINEBEFORE", (0, 0), (0, -1), 4, ACCENT_TITLE),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 15),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 15),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ])
+        )
         elements.append(info_table)
         elements.append(Spacer(1, 25))
-        
+
         elements.append(Paragraph("Αναφορά Οπισθοτομίας", title_style))
         elements.append(Spacer(1, 20))
 
-        # 2. ΑΡΧΙΚΑ ΔΕΔΟΜΕΝΑ
-        elements.append(Paragraph("1. Αρχικά Δεδομένα (Σκοπεύσεις σε Γνωστά Σημεία)", h2_style))
+        # 2. ΑΠΟΤΕΛΕΣΜΑΤΑ ΥΠΟΛΟΓΙΣΜΟΥ
+        elements.append(Paragraph("1. Αποτελέσματα Υπολογισμού", h2_style))
         elements.append(Spacer(1, 10))
-        t1_headers = [
-            Paragraph("Σκοπούμενο Σημείο", header_style),
+        t2_headers = [
+            Paragraph("Υπολογισμένο Σημείο", header_style),
             Paragraph("X (m)", header_style),
             Paragraph("Y (m)", header_style),
-            Paragraph("Μετρηθείσα Γωνία/Διεύθυνση (cc)", header_style)
         ]
-        t1_data = [t1_headers]
-        for row in input_rows:
-            t1_data.append([
-                str(row.get('pointName', '')),
-                format_num(row.get('x'), 3),
-                format_num(row.get('y'), 3),
-                format_num(row.get('angle'), 4)
-            ])
-        
-        t1 = Table(t1_data, colWidths=[120, 120, 120, 175])
-        t1_cmds = [
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,1), (-1,-1), my_font),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ]
-        for i in range(1, len(t1_data)):
-            t1_cmds.append(('BACKGROUND', (0, i), (-1, i), ROW_BG_1 if i % 2 == 1 else ROW_BG_2))
-        t1.setStyle(TableStyle(t1_cmds))
-        elements.append(t1)
-        elements.append(Spacer(1, 25))
-
-        # 3. ΤΕΛΙΚΑ ΑΠΟΤΕΛΕΣΜΑΤΑ
-        elements.append(Paragraph("2. Τελικά Αποτελέσματα Υπολογισμού", h2_style))
-        elements.append(Spacer(1, 10))
-        t2_headers = [Paragraph("Σταθμός (Νέο Σημείο)", header_style), Paragraph("Τελικό X (m)", header_style), Paragraph("Τελικό Y (m)", header_style)]
         t2_data = [t2_headers]
         for row in result_rows:
             t2_data.append([
-                str(row.get('pointName', 'P')),
-                format_num(row.get('x'), 3),
-                format_num(row.get('y'), 3)
+                str(row.get("pointName", "P")),
+                format_num(row.get("x"), 3),
+                format_num(row.get("y"), 3),
             ])
         t2 = Table(t2_data, colWidths=[150, 192.5, 192.5])
         t2_cmds = [
-            ('BACKGROUND', (0,0), (-1,0), HEADER_BG),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,1), (-1,-1), my_font_bold),
-            ('TEXTCOLOR', (1,1), (2,-1), BRIGHT_GREEN),
-            ('GRID', (0,0), (-1,-1), 0.5, GRID_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 8), ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font_bold),
+            ("TEXTCOLOR", (1, 1), (2, -1), BRIGHT_GREEN),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ]
         for i in range(1, len(t2_data)):
-            t2_cmds.append(('BACKGROUND', (0, i), (-1, i), ROW_BG_1 if i % 2 == 1 else ROW_BG_2))
+            t2_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
         t2.setStyle(TableStyle(t2_cmds))
         elements.append(t2)
         elements.append(Spacer(1, 25))
 
-        # 4. ΔΙΑΓΡΑΜΜΑ
-        elements.append(Paragraph("3. Διάγραμμα Οπισθοτομίας", h2_style))
+        # 3. ΓΝΩΣΤΑ ΣΗΜΕΙΑ
+        elements.append(
+            Paragraph("2. Γνωστά Σημεία (Συντεταγμένες)", h2_style)
+        )
         elements.append(Spacer(1, 10))
-        elements.append(create_survey_cad_drawing(input_rows, result_rows))
+        t1_headers = [
+            Paragraph("Σημείο", header_style),
+            Paragraph("X (m)", header_style),
+            Paragraph("Y (m)", header_style),
+        ]
+        t1_data = [t1_headers]
+        for row in input_rows:
+            t1_data.append([
+                str(row.get("pointName", "")),
+                format_num(row.get("x"), 3),
+                format_num(row.get("y"), 3),
+            ])
+
+        t1 = Table(t1_data, colWidths=[150, 192.5, 192.5])
+        t1_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]
+        for i in range(1, len(t1_data)):
+            t1_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
+        t1.setStyle(TableStyle(t1_cmds))
+        elements.append(t1)
+        elements.append(Spacer(1, 25))
+
+        # 4. ΠΑΡΑΤΗΡΗΣΕΙΣ ΓΩΝΙΩΝ
+        elements.append(Paragraph("3. Παρατηρήσεις Γωνιών", h2_style))
+        elements.append(Spacer(1, 10))
+        t_angles_headers = [
+            Paragraph("#", header_style),
+            Paragraph("Γωνία", header_style),
+        ]
+        t_angles_data = [t_angles_headers]
+        for row in input_rows:
+            t_angles_data.append([
+                str(row.get("pointName", "")),
+                format_num(row.get("angle"), 4),
+            ])
+
+        t_angles = Table(t_angles_data, colWidths=[250, 285])
+        t_angles_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 1), (-1, -1), my_font),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]
+        for i in range(1, len(t_angles_data)):
+            t_angles_cmds.append((
+                "BACKGROUND",
+                (0, i),
+                (-1, i),
+                ROW_BG_1 if i % 2 == 1 else ROW_BG_2,
+            ))
+        t_angles.setStyle(TableStyle(t_angles_cmds))
+        elements.append(t_angles)
+        elements.append(Spacer(1, 25))
+
+        # 5. ΔΙΑΓΡΑΜΜΑ (ΕΝΩΜΕΝΟ ΜΕ ΤΟΝ ΤΙΤΛΟ)
+        diagram_block = KeepTogether([
+            Paragraph("4. Διάγραμμα Οπισθοτομίας", h2_style),
+            Spacer(1, 10),
+            create_survey_cad_drawing(input_rows, result_rows),
+        ])
+        elements.append(diagram_block)
 
         # ΔΗΜΙΟΥΡΓΙΑ PDF
         current_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         doc.build(
-            elements, 
+            elements,
             canvasmaker=partial(
-                UniversalNumberedCanvas, doc_title="Αυτοματοποιημένη Αναφορά",
-                font_name=my_font, font_bold_name=my_font_bold, 
-                timestamp_str=current_timestamp, logo_path=str(LOGO_PATH) if 'LOGO_PATH' in globals() else None
-            )
+                UniversalNumberedCanvas,
+                doc_title="Αυτοματοποιημένη Αναφορά",
+                font_name=my_font,
+                font_bold_name=my_font_bold,
+                timestamp_str=current_timestamp,
+                logo_path=str(LOGO_PATH) if "LOGO_PATH" in globals() else None,
+            ),
         )
         buffer.seek(0)
-        
+
         return send_file(
-            buffer, as_attachment=True,
-            download_name='Resection_Report.pdf', mimetype='application/pdf'
+            buffer,
+            as_attachment=True,
+            download_name="Resection_Report.pdf",
+            mimetype="application/pdf",
         )
-        
+
     except Exception as e:
         import traceback
+
         print(f"Σφάλμα κατά τη δημιουργία Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/basic_calc/scale', methods=['POST'])
 def calc_scale():
@@ -3809,7 +4084,6 @@ def run_trig_leveling():
         import traceback
         print(f"Σφάλμα κατά τον υπολογισμό Τριγωνομετρικής Υψομετρίας:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/reports/trig-leveling', methods=['POST'])
 def export_trig_leveling_report():

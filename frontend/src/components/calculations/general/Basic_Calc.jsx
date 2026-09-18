@@ -528,7 +528,7 @@ const BasicCalculations = ({ projectInfo }) => {
 
       const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
       const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
-      const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Forward_Intersection_Report.pdf` : 'Forward_Intersection_Report.pdf';
+      const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Intersection_Report.pdf` : 'Intersection_Report.pdf';
 
       await saveBlobFile(response.data, fileName);
     } catch (error) {
