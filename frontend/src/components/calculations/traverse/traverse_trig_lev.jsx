@@ -14,7 +14,8 @@ const TraverseTrigLevel = ({
   const [showTrigResults, setShowTrigResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- STATES ΓΙΑ ΤΙΣ ΑΝΟΧΕΣ ---
+  // --- STATE ΓΙΑ ΧΩΡΙΣ ΔΙΟΡΘΩΣΗ & ΑΝΟΧΕΣ ---
+  const [noCorrection, setNoCorrection] = useState(false);
   const [tolD, setTolD] = useState("0.050");
   const [tolDH, setTolDH] = useState("0.020");
   const [toleranceReport, setToleranceReport] = useState(null);
@@ -38,7 +39,6 @@ const TraverseTrigLevel = ({
     return isNaN(num) ? val : num.toFixed(decimals);
   };
 
-  // ΕΞΥΠΝΟ FORMATTING: Εφαρμόζει δεκαδικά παντού, ΕΚΤΟΣ από το κελί που κάνουμε edit (όπως στο Adjustment)
   useEffect(() => {
     if (!observations || observations.length === 0) {
       if (localObs.length === 0) {
@@ -53,7 +53,6 @@ const TraverseTrigLevel = ({
     }
 
     let hasChanges = false;
-    // Βρίσκουμε ποιο input έχει το focus αυτή τη στιγμή (αν υπάρχει)
     const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
 
     const formattedObservations = observations.map((obs, index) => {
@@ -88,7 +87,6 @@ const TraverseTrigLevel = ({
       setLocalObs(formattedObservations);
       if (setObservations) setObservations(formattedObservations);
     } else {
-      // Κρατάμε το localObs συγχρονισμένο με τα observations χωρίς να ενοχλούμε την πληκτρολόγηση
       setLocalObs(observations);
     }
   }, [observations, setObservations]);
@@ -102,15 +100,20 @@ const TraverseTrigLevel = ({
   const handleTrigCalc = async () => {
     setIsLoading(true);
     try {
+      const endpoint = noCorrection 
+        ? `${API_BASE_URL}/api/traverse_height_no_correction`
+        : `${API_BASE_URL}/api/traverse_height`;
+
       const payload = {
         observations: localObs, 
         stations: stations,
         project_name: typeof projectSettings === 'string' ? projectSettings : (projectSettings?.name || ''),
         tolD: parseFloat(tolD) || 0.050,
-        tolDH: parseFloat(tolDH) || 0.020
+        tolDH: parseFloat(tolDH) || 0.020,
+        no_correction: noCorrection
       };
 
-      const response = await axios.post(`${API_BASE_URL}/api/traverse_height`, payload);
+      const response = await axios.post(endpoint, payload);
 
       if (response.data && response.data.status === "success") {
         if (response.data.stations && setStations) {
@@ -147,7 +150,6 @@ const TraverseTrigLevel = ({
     else if (field === 'z') handleObsInputChange(id, field, to4(value));
   };
 
-  // Έξυπνη πλοήγηση με τα βελάκια χωρίς μαρκάρισμα/επιλογή του κειμένου
   const handleKeyDown = (e, index, colName) => {
     const columns = ['from', 'to', 's', 'z', 'hi', 'ht'];
     const colIndex = columns.indexOf(colName);
@@ -197,21 +199,41 @@ const TraverseTrigLevel = ({
 
   const removeObsRow = (id) => updateObsData(localObs.filter(o => o.id !== id));
 
+  const getColSpan = () => {
+    if (!showTrigResults) return 8;
+    return noCorrection ? 6 : 7;
+  };
+
   return (
     <div className="flex flex-col gap-4">
       
       {/* === ΕΝΙΑΙΟ ΠΛΑΙΣΙΟ (HEADER & ΠΙΝΑΚΑΣ ΜΑΖΙ) === */}
       <div className="bg-[#0b1120] border border-slate-800/50 rounded-2xl shadow-2xl flex flex-col relative overflow-hidden">
         
-        {/* HEADER: ΤΙΤΛΟΣ & ΡΥΘΜΙΣΕΙΣ ΑΝΟΧΩΝ */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800/50 bg-[#0b1120] z-40 relative">
-          <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0">
+        {/* HEADER: ΤΙΤΛΟΣ, CHECKBOX & ΡΥΘΜΙΣΕΙΣ ΑΝΟΧΩΝ */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-800/50 bg-[#0b1120] z-40 relative flex-wrap gap-3">
+          <h3 className="text-[11px] font-bold text-slate-400 tracking-[0.15em] flex items-center gap-2 ml-1 shrink-0 uppercase">
             <Target size={14} className="text-blue-400" />
             1. Πίνακας Παρατηρήσεων
           </h3>
           
           <div className="flex items-center gap-4 border-l border-slate-800/60 pl-4">
-            <div className="flex items-center gap-2">
+            
+            {/* ΕΠΙΛΟΓΗ 2: GLASSMORPHIC PILL BUTTON */}
+            <button
+              type="button"
+              onClick={() => setNoCorrection(!noCorrection)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer select-none ${
+                noCorrection 
+                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)]' 
+                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full transition-colors ${noCorrection ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+              <span>Χωρίς διόρθωση</span>
+            </button>
+
+            <div className="flex items-center gap-2 border-l border-slate-800/60 pl-4">
               <Settings2 size={14} className="text-slate-500" />
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Ορια Ανοχης:</span>
             </div>
@@ -246,7 +268,6 @@ const TraverseTrigLevel = ({
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">From</th>
                 <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center w-20">To</th>
                 
-                {/* ΕΜΦΑΝΙΣΗ ΑΡΧΙΚΩΝ ΔΕΔΟΜΕΝΩΝ ΜΟΝΟ ΑΝ ΔΕΝ ΦΑΙΝΟΝΤΑΙ ΤΑ ΑΠΟΤΕΛΕΣΜΑΤΑ */}
                 {!showTrigResults && (
                   <>
                     <th className="p-4 text-[10px] font-black text-slate-500 tracking-widest text-center">D [m]</th>
@@ -256,12 +277,15 @@ const TraverseTrigLevel = ({
                   </>
                 )}
                 
-                {/* ΕΜΦΑΝΙΣΗ ΑΠΟΤΕΛΕΣΜΑΤΩΝ */}
                 {showTrigResults && (
                   <>
-                    <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔH (αρχικό) [m]</th>
-                    <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθωση [m]</th>
-                    <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">ΔH (τελικό) [m]</th>
+                    <th className="p-4 text-[10px] font-black text-purple-400/80 tracking-widest text-center">ΔΗ (αρχικό) [m]</th>
+                    
+                    {!noCorrection && (
+                      <th className="p-4 text-[10px] font-black text-rose-400/80 tracking-widest text-center">Διόρθωση [m]</th>
+                    )}
+
+                    <th className="p-4 text-[10px] font-black text-amber-400/80 tracking-widest text-center">ΔΗ (τελικό) [m]</th>
                   </>
                 )}
                 
@@ -311,8 +335,12 @@ const TraverseTrigLevel = ({
                       {showTrigResults && (
                         <>
                           <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-purple-400 cursor-default" value={formatVal(obs.dh_mean ?? obs.dh, 3)} disabled placeholder="-" /></td>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-rose-400 cursor-default" value={formatVal(obs.corr, 3)} disabled placeholder="-" /></td>
-                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-amber-400 cursor-default" value={formatVal(obs.dh_final, 3)} disabled placeholder="-" /></td>
+                          
+                          {!noCorrection && (
+                            <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-rose-400 cursor-default" value={formatVal(obs.corr, 3)} disabled placeholder="-" /></td>
+                          )}
+
+                          <td className="p-2"><input className="w-full bg-transparent p-2 text-sm text-center font-mono font-bold outline-none text-amber-400 cursor-default" value={formatVal(obs.dh_final ?? obs.dh_mean ?? obs.dh, 3)} disabled placeholder="-" /></td>
                         </>
                       )}
 
@@ -321,7 +349,7 @@ const TraverseTrigLevel = ({
                       </td>
                     </tr>
                     <tr className="h-0 p-0">
-                      <td colSpan={showTrigResults ? 7 : 8} className="p-0 h-0 relative">
+                      <td colSpan={getColSpan()} className="p-0 h-0 relative">
                         <button onClick={() => addObsRowAt(index)} className="absolute left-1/2 -translate-x-1/2 -top-3 z-30 opacity-0 hover:opacity-100 transition-all bg-slate-800 text-blue-500 rounded-full p-1.5 border border-slate-700 scale-75 hover:scale-100 cursor-pointer shadow-lg"><PlusCircle size={16} /></button>
                       </td>
                     </tr>
@@ -329,7 +357,7 @@ const TraverseTrigLevel = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={showTrigResults ? 7 : 8} className="px-4 py-16 text-center text-slate-500">
+                  <td colSpan={getColSpan()} className="px-4 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-4">
                       <Database size={28} className="opacity-50" />
                       <span className="text-sm">Δεν βρέθηκαν δεδομένα</span>
