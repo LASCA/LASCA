@@ -2306,6 +2306,120 @@ def run_traverse_height():
         print(f"DEBUG ERROR: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+#trigonometriki ypsometria odeusis no correction 
+@app.route('/api/traverse_height_no_correction', methods=['POST'])
+def run_traverse_height_no_correction():
+    try:
+        data = request.json or {}
+        
+        observations = data.get('observations', [])
+        stations = data.get('stations', [])
+        
+        tol_s = float(data.get('tolD', 0.050))
+        tol_dh = float(data.get('tolDH', 0.020))
+
+        if not observations or not stations:
+            return jsonify({"error": "Λείπουν δεδομένα παρατηρήσεων ή στάσεων."}), 400
+
+        measurements_json = []
+
+        for st in stations:
+            measurements_json.append({
+                "id": st.get("id"),
+                "name": st.get("name", ""),
+                "h": st.get("h", "")
+            })
+
+        for obs in observations:
+            from_st = obs.get("From") or obs.get("from") or ""
+            to_st = obs.get("To") or obs.get("to") or ""
+            
+            dist_val = obs.get("s") or obs.get("Slope_D") or obs.get("dist") or 0.0
+            z_val = obs.get("z") or obs.get("Z[grad]") or 0.0
+            hs_val = obs.get("hi") or obs.get("H_station") or 0.0
+            ht_val = obs.get("ht") or obs.get("H_target") or 0.0
+
+            measurements_json.append({
+                "id": obs.get("id"),
+                "From": from_st,
+                "To": to_st,
+                "Dist": float(dist_val) if dist_val else 0.0, 
+                "Z_grad": float(z_val) if z_val else 0.0,
+                "H_station": float(hs_val) if hs_val else 0.0,
+                "H_target": float(ht_val) if ht_val else 0.0
+            })
+
+        # Κλήση της νέας συνάρτησης χωρίς υπολογισμό/κατανομή διορθώσεων
+        updated_json, tolerance_report = dpr.traverse_level_calc_no_correction(
+            measurements_json, 
+            tol_dh=tol_dh, 
+            tol_s=tol_s
+        )
+
+        updated_stations = []
+        updated_observations = []
+        
+        if updated_json:
+            for row in updated_json:
+                if "name" in row and row["name"] != "":
+                    updated_stations.append({
+                        "id": row.get("id"),
+                        "name": row.get("name"),
+                        "h": row.get("h")
+                    })
+                elif "From" in row and row["From"] != "":
+                    updated_observations.append({
+                        "id": row.get("id"),
+                        "from": row.get("From"),
+                        "to": row.get("To"),
+                        "s": row.get("Dist"),
+                        "z": row.get("Z_grad"),
+                        "hi": row.get("H_station"),
+                        "ht": row.get("H_target"),
+                        "dh_mean": row.get("dh_mean"),
+                        "corr": row.get("corr"),
+                        "dh_final": row.get("dh_final")
+                    })
+
+        # Ενημέρωση latest_traverse.json
+        try:
+            project_name = get_active_project_name() if 'get_active_project_name' in globals() else None
+            project_dir = get_request_project_dir(project_name) if 'WORKSPACE_DIR' in globals() else None
+            if project_dir:
+                json_path = project_dir / "latest_traverse.json"
+                if json_path.exists():
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        traverse_data = json.load(f)
+
+                    heights_map = {
+                        str(st["name"]): st["h"] 
+                        for st in updated_stations 
+                        if st.get("name") and st.get("h") not in [None, "", "---"]
+                    }
+
+                    file_updated = False
+                    for station in traverse_data:
+                        st_name = station.get("Station_Name")
+                        if st_name in heights_map:
+                            station["ZS"] = float(heights_map[st_name])
+                            file_updated = True
+
+                    if file_updated:
+                        atomic_write_json(json_path, traverse_data)
+        except Exception as e:
+            print(f"DEBUG WARNING: Σφάλμα αποθήκευσης ZS: {e}")
+
+        return jsonify({
+            "status": "success",
+            "stations": updated_stations,
+            "observations": updated_observations,
+            "toleranceReport": tolerance_report
+        })
+
+    except Exception as e:
+        print(f"DEBUG ERROR: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
 ## ==========================================
 # ENDPOINT ΓΙΑ ΧΩΡΟΣΤΑΘΜΗΣΗ (SPIRIT LEVELING)
 # ==========================================

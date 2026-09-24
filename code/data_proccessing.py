@@ -846,6 +846,192 @@ def traverse_level_calc(measurements_json, tol_dh=0.020, tol_s=0.050):
     # Επιστρέφουμε ΠΛΕΟΝ TUPLE: (τα δεδομένα, το report)
     return measurements_json, tolerance_report
 
+def traverse_level_calc_no_correction(measurements_json, tol_dh=0.020, tol_s=0.050):
+    if not measurements_json:
+        return measurements_json, {"hasErrors": False, "errors": []}
+        
+    df_raw = pd.DataFrame(measurements_json)
+    
+    # 1. Εξαγωγή Σταθμών & Γνωστών Υψομέτρων
+    df_stations = pd.DataFrame({
+        'Stations': df_raw.get('name', pd.Series(dtype=str)),
+        'H_m': df_raw.get('h', pd.Series(dtype=float))
+    })
+    
+    known_heights_initial = {}
+    for _, row in df_stations.dropna(subset=['H_m']).iterrows():
+        st = normalize_node(row['Stations'])
+        if st and row['H_m'] != "" and not pd.isna(row['H_m']):
+            try:
+                val = float(row['H_m'])
+                known_heights_initial[st] = val
+            except (ValueError, TypeError):
+                pass
+
+    # 2. Αναγνώριση Στηλών
+    z_col = next((c for c in df_raw.columns if 'z' in c.lower() or 'grad' in c.lower()), None)
+    dist_col = next((c for c in df_raw.columns if any(x in c.lower() for x in ['slope', 's_', 'dist', 'horiz'])), None)
+    from_col = next((c for c in df_raw.columns if 'from' in c.lower()), 'From')
+    to_col = next((c for c in df_raw.columns if 'to' in c.lower() and c.lower() != 'total'), 'To')
+
+    if not z_col or not dist_col or from_col not in df_raw.columns or to_col not in df_raw.columns:
+        return measurements_json, {"hasErrors": False, "errors": []}
+
+    for col in ['H_station', 'H_target']:
+        if col not in df_raw.columns:
+            df_raw[col] = 0.0
+
+    df_measurements = df_raw[[from_col, to_col, dist_col, z_col, 'H_station', 'H_target']].copy()
+    df_measurements.rename(columns={dist_col: 'Dist', z_col: 'Z_grad', from_col: 'From', to_col: 'To'}, inplace=True)
+    
+    df_measurements['From_norm'] = df_measurements['From'].apply(normalize_node)
+    df_measurements['To_norm'] = df_measurements['To'].apply(normalize_node)
+
+    mask = (df_measurements['From_norm'] != '') & (df_measurements['To_norm'] != '')
+    df_meas_clean = df_measurements[mask].copy()
+
+    if df_meas_clean.empty:
+        return measurements_json, {"hasErrors": False, "errors": []}
+
+    for col in ['Dist', 'Z_grad', 'H_station', 'H_target']:
+        df_meas_clean[col] = pd.to_numeric(df_meas_clean[col], errors='coerce').fillna(0.0)
+
+    # 3. Υπολογισμός dh κάθε γραμμής μέτρησης (Raw / Αρχικό ΔΗ)
+    z_rad = df_meas_clean['Z_grad'] * np.pi / 200.0
+    if bool((np.abs(np.sin(z_rad)) < 1e-7).any()):
+        raise ValueError("Η ζενίθια γωνία είναι πολύ κοντά σε 0g, 200g ή 400g.")
+    df_meas_clean['dh_row'] = (df_meas_clean['Dist'] / np.tan(z_rad)) + df_meas_clean['H_station'] - df_meas_clean['H_target']
+    df_meas_clean['L_horiz'] = df_meas_clean['Dist']
+
+    # 4. Ενοποίηση Μετάβασης / Επιστροφής (Forward / Backward) ανά πλευρά
+    pair_dict = {}
+    for idx, row in df_meas_clean.iterrows():
+        start, end = row['From_norm'], row['To_norm']
+        dh, l_horiz = row['dh_row'], row['L_horiz']
+        
+        pair = (start, end)
+        rev_pair = (end, start)
+        
+        if pair in pair_dict:
+            pair_dict[pair]['dh_fw'].append(dh)
+            pair_dict[pair]['L_fw'].append(l_horiz)
+        elif rev_pair in pair_dict:
+            pair_dict[rev_pair]['dh_bw'].append(dh)
+            pair_dict[rev_pair]['L_bw'].append(l_horiz)
+        else:
+            pair_dict[pair] = {'dh_fw': [dh], 'L_fw': [l_horiz], 'dh_bw': [], 'L_bw': []}
+
+    segments = []
+    tolerance_errors = []
+
+    for (start, end), data in pair_dict.items():
+        dh_fw = np.mean(data['dh_fw']) if data['dh_fw'] else None
+        dh_bw = np.mean(data['dh_bw']) if data['dh_bw'] else None
+        
+        l_fw = np.mean(data['L_fw']) if data['L_fw'] else 0.0
+        l_bw = np.mean(data['L_bw']) if data['L_bw'] else 0.0
+
+        if dh_fw is not None and dh_bw is not None:
+            # --- ΕΛΕΓΧΟΣ ΑΝΟΧΩΝ ---
+            diff_dh = abs(dh_fw + dh_bw) 
+            diff_l = abs(l_fw - l_bw)
+            
+            edge_name = f"{start} - {end}"
+            
+            if diff_dh > tol_dh:
+                tolerance_errors.append({
+                    "edge": edge_name,
+                    "type": "ΔH",
+                    "diff": f"{diff_dh:.4f}",
+                    "limit": f"{tol_dh:.3f}"
+                })
+            
+            if diff_l > tol_s:
+                tolerance_errors.append({
+                    "edge": edge_name,
+                    "type": "D",
+                    "diff": f"{diff_l:.4f}",
+                    "limit": f"{tol_s:.3f}"
+                })
+
+            dh_mo = (dh_fw - dh_bw) / 2.0
+            l_mean = (l_fw + l_bw) / 2.0
+        else:
+            dh_mo = dh_fw if dh_fw is not None else -dh_bw
+            l_mean = l_fw if l_fw > 0 else l_bw
+
+        segments.append({'From': start, 'To': end, 'dh_mean': dh_mo, 'L_mean': l_mean})
+
+    # 5. Κατασκευή Γράφου
+    graph = {}
+    final_segment_dh = {}
+
+    for seg in segments:
+        u, v = seg['From'], seg['To']
+        dh_m = seg['dh_mean']
+        
+        if u not in graph: graph[u] = []
+        if v not in graph: graph[v] = []
+        graph[u].append({'to': v, 'dh': dh_m, 'L': seg['L_mean']})
+        graph[v].append({'to': u, 'dh': -dh_m, 'L': seg['L_mean']})
+
+        final_segment_dh[(u, v)] = dh_m
+        final_segment_dh[(v, u)] = -dh_m
+
+    # 6. Διάδοση Υψομέτρων σε Όλους τους Σταθμούς
+    known_heights = known_heights_initial.copy()
+    queue = list(known_heights.keys())
+    visited = set(known_heights.keys())
+
+    while queue:
+        current_node = queue.pop(0)
+        current_h = known_heights[current_node]
+
+        if current_node in graph:
+            for edge in graph[current_node]:
+                neighbor = edge['to']
+                if neighbor not in visited:
+                    dh_step = final_segment_dh.get((current_node, neighbor), edge['dh'])
+                    new_h = current_h + dh_step
+                    
+                    if neighbor not in known_heights_initial:
+                        known_heights[neighbor] = round(new_h, 3)
+
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+
+    # 7. Ενημέρωση Αρχικού JSON
+    for idx, row in enumerate(measurements_json):
+        st_name = normalize_node(row.get('name', ''))
+        if st_name and st_name in known_heights:
+            row['h'] = known_heights[st_name]
+
+        frm = normalize_node(row.get(from_col, ''))
+        to = normalize_node(row.get(to_col, ''))
+        
+        if frm and to:
+            # Λαμβάνουμε την ΑΡΧΙΚΗ μεμονωμένη υψομετρική διαφορά της γραμμής
+            dh_row = df_meas_clean.loc[idx, 'dh_row'] if idx in df_meas_clean.index else 0.0
+            
+            if (frm, to) in final_segment_dh:
+                target_dh = final_segment_dh[(frm, to)]
+                
+                row['dh_mean'] = round(dh_row, 4)      # Αρχικό ΔΗ της συγκεκριμένης μέτρησης
+                row['corr'] = 0.0                      # Χωρίς συνόρθωση
+                row['dh_final'] = round(target_dh, 4)  # Μέσος όρος μετάβασης-επιστροφής
+            else:
+                row['dh_mean'] = round(dh_row, 4)
+                row['corr'] = 0.0
+                row['dh_final'] = round(dh_row, 4)
+
+    # 8. Δημιουργία Report Ανοχών
+    tolerance_report = {
+        "hasErrors": len(tolerance_errors) > 0,
+        "errors": tolerance_errors
+    }
+
+    return measurements_json, tolerance_report
+
 # OPTIONAL: CSV LOADER
 def load_traverse_from_csv(filepath: str) -> List[TraversePoint]:
     """
