@@ -32,22 +32,22 @@ User, Project, ProjectMember = lasca.User, lasca.Project, lasca.ProjectMember
 WORKSPACE_DIR = lasca.WORKSPACE_DIR
 AVATAR_DIR = lasca.USER_AVATAR_DIR
 
-SEED_PASSWORD = 'test1234'
+SEED_PASSWORD = 'lasca123'
 
 # Το .test είναι δεσμευμένο domain: κανένα από αυτά τα email δεν είναι πραγματικό.
 SEED_USERS = [
-    {'email': 'maria@lasca.test', 'name': 'Μαρία (test)'},
-    {'email': 'nikos@lasca.test', 'name': 'Νίκος (test)'},
-    {'email': 'eleni@lasca.test', 'name': 'Ελένη (test)'},
+    {'email': 'savvas@lasca.test', 'name': 'SAVVAS (test)'},
+    {'email': 'ilias@lasca.test', 'name': 'Liakos (test)'},
+    {'email': 'alex@lasca.test', 'name': 'Tragos (test)'},
 ]
 
 # owner = email δημιουργού, shared_with = emails που έχουν πρόσβαση
 SEED_PROJECTS = [
-    {'name': 'Άσκηση 1 - Όδευση', 'owner': 'maria@lasca.test', 'shared_with': ['nikos@lasca.test'],
+    {'name': 'Άσκηση 1 - Όδευση', 'owner': 'savvas@lasca.test', 'shared_with': ['alex@lasca.test'],
      'settings': {'designer': 'Μαρία', 'employer': 'ΑΠΘ', 'location': 'Πανεπιστημιούπολη'}},
-    {'name': 'Αποτύπωση Κτιρίου', 'owner': 'maria@lasca.test', 'shared_with': [],
+    {'name': 'Αποτύπωση Κτιρίου', 'owner': 'ilias@lasca.test', 'shared_with': [],
      'settings': {'designer': 'Μαρία', 'employer': 'ΑΠΘ', 'location': 'Θεσσαλονίκη'}},
-    {'name': 'Χωροστάθμηση Campus', 'owner': 'nikos@lasca.test', 'shared_with': ['maria@lasca.test', 'eleni@lasca.test'],
+    {'name': 'Χωροστάθμηση Campus', 'owner': 'alex@lasca.test', 'shared_with': ['savvas@lasca.test', 'ilias@lasca.test'],
      'settings': {'designer': 'Νίκος', 'employer': 'ΑΠΘ', 'location': 'Πανεπιστημιούπολη'}},
 ]
 
@@ -147,3 +147,9 @@ if __name__ == '__main__':
     if command in {'reset', 'fresh'}:
         print('\nΚαθάρισε και τον browser (F12 → Application → Clear site data) ή κάνε Αποσύνδεση, '
               'αλλιώς μπορεί να βρεθείς συνδεδεμένος ως άλλος χρήστης.')
+
+
+# python code\dev_tools.py fresh	Σβήνει τα πάντα και φορτώνει τα δεδομένα δοκιμής. Αυτό θα χρησιμοποιείς συνήθως
+# python code\dev_tools.py reset	Μόνο σβήσιμο: χρήστες, projects, εικόνες προφίλ
+# python code\dev_tools.py seed     Μόνο φόρτωση δεδομένων δοκιμής (δεν σβήνει ό,τι υπάρχει)
+# python code\dev_tools.py list	    Δείχνει ποιοι χρήστες και projects υπάρχουν
