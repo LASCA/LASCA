@@ -740,7 +740,15 @@ def get_active_project_name():
     return None
 
 # Ορίζουμε τον κεντρικό φάκελο όπου θα αποθηκεύονται όλα τα projects στον home φάκελο
-WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
+# LASCA_PROJECTS_DIR στο .env: ξεχωριστός φάκελος για τα projects της web έκδοσης
+# (τοπικά π.χ. ./local_data/projects, στον server π.χ. /srv/lasca/projects).
+# Αν λείπει, κρατάμε τον παλιό φάκελο της desktop εφαρμογής (~/LASCA).
+_projects_dir_env = os.getenv('LASCA_PROJECTS_DIR', '').strip()
+if _projects_dir_env:
+    WORKSPACE_DIR = Path(_projects_dir_env).expanduser().resolve()
+    WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
 
 
 def get_request_project_dir(project_name):
