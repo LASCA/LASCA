@@ -35,7 +35,11 @@ except ImportError:
 from datetime import datetime
 from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
 from flask import Flask, Response, request, jsonify, send_file, send_from_directory
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_sqlalchemy import SQLAlchemy
+from flask import render_template_string
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
@@ -213,7 +217,24 @@ if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'lasca-web-secret-key')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('FEEDBACK_MAX_SIZE_MB', '5')) * 1024 * 1024
+
+sqlite_db_value = os.getenv('LASCA_SQLITE_DB') or str((BASE_DIR / 'lasca_data' / 'lasca.db').resolve())
+if sqlite_db_value.startswith('sqlite'):
+    db_uri = sqlite_db_value
+    db_path = None
+else:
+    db_path = Path(sqlite_db_value).expanduser().resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_uri = f'sqlite:///{db_path.as_posix()}'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = None
 
 logger = logging.getLogger(__name__)
 logger.handlers.clear()
@@ -266,6 +287,94 @@ logger.info('Feedback log file: %s', FEEDBACK_LOG_FILE)
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 if resend is not None:
     resend.api_key = os.environ.get('RESEND_API_KEY')
+
+LASCA_DATA = Path(os.getenv('LASCA_DATA', str(Path.home() / 'LASCA_DATA'))).expanduser().resolve()
+LASCA_DATA.mkdir(parents=True, exist_ok=True)
+USER_AVATAR_DIR = LASCA_DATA / 'avatars'
+USER_AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    display_name = db.Column(db.String(150), nullable=False, default='')
+    avatar_path = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    @property
+    def avatar_url(self):
+        if not self.avatar_path or not Path(self.avatar_path).exists():
+            return None
+        return f'/api/users/{self.id}/avatar?ts={uuid.uuid4().hex}'
+
+    def to_public_dict(self):
+        display_name = (self.display_name or '').strip() or self.email.split('@', 1)[0]
+        return {
+            'id': self.id,
+            'email': self.email,
+            'display_name': display_name,
+            'avatar_url': self.avatar_url,
+        }
+
+
+class Project(db.Model):
+    __tablename__ = 'projects'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owner = db.relationship('User', backref=db.backref('owned_projects', lazy=True))
+
+
+class ProjectMember(db.Model):
+    __tablename__ = 'project_members'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    role = db.Column(db.String(50), nullable=False, default='editor')
+    project = db.relationship('Project', backref=db.backref('members', lazy=True))
+    user = db.relationship('User', backref=db.backref('project_memberships', lazy=True))
+
+    __table_args__ = (db.UniqueConstraint('project_id', 'user_id', name='uq_project_user_member'),)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
+with app.app_context():
+    db.create_all()
+
+
+def normalize_email(value):
+    return (value or '').strip().lower()
+
+
+def user_has_project_access(user, project):
+    if user is None or project is None:
+        return False
+    if project.owner_id == user.id:
+        return True
+    return bool(ProjectMember.query.filter_by(project_id=project.id, user_id=user.id).first())
+
+
+def project_record_by_name(project_name):
+    if not project_name:
+        return None
+    return Project.query.filter(db.func.lower(Project.name) == str(project_name).strip().lower()).first()
+
+
+def project_access_error(project_name):
+    return jsonify({"error": f"Δεν έχετε πρόσβαση στο project '{project_name}'"}), 403
 
 
 def find_free_port():
@@ -388,6 +497,101 @@ class UniversalNumberedCanvas(canvas.Canvas):
         
         self.restoreState()
 
+@app.route('/profile')
+@login_required
+def profile_page():
+    return render_template_string('''
+        <!doctype html>
+        <html lang="el">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>LASCA | Προφίλ</title>
+            <style>
+                body { font-family: system-ui, sans-serif; background: #020817; color: #e2e8f0; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+                .card { width: min(520px, 90vw); background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 24px; padding: 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+                h1 { margin: 0 0 16px; font-size: 28px; }
+                form { display: grid; gap: 18px; }
+                label { display: grid; gap: 8px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
+                input { background: #020817; border: 1px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+                input[type="file"] { padding: 10px; }
+                button { background: linear-gradient(135deg, #0f172a, #1e293b); color: #f8fafc; border: 1px solid rgba(148,163,184,0.35); border-radius: 12px; padding: 12px 16px; font-weight: 700; cursor: pointer; }
+                .meta { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+                .banner { border: 1px solid rgba(59,130,246,0.35); background: rgba(30,41,59,0.8); border-radius: 12px; padding: 12px; margin-bottom: 18px; color: #cbd5e1; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="banner">Σύνδεδεμένος ως: {{ current_user.email }}</div>
+                <h1>Προφίλ χρήστη</h1>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <label>
+                        Όνομα εμφάνισης
+                        <input id="display_name" name="display_name" value="{{ current_user.display_name or current_user.email.split('@',1)[0] }}" />
+                    </label>
+                    <label>
+                        Εικόνα προφίλ
+                        <input id="avatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
+                    </label>
+                    <button type="submit">Αποθήκευση</button>
+                </form>
+                <div class="meta">Μέγιστο μέγεθος: 2MB · Επιτρεπτά: png, jpg, webp</div>
+            </div>
+            <script>
+                const form = document.getElementById('profileForm');
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const payload = new FormData();
+                    payload.append('display_name', document.getElementById('display_name').value.trim());
+                    const file = document.getElementById('avatar').files[0];
+                    if (file) payload.append('avatar', file);
+                    const res = await fetch('/api/me', {
+                        method: 'PUT',
+                        body: payload,
+                        credentials: 'same-origin'
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        alert(data.error || 'Αποτυχία αποθήκευσης');
+                        return;
+                    }
+                    alert('Το προφίλ ενημερώθηκε επιτυχώς');
+                    location.reload();
+                });
+            </script>
+        </body>
+        </html>
+    ''')
+
+
+@app.route('/api/me', methods=['PUT'])
+@login_required
+def update_current_user():
+    display_name = (request.form.get('display_name') or '').strip()
+    avatar = request.files.get('avatar')
+
+    if display_name:
+        current_user.display_name = display_name[:150]
+    if avatar and avatar.filename:
+        extension = Path(secure_filename(avatar.filename)).suffix.lower()
+        if extension not in {'.png', '.jpg', '.jpeg', '.webp'}:
+            return jsonify({"error": "Μη έγκυρη μορφή εικόνας"}), 400
+        if avatar.content_length and avatar.content_length > 2 * 1024 * 1024:
+            return jsonify({"error": "Η εικόνα πρέπει να είναι μικρότερη από 2MB"}), 400
+        file_name = f"{uuid.uuid4().hex}{extension}"
+        target = USER_AVATAR_DIR / file_name
+        avatar.save(target)
+        if current_user.avatar_path and Path(current_user.avatar_path).exists():
+            try:
+                Path(current_user.avatar_path).unlink()
+            except OSError:
+                pass
+        current_user.avatar_path = str(target)
+
+    db.session.commit()
+    return jsonify(current_user.to_public_dict())
+
+
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -479,6 +683,7 @@ def _send_feedback_email(
             'to': [receiver_email],
             'subject': subject,
             'html': html_body,
+            'reply_to': current_user.email if current_user.is_authenticated else (feedback.get('email') or 'Anonymous'),
         }
         if screenshot_content is not None:
             email_data['attachments'] = [{
@@ -493,20 +698,18 @@ def _send_feedback_email(
 
 
 @app.route('/api/feedback', methods=['POST'])
+@login_required
 def submit_feedback():
     try:
         data = request.get_json(silent=True) or {}
         is_json_request = bool(data)
         feedback_type = str(data.get('type', 'general') if is_json_request else request.form.get('type', 'general')).strip().lower() or 'general'
-        email = str(data.get('user_email', '') if is_json_request else request.form.get('email', '')).strip()
         message = str(data.get('details', '') if is_json_request else request.form.get('message', '')).strip()
 
         if feedback_type not in FEEDBACK_TYPES:
             return _feedback_error('Invalid feedback type', 400)
         if not message:
             return _feedback_error('Message is required', 400)
-        if email and not EMAIL_RE.fullmatch(email):
-            return _feedback_error('Invalid email address', 400)
 
         screenshot_content = None
         screenshot_filename = 'screenshot'
@@ -533,9 +736,10 @@ def submit_feedback():
                 screenshot_content = screenshot_file.read()
             screenshot_filename = destination.name
 
+        user_email = current_user.email
         feedback = {
             'type': feedback_type,
-            'email': email,
+            'email': user_email,
             'message': message,
             'screenshot_path': screenshot_path,
             'created_at': datetime.utcnow().isoformat() + 'Z',
@@ -589,7 +793,16 @@ def get_request_project_dir(project_name):
     """Resolve an optional request project without allowing workspace escape."""
     if not project_name:
         return None
-    return resolve_project_dir(WORKSPACE_DIR, str(project_name))
+    project_name = str(project_name).strip()
+    if current_user.is_authenticated:
+        project = project_record_by_name(project_name)
+        if project is not None and not user_has_project_access(current_user, project):
+            raise PermissionError(f"Δεν έχετε πρόσβαση στο project '{project_name}'")
+        if project is None:
+            project_path = (WORKSPACE_DIR / project_name).resolve()
+            if project_path.exists() and project_path.is_dir():
+                raise PermissionError(f"Δεν έχετε πρόσβαση στο project '{project_name}'")
+    return resolve_project_dir(WORKSPACE_DIR, project_name)
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -600,22 +813,207 @@ def normalize_400(angle):
     while angle >= 400.0: angle -= 400.0
     return angle
 
+@app.route('/api/register', methods=['POST'])
+def register_user():
+    data = request.get_json(silent=True) or {}
+    email = normalize_email(data.get('email'))
+    password = str(data.get('password') or '')
+    display_name = str(data.get('display_name') or '').strip()
+
+    if not email or not EMAIL_RE.fullmatch(email):
+        return jsonify({"error": "Το email δεν είναι έγκυρο"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
+    if User.query.filter(db.func.lower(User.email) == email).first():
+        return jsonify({"error": "Υπάρχει ήδη χρήστης με αυτό το email"}), 409
+
+    user = User(email=email, display_name=display_name or email.split('@', 1)[0])
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    login_user(user)
+    return jsonify({"status": "success", "user": user.to_public_dict()}), 201
+
+
+@app.route('/api/login', methods=['POST'])
+def login_user_route():
+    data = request.get_json(silent=True) or {}
+    email = normalize_email(data.get('email'))
+    password = str(data.get('password') or '')
+
+    if not email or not password:
+        return jsonify({"error": "Το email και ο κωδικός είναι υποχρεωτικά"}), 400
+
+    user = User.query.filter(db.func.lower(User.email) == email).first()
+    if user is None or not user.check_password(password):
+        return jsonify({"error": "Λανθασμένο email ή κωδικός"}), 401
+
+    login_user(user)
+    return jsonify({"status": "success", "user": user.to_public_dict()})
+
+
+@app.route('/api/logout', methods=['POST'])
+@login_required
+def logout_user_route():
+    logout_user()
+    return jsonify({"status": "success", "message": "Αποσυνδεθήκατε επιτυχώς"})
+
+
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Δεν είστε συνδεδεμένος"}), 401
+    return jsonify(current_user.to_public_dict())
+
+
+@app.route('/api/users/<int:user_id>/avatar')
+@login_required
+def get_user_avatar(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
+    if user.id != current_user.id and not user_has_project_access(current_user, Project.query.filter_by(owner_id=user.id).first()):
+        return jsonify({"error": "Δεν έχετε πρόσβαση"}), 403
+    if not user.avatar_path:
+        return jsonify({"error": "Δεν υπάρχει avatar"}), 404
+
+    avatar_file = Path(user.avatar_path)
+    if not avatar_file.exists() or not avatar_file.is_file():
+        return jsonify({"error": "Το avatar δεν βρέθηκε"}), 404
+    return send_file(avatar_file, mimetype='image/jpeg')
+
+
 @app.route('/api/projects/list', methods=['GET'])
+@login_required
 def list_projects():
     try:
         if not WORKSPACE_DIR.exists():
             WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
             return jsonify([])
-        projects = [d.name for d in WORKSPACE_DIR.iterdir() if d.is_dir()]
+
+        owned = [project.name for project in Project.query.filter_by(owner_id=current_user.id).all()]
+        shared = [
+            project.name for project in Project.query.join(ProjectMember).filter(ProjectMember.user_id == current_user.id, Project.id == ProjectMember.project_id).all()
+        ]
+        projects = sorted(set(owned + shared))
         return jsonify(projects)
     except Exception as e:
         print(f"ERROR: Σφάλμα κατά τη λίστα των projects: {str(e)}")
         return jsonify({"error": "Αποτυχία ανάγνωσης φακέλων εργασίας"}), 500
 
-@app.route('/api/projects/<project_name>', methods=['DELETE'])
-def delete_project(project_name):
-    project_dir = (WORKSPACE_DIR / project_name).resolve()
+@app.route('/api/projects/members', methods=['GET'])
+@login_required
+def get_project_members():
+    project_name = request.args.get('project_name') or get_active_project_name()
+    if not project_name:
+        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
 
+    project = project_record_by_name(project_name)
+    if project is None:
+        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
+    if not user_has_project_access(current_user, project):
+        return project_access_error(project_name)
+
+    members = []
+    owner = project.owner
+    if owner:
+        members.append({
+            'id': owner.id,
+            'email': owner.email,
+            'display_name': owner.display_name or owner.email.split('@', 1)[0],
+            'avatar_url': owner.avatar_url,
+            'role': 'owner',
+            'is_owner': True,
+        })
+    for member in ProjectMember.query.filter_by(project_id=project.id).all():
+        user = member.user
+        if not user or user.id == owner.id:
+            continue
+        members.append({
+            'id': user.id,
+            'email': user.email,
+            'display_name': user.display_name or user.email.split('@', 1)[0],
+            'avatar_url': user.avatar_url,
+            'role': member.role,
+            'is_owner': False,
+        })
+    return jsonify({"project_name": project.name, "members": members})
+
+
+@app.route('/api/projects/share', methods=['POST'])
+@login_required
+def share_project():
+    data = request.get_json(silent=True) or {}
+    project_name = str(data.get('project_name') or get_active_project_name() or '').strip()
+    email = normalize_email(data.get('email'))
+
+    if not project_name:
+        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
+    if not email:
+        return jsonify({"error": "Το email είναι υποχρεωτικό"}), 400
+
+    project = project_record_by_name(project_name)
+    if project is None:
+        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
+    if project.owner_id != current_user.id:
+        return jsonify({"error": "Μόνο ο owner του project μπορεί να το κοινοποιήσει"}), 403
+
+    target_user = User.query.filter(db.func.lower(User.email) == email).first()
+    if target_user is None:
+        return jsonify({"error": "Δεν υπάρχει χρήστης με αυτό το email"}), 404
+    if target_user.id == current_user.id:
+        return jsonify({"error": "Δεν μπορείτε να κοινοποιήσετε το project στον εαυτό σας"}), 400
+    if ProjectMember.query.filter_by(project_id=project.id, user_id=target_user.id).first():
+        return jsonify({"error": "Ο χρήστης έχει ήδη πρόσβαση στο project"}), 409
+
+    db.session.add(ProjectMember(project_id=project.id, user_id=target_user.id, role='editor'))
+    db.session.commit()
+    return jsonify({"status": "success", "message": f"Το project κοινοποιήθηκε στον {target_user.email}"})
+
+
+@app.route('/api/projects/members', methods=['DELETE'])
+@login_required
+def remove_project_member():
+    data = request.get_json(silent=True) or {}
+    project_name = str(data.get('project_name') or get_active_project_name() or '').strip()
+    email = normalize_email(data.get('email'))
+
+    if not project_name:
+        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
+    if not email:
+        return jsonify({"error": "Το email είναι υποχρεωτικό"}), 400
+
+    project = project_record_by_name(project_name)
+    if project is None:
+        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
+    if project.owner_id != current_user.id:
+        return jsonify({"error": "Μόνο ο owner του project μπορεί να αφαιρέσει μέλη"}), 403
+
+    target_user = User.query.filter(db.func.lower(User.email) == email).first()
+    if target_user is None:
+        return jsonify({"error": "Δεν υπάρχει χρήστης με αυτό το email"}), 404
+    if target_user.id == project.owner_id:
+        return jsonify({"error": "Ο owner δεν μπορεί να αφαιρεθεί από το project"}), 400
+
+    membership = ProjectMember.query.filter_by(project_id=project.id, user_id=target_user.id).first()
+    if membership is None:
+        return jsonify({"error": "Ο χρήστης δεν έχει πρόσβαση στο project"}), 404
+
+    db.session.delete(membership)
+    db.session.commit()
+    return jsonify({"status": "success", "message": f"Ο χρήστης {target_user.email} αφαιρέθηκε από το project"})
+
+
+@app.route('/api/projects/<project_name>', methods=['DELETE'])
+@login_required
+def delete_project(project_name):
+    project = project_record_by_name(project_name)
+    if project is None:
+        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
+    if project.owner_id != current_user.id:
+        return jsonify({"error": "Μόνο ο owner μπορεί να διαγράψει το project"}), 403
+
+    project_dir = (WORKSPACE_DIR / project.name).resolve()
     try:
         project_dir.relative_to(WORKSPACE_DIR.resolve())
     except ValueError:
@@ -626,43 +1024,70 @@ def delete_project(project_name):
 
     try:
         shutil.rmtree(project_dir)
+        db.session.delete(project)
+        ProjectMember.query.filter_by(project_id=project.id).delete()
+        db.session.commit()
         return jsonify({"status": "success", "message": f"Το project '{project_name}' διαγράφηκε."})
     except OSError as e:
         print(f"ERROR: Σφάλμα διαγραφής project: {str(e)}")
         return jsonify({"error": "Αποτυχία διαγραφής project"}), 500
 
+
 @app.route('/api/projects/load', methods=['POST'])
+@login_required
 def load_project():
     try:
-        req = request.json
-        project_name = req.get("project_name")
+        req = request.get_json(silent=True) or {}
+        project_name = str(req.get("project_name") or '').strip()
         settings = req.get("settings", {})
 
         if not project_name:
             return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
 
-        project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
-        project_state = project.setup_project_structure(initial_settings=settings)
-        
+        project = project_record_by_name(project_name)
+        if project is None:
+            project = Project(name=project_name, owner_id=current_user.id)
+            db.session.add(project)
+            db.session.commit()
+        elif not user_has_project_access(current_user, project):
+            return project_access_error(project_name)
+
+        project_dir = resolve_project_dir(WORKSPACE_DIR, project_name)
+        project_dir.mkdir(parents=True, exist_ok=True)
+        topo_project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
+        project_state = topo_project.setup_project_structure(initial_settings=settings)
+
         return jsonify(project_state)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
     except Exception as e:
         print(f"ERROR: Σφάλμα κατά τη φόρτωση του project: {str(e)}")
         return jsonify({"error": "Αποτυχία αρχικοποίησης/φόρτωσης project"}), 500
 
+
 @app.route('/api/projects/save', methods=['POST'])
+@login_required
 def save_project():
     try:
-        req = request.json
-        project_name = req.get("project_name")
+        req = request.get_json(silent=True) or {}
+        project_name = str(req.get("project_name") or '').strip()
         current_state = req.get("state")
 
         if not project_name or not current_state:
             return jsonify({"error": "Λείπουν απαραίτητα δεδομένα"}), 400
 
-        project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
-        project.save_state(current_state)
-        
+        project = project_record_by_name(project_name)
+        if project is None:
+            return jsonify({"error": "Το project δεν βρέθηκε ή δεν είναι διαθέσιμο"}), 404
+        if not user_has_project_access(current_user, project):
+            return project_access_error(project_name)
+
+        topo_project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
+        topo_project.save_state(current_state)
+
         return jsonify({"status": "success", "message": f"Το project '{project_name}' αποθηκεύτηκε!"})
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
     except Exception as e:
         print(f"ERROR: Σφάλμα κατά την αποθήκευση του project: {str(e)}")
         return jsonify({"error": "Αποτυχία αποθήκευσης δεδομένων"}), 500

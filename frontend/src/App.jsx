@@ -17,6 +17,8 @@ import BasicCalculations from './components/calculations/general/Basic_Calc';
 import TrigonometricHeight from './components/calculations/Levelings/trig_leveling';
 import LascaLoader from './components/animations/LascaLoader';
 import LascaIntro from './components/animations/LascaIntro';
+import UserMenu from './components/layout/UserMenu';
+import ShareProjectModal from './components/ShareProjectModal';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -31,7 +33,9 @@ function App() {
     return localStorage.getItem('current_active_project') || null;
   });
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isShareProjectOpen, setIsShareProjectOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
 
   // --- LOADER STATE (ΜΟΝΟ ΓΙΑ ΑΛΛΑΓΗ/ΔΗΜΙΟΥΡΓΙΑ PROJECT) ---
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
@@ -125,6 +129,13 @@ function App() {
     setLevelingMetrics({});
     setTrigHeightData([]);
   };
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/me`, { credentials: 'same-origin' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setCurrentUser(data || null))
+      .catch(() => setCurrentUser(null));
+  }, []);
 
   // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ) ---
   useEffect(() => {
@@ -369,6 +380,11 @@ function App() {
         onProjectLoaded={handleProjectLoaded}
         currentProject={currentProject}
       />
+      <ShareProjectModal
+        isOpen={isShareProjectOpen}
+        onClose={() => setIsShareProjectOpen(false)}
+        projectName={currentProject}
+      />
 
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
@@ -387,6 +403,7 @@ function App() {
             <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
             {currentProject ? "Αλλαγή Project" : "Επιλογή Project"}
           </button>
+          <UserMenu user={currentUser} currentProject={currentProject} onOpenShareProject={() => setIsShareProjectOpen(true)} />
         </div>
 
         {activeTab !== 'dashboard' && <Header activeTab={activeTab} />}

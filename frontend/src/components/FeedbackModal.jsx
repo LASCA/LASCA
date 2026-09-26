@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { 
   X, 
@@ -17,7 +17,6 @@ import {
 const FeedbackModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     type: 'bug', // bug | feature | general
-    email: '',
     message: '',
     file: null
   });
@@ -25,11 +24,20 @@ const FeedbackModal = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch(`${API_BASE_URL}/api/me`, { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setUserEmail(data?.email || ''))
+      .catch(() => setUserEmail(''));
+  }, [isOpen]);
 
   const handleClose = () => {
     onClose();
     setTimeout(() => {
-      setFormData({ type: 'bug', email: '', message: '', file: null });
+      setFormData({ type: 'bug', message: '', file: null });
       setIsSuccess(false);
       setSubmitError('');
     }, 300);
@@ -58,7 +66,6 @@ const FeedbackModal = ({ isOpen, onClose }) => {
 
     const payload = new FormData();
     payload.append('type', formData.type);
-    payload.append('email', formData.email);
     payload.append('message', formData.message);
     if (formData.file) {
       payload.append('screenshot', formData.file);
@@ -170,19 +177,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            {/* Email */}
-            <div className="flex flex-col gap-2">
-              <label htmlFor="email" className="text-[11px] font-bold text-slate-400 tracking-wider">
-                Email Επικοινωνιας
-              </label>
-              <input 
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
-                placeholder="Για να σας απαντήσουμε..."
-              />
+            <div className="flex items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-[11px] text-indigo-200">
+              <span className="font-semibold">Η απάντηση θα σταλεί στο</span>
+              <span className="font-bold text-indigo-100">{userEmail || 'συνδεδεμένος χρήστης'}</span>
             </div>
 
             {/* Μήνυμα */}
