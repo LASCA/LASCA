@@ -465,7 +465,7 @@ const Tachymetry = ({
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] gap-6 overflow-hidden">
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
       `}</style>
@@ -489,7 +489,6 @@ const Tachymetry = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Αυξημένα πλάτη containers για να μη κόβεται το κείμενο */}
                 <div className="w-[150px]">
                   <CustomDropdown 
                     value={activeStation} 
@@ -514,11 +513,11 @@ const Tachymetry = ({
             </div>
 
             {/* 2η Γραμμή: Τριπλός Διακόπτης m_ij & Κουμπιά Ενεργειών */}
-            <div className="flex items-center justify-between border-t border-slate-800/60 pt-2.5 gap-3 flex-wrap">
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-2.5 gap-2 flex-nowrap">
               
               {/* WIDGET ΣΥΝΤΕΛΕΣΤΗ m_ij */}
-              <div className="flex items-center gap-2.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1 rounded-xl group">
-                <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap group-hover:text-amber-500/80 transition-colors">
+              <div className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 px-2.5 py-1 rounded-xl shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
                   Συντελεστής m<sub className="lowercase">ij</sub>:
                 </span>
 
@@ -567,7 +566,7 @@ const Tachymetry = ({
                       setScaleFactor(e.target.value.replace(/,/g, '.'));
                     }
                   }}
-                  className={`w-[82px] text-center border text-[10px] rounded-md px-2 py-0.5 outline-none transition-all font-mono shadow-inner ${
+                  className={`w-[76px] text-center border text-[10px] rounded-md px-1.5 py-0.5 outline-none transition-all font-mono shadow-inner ${
                     scaleMode === "Χειροκίνητα"
                       ? "border-amber-500/50 text-amber-300 bg-amber-500/5 focus:border-amber-400"
                       : scaleMode === "Υπολογισμός"
@@ -578,78 +577,84 @@ const Tachymetry = ({
                 />
               </div>
 
-              {/* Κουμπιά Επιμέρους Ενεργειών */}
-              <div className="flex items-center gap-2">
-                {computedResults.length > 0 && <CheckCircle size={14} className="text-emerald-500" title="Έχει Υπολογιστεί" />}
+              {/* Κουμπιά Επιμέρους Ενεργειών & Εξαγωγών */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {computedResults.length > 0 && (
+                  <CheckCircle size={14} className="text-emerald-500 mr-1" title="Έχει υπολογιστεί" />
+                )}
                 
+                {/* Κύριο Κουμπί Επίλυσης */}
                 <button 
                   onClick={handleCalculate}
                   disabled={isLoading || measurements.length === 0}
-                  className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase ${
+                  title="Επίλυση & υπολογισμός στάσης"
+                  className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-wider ${
                     isLoading 
                       ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 cursor-pointer'
                   }`}
                 >
-                  {isLoading ? <Cpu size={12} className="animate-spin" /> : <Play size={12} className="group-hover:text-emerald-300" />}
-                  Επιλυση
+                  {isLoading ? <Cpu size={13} className="animate-spin" /> : <Play size={13} className="group-hover:text-emerald-300" />}
+                  <span>ΕΠΙΛΥΣΗ</span>
                 </button>
 
+                {/* Διαχωριστικό */}
+                <div className="h-4 w-[1px] bg-slate-800/80 mx-1"></div>
+
+                {/* Export TXT */}
                 <button 
                   onClick={handleExportAll}
                   disabled={isExporting || measurements.length === 0}
-                  title="Εξαγωγή όλων των σημείων όλων των στάσεων σε .txt"
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                  title="Εξαγωγή σημείων σε αρχείο .TXT"
+                  className={`p-1.5 rounded-lg transition-all duration-200 border cursor-pointer ${
                     isExporting
                       ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                      : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30 hover:border-cyan-500/50 cursor-pointer'
+                      : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30 hover:border-cyan-500/50'
                   }`}
                 >
-                  {isExporting ? <Cpu size={12} className="animate-spin" /> : <FileText size={12} className="group-hover:text-cyan-300" />}
-                  Export TXT
+                  {isExporting ? <Cpu size={14} className="animate-spin" /> : <FileText size={14} />}
                 </button>
 
-                {/* ΝΕΟ ΚΟΥΜΠΙ ΕΞΑΓΩΓΗΣ DXF */}
+                {/* Export DXF */}
                 <button 
                   onClick={handleExportDxf}
                   disabled={isExportingDxf || measurements.length === 0}
-                  title="Εξαγωγή όλων των σημείων σε CAD (DXF)"
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                  title="Εξαγωγή σχεδίου σε CAD (.DXF)"
+                  className={`p-1.5 rounded-lg transition-all duration-200 border cursor-pointer ${
                     isExportingDxf
                       ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 hover:border-amber-500/50 cursor-pointer'
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 hover:border-amber-500/50'
                   }`}
                 >
-                  {isExportingDxf ? <Cpu size={12} className="animate-spin" /> : <Layers size={12} className="group-hover:text-amber-300" />}
-                  Export DXF
+                  {isExportingDxf ? <Cpu size={14} className="animate-spin" /> : <Layers size={14} />}
                 </button>
 
+                {/* Export GeoJSON */}
                 <button
                   onClick={handleExportGeoJson}
                   disabled={isExportingGeoJson || measurements.length === 0}
-                  title="Εξαγωγή σημείων αποτύπωσης σε GeoJSON (EGSA87 / EPSG:2100)"
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                  title="Εξαγωγή σημείων σε GeoJSON (ΕΓΣΑ87)"
+                  className={`p-1.5 rounded-lg transition-all duration-200 border cursor-pointer ${
                     isExportingGeoJson
                       ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                      : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border-teal-500/30 hover:border-teal-500/50 cursor-pointer'
+                      : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border-teal-500/30 hover:border-teal-500/50'
                   }`}
                 >
-                  {isExportingGeoJson ? <Cpu size={12} className="animate-spin" /> : <MapIcon size={12} className="group-hover:text-teal-300" />}
-                  Export GeoJSON
+                  {isExportingGeoJson ? <Cpu size={14} className="animate-spin" /> : <MapIcon size={14} />}
                 </button>
 
+                {/* Export KML */}
                 <button
                   onClick={handleExportKml}
                   disabled={isExportingKml || measurements.length === 0}
-                  title="Εξαγωγή σημείων αποτύπωσης σε Google Earth (KML)"
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                  title="Εξαγωγή σημείων σε Google Earth (.KML)"
+                  className={`p-1.5 rounded-lg transition-all duration-200 border cursor-pointer ${
                     isExportingKml
                       ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 hover:border-rose-500/50 cursor-pointer'
+                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 hover:border-rose-500/50'
                   }`}
                 >
-                  {isExportingKml ? <Cpu size={12} className="animate-spin" /> : <MapIcon size={12} className="group-hover:text-rose-300" />}
-                  Export KML
+                  {isExportingKml ? <Cpu size={14} className="animate-spin" /> : <Compass size={14} />}
                 </button>
               </div>
 
@@ -666,7 +671,7 @@ const Tachymetry = ({
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">Hz [grad]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">V [grad]</th>
                   <th className="w-[12%] p-3 text-[9px] font-black text-slate-500 tracking-widest text-center">
-                    SD [m] {scaleMode !== "Χωρίς" && <span className="text-[8px] text-amber-400/80 font-normal"></span>}
+                    SD [m]
                   </th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">X [m]</th>
                   <th className="w-[15%] p-3 text-[9px] font-black text-emerald-500/70 tracking-widest text-right">Y [m]</th>
