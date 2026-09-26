@@ -34,12 +34,13 @@ except ImportError:
 
 from datetime import datetime
 from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, Response, request, jsonify, send_file, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from ezdxf.enums import TextEntityAlignment
 from io import BytesIO
+from pyproj import CRS, Transformer
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether, PageBreak, BaseDocTemplate, PageTemplate, Frame, NextPageTemplate
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -52,6 +53,15 @@ from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from functools import partial 
 from reportlab.platypus import  Image as RLImage
 from reportlab.graphics.shapes import Drawing, Line, Polygon, Circle, Rect, String
+
+EGSA87_TO_WGS84 = Transformer.from_crs(
+    CRS.from_proj4(
+        "+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9996 +x_0=500000 +y_0=0 "
+        "+ellps=GRS80 +towgs84=-199.87,74.79,246.62,0,0,0,0 +units=m +no_defs"
+    ),
+    CRS.from_epsg(4326),
+    always_xy=True
+)
 
 
 def create_survey_cad_drawing(
@@ -1893,6 +1903,216 @@ def export_traverse_report():
         print(f"Σφάλμα κατά τη δημιουργία Traverse Report:\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+def _get_traverse_export_data(data):
+    source_points = data.get('points') or data.get('results') or []
+    points = []
+    for point in source_points:
+        if not isinstance(point, dict):
+            continue
+        try:
+            x = float(point.get('x', point.get('X', point.get('XS'))))
+            y = float(point.get('y', point.get('Y', point.get('YS'))))
+            z = float(point.get('z', point.get('Z', point.get('ZS', 0.0))) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if not all(math.isfinite(value) for value in (x, y, z)):
+            continue
+        station_id = str(point.get('name', point.get('Station_Name', point.get('station_id', '')))).strip()
+        points.append({
+            'station_id': station_id,
+            'x': x,
+            'y': y,
+            'z': z,
+            'source': point
+        })
+
+    if len(points) < 2:
+        return None, None, (jsonify({"error": "Απαιτούνται τουλάχιστον δύο έγκυρες στάσεις."}), 400)
+
+    fixed_indices = {0, 1, len(points) - 2, len(points) - 1} if len(points) >= 4 else {0, len(points) - 1}
+    for index, point in enumerate(points):
+        point['station_type'] = (
+            'ΓΝΩΣΤΗ'
+            if index in fixed_indices or 'Σ' in point['station_id'].upper()
+            else 'ΥΠΟΛΟΓΙΣΜΕΝΗ'
+        )
+
+    metrics = data.get('metrics') or {}
+
+    def metric_number(keys, fallback):
+        for key in keys:
+            value = metrics.get(key)
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number):
+                return number
+        return fallback
+
+    fx_mm = metric_number(('fx_mm',), metric_number(('dx',), 0.0) * 1000)
+    fy_mm = metric_number(('fy_mm',), metric_number(('dy',), 0.0) * 1000)
+    fz_mm = metric_number(('fz_mm',), metric_number(('fz',), 0.0) * 1000)
+    fs_mm = metric_number(('fs_mm',), math.sqrt(fx_mm ** 2 + fy_mm ** 2 + fz_mm ** 2))
+
+    computed_length = sum(
+        math.hypot(points[index + 1]['x'] - points[index]['x'], points[index + 1]['y'] - points[index]['y'])
+        for index in range(1, len(points) - 2)
+    ) if len(points) >= 4 else sum(
+        math.hypot(points[index + 1]['x'] - points[index]['x'], points[index + 1]['y'] - points[index]['y'])
+        for index in range(len(points) - 1)
+    )
+    total_length_m = metric_number(('total_length_m', 'totalLength'), computed_length)
+    relative_precision = str(metrics.get('relative_precision') or '').strip()
+    if not relative_precision:
+        relative_precision = f"1:{round(total_length_m / (fs_mm / 1000))}" if fs_mm > 0 else '1:∞'
+
+    traverse_name = str(data.get('traverse_name') or 'ΟΔΕΥΣΗ-1')
+    stats = {
+        'traverse_name': traverse_name,
+        'total_length_m': total_length_m,
+        'stations_count': len(points),
+        'fx_mm': fx_mm,
+        'fy_mm': fy_mm,
+        'fz_mm': fz_mm,
+        'fs_mm': fs_mm,
+        'relative_precision': relative_precision
+    }
+    return points, stats, None
+
+
+@app.route('/api/export/traverse/geojson', methods=['POST'])
+def export_traverse_geojson():
+    data = request.get_json(silent=True) or {}
+    points, stats, error = _get_traverse_export_data(data)
+    if error:
+        return error
+
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [point['x'], point['y'], point['z']]
+            },
+            "properties": {
+                "station_id": point['station_id'],
+                "x": point['x'],
+                "y": point['y'],
+                "z": point['z'],
+                "station_type": point['station_type']
+            }
+        }
+        for point in points
+    ]
+    features.append({
+        "type": "Feature",
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [[point['x'], point['y'], point['z']] for point in points]
+        },
+        "properties": {
+            "traverse_name": stats['traverse_name'],
+            "total_length_m": stats['total_length_m'],
+            "stations_count": stats['stations_count'],
+            "fx_mm": stats['fx_mm'],
+            "fy_mm": stats['fy_mm'],
+            "fz_mm": stats['fz_mm'],
+            "fs_mm": stats['fs_mm'],
+            "relative_precision": stats['relative_precision']
+        }
+    })
+    feature_collection = {
+        "type": "FeatureCollection",
+        "name": stats['traverse_name'],
+        "crs": {
+            "type": "name",
+            "properties": {"name": "urn:ogc:def:crs:EPSG::2100"}
+        },
+        "features": features
+    }
+    return Response(
+        json.dumps(feature_collection, ensure_ascii=False, allow_nan=False),
+        mimetype='application/json',
+        headers={"Content-Disposition": "attachment; filename=traverse_network.geojson"}
+    )
+
+
+@app.route('/api/export/traverse/kml', methods=['POST'])
+def export_traverse_kml():
+    data = request.get_json(silent=True) or {}
+    points, stats, error = _get_traverse_export_data(data)
+    if error:
+        return error
+
+    transformed_points = []
+    for point in points:
+        longitude, latitude = EGSA87_TO_WGS84.transform(point['x'], point['y'])
+        if not all(math.isfinite(value) for value in (longitude, latitude, point['z'])):
+            continue
+        transformed_points.append({**point, 'longitude': longitude, 'latitude': latitude})
+
+    if len(transformed_points) < 2:
+        return jsonify({"error": "Δεν υπάρχουν αρκετές έγκυρες στάσεις για εξαγωγή."}), 400
+
+    placemarks = []
+    for point in transformed_points:
+        station_id = escape(point['station_id'])
+        description = (
+            '<div style="font-family:sans-serif;padding:5px">'
+            f'<b>Station:</b> {station_id}<br/>'
+            f'<b>Type:</b> {escape(point["station_type"])}<br/>'
+            f'<b>X (EGSA):</b> {point["x"]:.3f}<br/>'
+            f'<b>Y (EGSA):</b> {point["y"]:.3f}<br/>'
+            f'<b>Z:</b> {point["z"]:.3f} m'
+            '</div>'
+        ).replace(']]>', ']]]]><![CDATA[>')
+        placemarks.append(
+            '<Placemark>'
+            f'<name>{station_id}</name>'
+            '<styleUrl>#stationStyle</styleUrl>'
+            f'<description><![CDATA[{description}]]></description>'
+            '<Point><coordinates>'
+            f'{point["longitude"]:.10f},{point["latitude"]:.10f},{point["z"]:.3f}'
+            '</coordinates></Point>'
+            '</Placemark>'
+        )
+
+    line_coordinates = ' '.join(
+        f'{point["longitude"]:.10f},{point["latitude"]:.10f},{point["z"]:.3f}'
+        for point in transformed_points
+    )
+    line_description = (
+        '<div style="font-family:sans-serif;padding:5px">'
+        f'<b>Total length:</b> {stats["total_length_m"]:.3f} m<br/>'
+        f'<b>f_x:</b> {stats["fx_mm"]:.3f} mm<br/>'
+        f'<b>f_y:</b> {stats["fy_mm"]:.3f} mm<br/>'
+        f'<b>f_z:</b> {stats["fz_mm"]:.3f} mm<br/>'
+        f'<b>f_s:</b> {stats["fs_mm"]:.3f} mm<br/>'
+        f'<b>Relative precision:</b> {escape(stats["relative_precision"])}'
+        '</div>'
+    ).replace(']]>', ']]]]><![CDATA[>')
+    kml_content = '\n'.join([
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>',
+        f'<name>{escape(stats["traverse_name"])}</name>',
+        '<Style id="stationStyle"><IconStyle><scale>0.9</scale><Icon>'
+        '<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>'
+        '</Icon></IconStyle></Style>',
+        '<Style id="traverseLineStyle"><LineStyle><color>ffff9900</color><width>3</width></LineStyle></Style>',
+        *placemarks,
+        '<Placemark><name>Traverse Line</name><styleUrl>#traverseLineStyle</styleUrl>',
+        f'<description><![CDATA[{line_description}]]></description>',
+        f'<LineString><tessellate>1</tessellate><coordinates>{line_coordinates}</coordinates></LineString>',
+        '</Placemark></Document></kml>'
+    ])
+    return Response(
+        kml_content,
+        mimetype='application/vnd.google-earth.kml+xml',
+        headers={"Content-Disposition": "attachment; filename=traverse_network.kml"}
+    )
+
+
 @app.route('/api/traverse/export-dxf', methods=['POST'])
 def export_traverse_dxf():
     try:
@@ -2898,6 +3118,214 @@ def export_tachymetry_dxf():
     except Exception as e:
         print(f"WARNING: Σφάλμα κατά τη δημιουργία του DXF: {e}")
         return jsonify({"error": "Αποτυχία δημιουργίας αρχείου DXF"}), 500
+
+@app.route('/api/tachymetry/export_geojson', methods=['POST'])
+def export_tachymetry_geojson():
+    data = request.json or {}
+    if not data.get('measurements'):
+        return jsonify({"error": "Δεν βρέθηκαν μετρήσεις"}), 400
+
+    project_name, all_calculated_points = _calculate_tachymetry_export_points(data)
+    geojson = {
+        "type": "FeatureCollection",
+        "name": "Tachymetry_Detail_Points",
+        "crs": {
+            "type": "name",
+            "properties": {"name": "urn:ogc:def:crs:EPSG::2100"}
+        },
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [point['x'], point['y'], point['z']]
+                },
+                "properties": {
+                    "point_id": point['point_id'],
+                    "x": point['x'],
+                    "y": point['y'],
+                    "z": point['z'],
+                    "occupied_station": point['occupied_station']
+                }
+            }
+            for point in all_calculated_points
+        ]
+    }
+    filename_project = secure_filename(project_name) if project_name else 'export'
+    filename = f"tachymetry_detail_points_{filename_project or 'export'}.geojson"
+    geojson_bytes = json.dumps(geojson, ensure_ascii=False, allow_nan=False, indent=2).encode('utf-8')
+    return send_file(
+        BytesIO(geojson_bytes),
+        mimetype='application/geo+json',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+def _calculate_tachymetry_export_points(data):
+    measurements = data.get('measurements', [])
+    stations = data.get('stations', [])
+    df_meas = pd.DataFrame(measurements)
+    df_st = pd.DataFrame(stations)
+
+    rename_st = {}
+    for col in df_st.columns:
+        if col.lower() in ['station_name', 'station']: rename_st[col] = 'Station_Name'
+        if col.lower() in ['xs', 'x']: rename_st[col] = 'XS'
+        if col.lower() in ['ys', 'y']: rename_st[col] = 'YS'
+        if col.lower() in ['zs', 'z']: rename_st[col] = 'ZS'
+    df_st.rename(columns=rename_st, inplace=True)
+
+    project_name = get_active_project_name()
+    project_dir = get_request_project_dir(project_name)
+    traverse_file = project_dir / "latest_traverse.json" if project_dir else None
+    project_state_file = project_dir / "project_state.json" if project_dir else None
+    traverse_stations = []
+
+    if traverse_file and traverse_file.exists():
+        try:
+            with open(traverse_file, 'r', encoding='utf-8') as f:
+                traverse_stations = json.load(f)
+        except Exception as e:
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του latest_traverse.json: {e}")
+    elif project_state_file and project_state_file.exists():
+        try:
+            with open(project_state_file, 'r', encoding='utf-8') as f:
+                p_state = json.load(f)
+                for pt in p_state.get('traverse_data', []):
+                    if pt.get('name') and pt.get('x') and pt.get('y'):
+                        traverse_stations.append({
+                            "Station_Name": str(pt['name']),
+                            "XS": float(pt['x']),
+                            "YS": float(pt['y']),
+                            "ZS": 0.0
+                        })
+        except Exception as e:
+            print(f"WARNING: Σφάλμα κατά την ανάγνωση του project_state.json: {e}")
+
+    if traverse_stations:
+        try:
+            df_trav = pd.DataFrame(traverse_stations)
+            if 'Station_Name' in df_st.columns:
+                df_st['Station_Name'] = df_st['Station_Name'].astype(str).str.strip()
+            if 'Station_Name' in df_trav.columns:
+                df_trav['Station_Name'] = df_trav['Station_Name'].astype(str).str.strip()
+            df_st = pd.concat([df_st, df_trav], ignore_index=True)
+            df_st = df_st.drop_duplicates(subset=['Station_Name'], keep='last')
+        except Exception as e:
+            print(f"WARNING: Σφάλμα κατά τη συγχώνευση των στάσεων: {e}")
+
+    st_col = None
+    or_col = None
+    for col in df_meas.columns:
+        if col.lower() in ['_filledstation', 'station', 'from']:
+            st_col = col
+        if col.lower() in ['_filledorientation', 'orientation', 'o', 'backsight']:
+            or_col = col
+
+    all_calculated_points = []
+    seen_keys = set()
+    if st_col and or_col:
+        df_meas[st_col] = df_meas[st_col].replace('', None).ffill()
+        df_meas[or_col] = df_meas[or_col].replace('', None).ffill()
+        unique_pairs = df_meas[[st_col, or_col]].dropna().drop_duplicates().to_dict('records')
+
+        for pair in unique_pairs:
+            target_st = str(pair[st_col]).strip()
+            target_or = str(pair[or_col]).strip()
+            try:
+                res_df, _, _ = dpr.tachymetry(
+                    data_meas=df_meas,
+                    data_st=df_st,
+                    target_station=target_st,
+                    target_orientation=target_or
+                )
+                if res_df is not None and not res_df.empty:
+                    for rec in res_df.to_dict('records'):
+                        point_id = str(rec.get('Σημείο', rec.get('Point_ID', '')))
+                        occupied_station = str(rec.get('Στάση', target_st))
+                        dedup_key = (occupied_station.upper(), point_id.upper())
+                        if dedup_key not in seen_keys:
+                            seen_keys.add(dedup_key)
+                            x = float(rec.get('X', 0.0))
+                            y = float(rec.get('Y', 0.0))
+                            z = float(rec.get('Z', 0.0))
+                            if all(math.isfinite(value) for value in (x, y, z)):
+                                all_calculated_points.append({
+                                    'point_id': point_id,
+                                    'occupied_station': occupied_station,
+                                    'x': x,
+                                    'y': y,
+                                    'z': z
+                                })
+            except Exception as err:
+                print(f"WARNING: Σφάλμα υπολογισμού για στάση {target_st} - {target_or}: {err}")
+
+    return project_name, all_calculated_points
+
+@app.route('/api/export/tachymetry/kml', methods=['POST'])
+def export_tachymetry_kml():
+    data = request.get_json(silent=True) or {}
+    points = data.get('points')
+    if points is None:
+        if not data.get('measurements'):
+            return jsonify({"error": "Δεν βρέθηκαν μετρήσεις ή σημεία"}), 400
+        project_name, points = _calculate_tachymetry_export_points(data)
+    else:
+        project_name = get_active_project_name()
+
+    placemarks = []
+    for point in points:
+        if not isinstance(point, dict):
+            continue
+        try:
+            x = float(point.get('x', point.get('X')))
+            y = float(point.get('y', point.get('Y')))
+            z = float(point.get('z', point.get('Z')))
+        except (TypeError, ValueError):
+            continue
+        longitude, latitude = EGSA87_TO_WGS84.transform(x, y)
+        if not all(math.isfinite(value) for value in (longitude, latitude, z)):
+            continue
+
+        point_id = str(point.get('point_id', point.get('point', '')))
+        occupied_station = str(point.get('occupied_station', point.get('station', '')))
+        description = (
+            '<div style="font-family:sans-serif;padding:5px">'
+            f'<b>Point ID:</b> {escape(point_id)}<br/>'
+            f'<b>X (EGSA):</b> {x:.3f} | <b>Y (EGSA):</b> {y:.3f}<br/>'
+            f'<b>Elevation Z:</b> {z:.3f} m<br/>'
+            f'<b>Occupied Station:</b> {escape(occupied_station)}'
+            '</div>'
+        ).replace(']]>', ']]]]><![CDATA[>')
+        placemarks.append(
+            '<Placemark>'
+            f'<name>{escape(point_id)}</name>'
+            '<styleUrl>#pointStyle</styleUrl>'
+            f'<description><![CDATA[{description}]]></description>'
+            '<Point><coordinates>'
+            f'{longitude:.10f},{latitude:.10f},{z:.3f}'
+            '</coordinates></Point>'
+            '</Placemark>'
+        )
+
+    kml_content = '\n'.join([
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<kml xmlns="http://www.opengis.net/kml/2.2">',
+        '<Document>',
+        '<name>Tachymetry Points</name>',
+        '<Style id="pointStyle"><IconStyle><scale>0.9</scale><Icon>'
+        '<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>'
+        '</Icon></IconStyle></Style>',
+        *placemarks,
+        '</Document>',
+        '</kml>'
+    ])
+    return Response(
+        kml_content,
+        mimetype="application/vnd.google-earth.kml+xml",
+        headers={"Content-Disposition": "attachment; filename=tachymetry_points.kml"}
+    )
 
 # ==========================================
 # CHARAXI

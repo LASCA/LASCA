@@ -6,7 +6,8 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from 'react-hot-toast';
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
-  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText
+  Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText,
+  Layers, Globe
 } from 'lucide-react';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
@@ -71,6 +72,8 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExportingGeoJSON, setIsExportingGeoJSON] = useState(false);
+  const [isExportingKML, setIsExportingKML] = useState(false);
   
   const statsRef = useRef(null);
   const chartRef = useRef(null);
@@ -175,12 +178,12 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     return isNaN(num) ? val : num.toFixed(decimals);
   };
 
-  const saveBlobFile = async (blob, defaultFileName) => {
+  const saveBlobFile = async (blob, defaultFileName, acceptedExtensions = ['.pdf', '.dxf', '.png']) => {
     try {
       if (window.showSaveFilePicker) {
         const fileHandle = await window.showSaveFilePicker({
           suggestedName: defaultFileName,
-          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.dxf', '.png'] } }]
+          types: [{ description: 'File', accept: { '*/*': acceptedExtensions } }]
         });
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
@@ -304,6 +307,68 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     } catch (error) {
       console.error('Σφάλμα κατά τη λήψη του DXF:', error);
       toast.error(error.message || 'Σφάλμα κατά τη λήψη του DXF.', { id: toastId });
+    }
+  };
+
+  const handleExportTraverseGeoJSON = async () => {
+    if (!data || data.length < 2) {
+      toast.error('Απαιτούνται τουλάχιστον δύο στάσεις για εξαγωγή.');
+      return;
+    }
+
+    setIsExportingGeoJSON(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/export/traverse/geojson`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          points: data,
+          metrics,
+          traverse_name: metrics?.traverse_name || 'ΟΔΕΥΣΗ-1'
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας GeoJSON');
+      }
+      await saveBlobFile(await response.blob(), 'traverse_network.geojson', ['.geojson', '.json']);
+      toast.success('Το GeoJSON κατέβηκε επιτυχώς!');
+    } catch (error) {
+      console.error('Σφάλμα κατά την εξαγωγή GeoJSON:', error);
+      toast.error(error.message || 'Αποτυχία δημιουργίας GeoJSON.');
+    } finally {
+      setIsExportingGeoJSON(false);
+    }
+  };
+
+  const handleExportTraverseKML = async () => {
+    if (!data || data.length < 2) {
+      toast.error('Απαιτούνται τουλάχιστον δύο στάσεις για εξαγωγή.');
+      return;
+    }
+
+    setIsExportingKML(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/export/traverse/kml`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          points: data,
+          metrics,
+          traverse_name: metrics?.traverse_name || 'ΟΔΕΥΣΗ-1'
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Αποτυχία δημιουργίας KML');
+      }
+      await saveBlobFile(await response.blob(), 'traverse_network.kml', ['.kml']);
+      toast.success('Το KML κατέβηκε επιτυχώς!');
+    } catch (error) {
+      console.error('Σφάλμα κατά την εξαγωγή KML:', error);
+      toast.error(error.message || 'Αποτυχία δημιουργίας KML.');
+    } finally {
+      setIsExportingKML(false);
     }
   };
 
@@ -520,6 +585,24 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
                   className="group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(236,72,153,0.05)] bg-gradient-to-r from-pink-500/10 to-purple-500/10 hover:from-pink-500/20 hover:to-purple-500/20 border border-pink-500/30 hover:border-purple-400/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] active:scale-95 cursor-pointer"
                 >
                   <FileText size={16} className="text-pink-500 group-hover:text-purple-400 transition-colors" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportTraverseGeoJSON}
+                  disabled={isExportingGeoJSON || data.length < 2}
+                  title="Εξαγωγή GeoJSON (QGIS)"
+                  className="group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.05)] bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 hover:from-cyan-500/20 hover:to-emerald-500/20 border border-cyan-500/30 hover:border-emerald-400/50 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExportingGeoJSON ? <Cpu size={16} className="animate-spin text-cyan-400" /> : <Layers size={16} className="text-cyan-400 group-hover:text-emerald-300 transition-colors" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportTraverseKML}
+                  disabled={isExportingKML || data.length < 2}
+                  title="Εξαγωγή KML (Google Earth)"
+                  className="group flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(245,158,11,0.05)] bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-orange-400/50 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExportingKML ? <Cpu size={16} className="animate-spin text-amber-400" /> : <Globe size={16} className="text-amber-400 group-hover:text-orange-300 transition-colors" />}
                 </button>
               </div>
               
