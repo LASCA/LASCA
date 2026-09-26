@@ -81,6 +81,8 @@ const Tachymetry = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDxf, setIsExportingDxf] = useState(false);
+  const [isExportingGeoJson, setIsExportingGeoJson] = useState(false);
+  const [isExportingKml, setIsExportingKml] = useState(false);
   const [viewMode, setViewMode] = useState('local'); 
   const [isFullscreen, setIsFullscreen] = useState(false); 
 
@@ -247,7 +249,7 @@ const Tachymetry = ({
         setViewMode('global'); 
       }
     } catch (error) {
-      console.error("Σφάλμα κατά την επίλυση ταχυμετρίας:", error);
+      console.error("Σφάλμα κατά την επίλυση της αποτύπωσης:", error);
       toast.error("Αποτυχία υπολογισμού. Ελέγξτε το Backend.");
     } finally {
       setIsLoading(false);
@@ -352,6 +354,60 @@ const Tachymetry = ({
     }
   };
 
+  const handleExportGeoJson = async () => {
+    if (!measurements.length) {
+      toast.error("Δεν υπάρχουν διαθέσιμα δεδομένα μετρήσεων.");
+      return;
+    }
+
+    setIsExportingGeoJson(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/tachymetry/export_geojson`, {
+        project_name: projectSettings,
+        measurements: getProcessedMeasurements(),
+        stations: stationsData
+      }, { responseType: 'blob' });
+      const contentDisposition = response.headers['content-disposition'] || '';
+      const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+      const filename = filenameMatch?.[1] || 'tachymetry_detail_points.geojson';
+      const blob = new Blob([response.data], { type: 'application/geo+json' });
+      await saveBlobFile(blob, filename, 'GeoJSON', ['.geojson', '.json']);
+      toast.success('Η εξαγωγή GeoJSON ολοκληρώθηκε επιτυχώς.');
+    } catch (error) {
+      console.error("Σφάλμα κατά την εξαγωγή GeoJSON:", error);
+      toast.error("Αποτυχία εξαγωγής αρχείου GeoJSON.");
+    } finally {
+      setIsExportingGeoJson(false);
+    }
+  };
+
+  const handleExportKml = async () => {
+    if (!measurements.length) {
+      toast.error("Δεν υπάρχουν διαθέσιμα δεδομένα μετρήσεων.");
+      return;
+    }
+
+    setIsExportingKml(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/export/tachymetry/kml`, {
+        project_name: projectSettings,
+        measurements: getProcessedMeasurements(),
+        stations: stationsData
+      }, { responseType: 'blob' });
+      const contentDisposition = response.headers['content-disposition'] || '';
+      const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+      const filename = filenameMatch?.[1] || 'tachymetry_detail_points.kml';
+      const blob = new Blob([response.data], { type: 'application/vnd.google-earth.kml+xml' });
+      await saveBlobFile(blob, filename, 'KML', ['.kml']);
+      toast.success('Η εξαγωγή KML ολοκληρώθηκε επιτυχώς.');
+    } catch (error) {
+      console.error("Σφάλμα κατά την εξαγωγή KML:", error);
+      toast.error("Αποτυχία εξαγωγής αρχείου KML.");
+    } finally {
+      setIsExportingKml(false);
+    }
+  };
+
   const handleDownload = async () => {
     if (!plotImage) return;
 
@@ -428,7 +484,7 @@ const Tachymetry = ({
                   <LayoutGrid size={16} className="text-emerald-500" />
                 </div>
                 <span className="text-[11px] font-black text-slate-200 tracking-[0.2em]">
-                  Ταχυμετρία
+                  Αποτύπωση
                 </span>
               </div>
 
@@ -566,6 +622,34 @@ const Tachymetry = ({
                 >
                   {isExportingDxf ? <Cpu size={12} className="animate-spin" /> : <Layers size={12} className="group-hover:text-amber-300" />}
                   Export DXF
+                </button>
+
+                <button
+                  onClick={handleExportGeoJson}
+                  disabled={isExportingGeoJson || measurements.length === 0}
+                  title="Εξαγωγή σημείων αποτύπωσης σε GeoJSON (EGSA87 / EPSG:2100)"
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                    isExportingGeoJson
+                      ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                      : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border-teal-500/30 hover:border-teal-500/50 cursor-pointer'
+                  }`}
+                >
+                  {isExportingGeoJson ? <Cpu size={12} className="animate-spin" /> : <MapIcon size={12} className="group-hover:text-teal-300" />}
+                  Export GeoJSON
+                </button>
+
+                <button
+                  onClick={handleExportKml}
+                  disabled={isExportingKml || measurements.length === 0}
+                  title="Εξαγωγή σημείων αποτύπωσης σε Google Earth (KML)"
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 shadow-sm text-[10px] font-bold tracking-widest uppercase border ${
+                    isExportingKml
+                      ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 hover:border-rose-500/50 cursor-pointer'
+                  }`}
+                >
+                  {isExportingKml ? <Cpu size={12} className="animate-spin" /> : <MapIcon size={12} className="group-hover:text-rose-300" />}
+                  Export KML
                 </button>
               </div>
 
