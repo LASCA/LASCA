@@ -10,7 +10,10 @@ import os
 import shutil
 import socket
 import threading
-import webview
+try:
+    import webview  # μόνο για την desktop έκδοση· στον web server δεν χρειάζεται
+except ImportError:
+    webview = None
 import logging
 from dotenv import load_dotenv
 import pandas as pd
@@ -32,12 +35,12 @@ try:
 except ImportError:
     resend = None
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import mimetypes
 from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
 from flask import Flask, Response, request, jsonify, send_file, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
-from flask import render_template_string
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -219,6 +222,20 @@ if not LOGO_PATH.exists():
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'lasca-web-secret-key')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('FEEDBACK_MAX_SIZE_MB', '5')) * 1024 * 1024
+
+# --- Cookies σύνδεσης ---
+# COOKIE_SECURE=1 στον server (HTTPS). Τοπικά (http://localhost) πρέπει να είναι 0.
+_cookie_secure = os.getenv('COOKIE_SECURE', '0').strip().lower() in {'1', 'true', 'yes'}
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=_cookie_secure,
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SAMESITE='Lax',
+    REMEMBER_COOKIE_SECURE=_cookie_secure,
+    REMEMBER_COOKIE_DURATION=timedelta(days=int(os.getenv('REMEMBER_ME_DAYS', '30'))),
+)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '').strip()
 
 sqlite_db_value = os.getenv('LASCA_SQLITE_DB') or str((BASE_DIR / 'lasca_data' / 'lasca.db').resolve())
 if sqlite_db_value.startswith('sqlite'):
@@ -497,73 +514,6 @@ class UniversalNumberedCanvas(canvas.Canvas):
         
         self.restoreState()
 
-@app.route('/profile')
-@login_required
-def profile_page():
-    return render_template_string('''
-        <!doctype html>
-        <html lang="el">
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>LASCA | Προφίλ</title>
-            <style>
-                body { font-family: system-ui, sans-serif; background: #020817; color: #e2e8f0; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-                .card { width: min(520px, 90vw); background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 24px; padding: 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
-                h1 { margin: 0 0 16px; font-size: 28px; }
-                form { display: grid; gap: 18px; }
-                label { display: grid; gap: 8px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
-                input { background: #020817; border: 1px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px 14px; font-size: 14px; }
-                input[type="file"] { padding: 10px; }
-                button { background: linear-gradient(135deg, #0f172a, #1e293b); color: #f8fafc; border: 1px solid rgba(148,163,184,0.35); border-radius: 12px; padding: 12px 16px; font-weight: 700; cursor: pointer; }
-                .meta { font-size: 12px; color: #94a3b8; margin-top: 8px; }
-                .banner { border: 1px solid rgba(59,130,246,0.35); background: rgba(30,41,59,0.8); border-radius: 12px; padding: 12px; margin-bottom: 18px; color: #cbd5e1; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <div class="banner">Σύνδεδεμένος ως: {{ current_user.email }}</div>
-                <h1>Προφίλ χρήστη</h1>
-                <form id="profileForm" enctype="multipart/form-data">
-                    <label>
-                        Όνομα εμφάνισης
-                        <input id="display_name" name="display_name" value="{{ current_user.display_name or current_user.email.split('@',1)[0] }}" />
-                    </label>
-                    <label>
-                        Εικόνα προφίλ
-                        <input id="avatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
-                    </label>
-                    <button type="submit">Αποθήκευση</button>
-                </form>
-                <div class="meta">Μέγιστο μέγεθος: 2MB · Επιτρεπτά: png, jpg, webp</div>
-            </div>
-            <script>
-                const form = document.getElementById('profileForm');
-                form.addEventListener('submit', async (event) => {
-                    event.preventDefault();
-                    const payload = new FormData();
-                    payload.append('display_name', document.getElementById('display_name').value.trim());
-                    const file = document.getElementById('avatar').files[0];
-                    if (file) payload.append('avatar', file);
-                    const res = await fetch('/api/me', {
-                        method: 'PUT',
-                        body: payload,
-                        credentials: 'same-origin'
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        alert(data.error || 'Αποτυχία αποθήκευσης');
-                        return;
-                    }
-                    alert('Το προφίλ ενημερώθηκε επιτυχώς');
-                    location.reload();
-                });
-            </script>
-        </body>
-        </html>
-    ''')
-
-
 @app.route('/api/me', methods=['PUT'])
 @login_required
 def update_current_user():
@@ -598,6 +548,10 @@ def serve_index():
 
 @app.errorhandler(404)
 def not_found(e):
+    # Άγνωστο API route -> JSON 404. Οτιδήποτε άλλο (/, /login, /signup, /app, /profile)
+    # το χειρίζεται το React Router, οπότε επιστρέφουμε το index.html.
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Δεν βρέθηκε"}), 404
     return send_from_directory(app.static_folder, 'index.html')
 
 
@@ -822,8 +776,8 @@ def register_user():
 
     if not email or not EMAIL_RE.fullmatch(email):
         return jsonify({"error": "Το email δεν είναι έγκυρο"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες"}), 400
     if User.query.filter(db.func.lower(User.email) == email).first():
         return jsonify({"error": "Υπάρχει ήδη χρήστης με αυτό το email"}), 409
 
@@ -831,7 +785,7 @@ def register_user():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    login_user(user)
+    login_user(user, remember=bool(data.get('remember')))
     return jsonify({"status": "success", "user": user.to_public_dict()}), 201
 
 
@@ -848,8 +802,51 @@ def login_user_route():
     if user is None or not user.check_password(password):
         return jsonify({"error": "Λανθασμένο email ή κωδικός"}), 401
 
-    login_user(user)
+    login_user(user, remember=bool(data.get('remember')))
     return jsonify({"status": "success", "user": user.to_public_dict()})
+
+
+@app.route('/api/auth/config', methods=['GET'])
+def auth_config():
+    """Δημόσιες ρυθμίσεις για το frontend (π.χ. αν είναι ενεργό το Google login)."""
+    return jsonify({"google_client_id": GOOGLE_CLIENT_ID or None})
+
+
+@app.route('/api/auth/google', methods=['POST'])
+def google_login_route():
+    """Σύνδεση/εγγραφή με Google. Το frontend στέλνει το ID token (credential) του Google."""
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({"error": "Η σύνδεση με Google δεν είναι ενεργή σε αυτόν τον server"}), 503
+    data = request.get_json(silent=True) or {}
+    credential = str(data.get('credential') or '')
+    if not credential:
+        return jsonify({"error": "Λείπει το token του Google"}), 400
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+        info = google_id_token.verify_oauth2_token(credential, google_requests.Request(), GOOGLE_CLIENT_ID)
+    except ImportError:
+        logger.error('google-auth is not installed')
+        return jsonify({"error": "Η σύνδεση με Google δεν είναι διαθέσιμη"}), 503
+    except ValueError:
+        return jsonify({"error": "Μη έγκυρη σύνδεση Google. Δοκίμασε ξανά."}), 401
+
+    email = normalize_email(info.get('email'))
+    if not email or not info.get('email_verified'):
+        return jsonify({"error": "Ο λογαριασμός Google δεν έχει επιβεβαιωμένο email"}), 401
+
+    user = User.query.filter(db.func.lower(User.email) == email).first()
+    created = False
+    if user is None:
+        user = User(email=email, display_name=(info.get('name') or email.split('@', 1)[0])[:150])
+        # Τυχαίος κωδικός που δεν τον ξέρει κανείς: ο λογαριασμός μπαίνει μόνο μέσω Google.
+        user.set_password(uuid.uuid4().hex + uuid.uuid4().hex)
+        db.session.add(user)
+        db.session.commit()
+        created = True
+
+    login_user(user, remember=bool(data.get('remember', True)))
+    return jsonify({"status": "success", "created": created, "user": user.to_public_dict()}), (201 if created else 200)
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -880,7 +877,37 @@ def get_user_avatar(user_id):
     avatar_file = Path(user.avatar_path)
     if not avatar_file.exists() or not avatar_file.is_file():
         return jsonify({"error": "Το avatar δεν βρέθηκε"}), 404
-    return send_file(avatar_file, mimetype='image/jpeg')
+    return send_file(avatar_file, mimetype=mimetypes.guess_type(avatar_file.name)[0] or 'image/jpeg')
+
+
+@app.route('/api/me/projects', methods=['GET'])
+@login_required
+def list_my_projects_detailed():
+    """Projects του χρήστη για τη σελίδα Προφίλ: δικά του και κοινοποιημένα σε αυτόν."""
+    def describe(project, role):
+        project_dir = WORKSPACE_DIR / project.name
+        data_file = project_dir / 'project_data.json'
+        stamp_source = data_file if data_file.exists() else project_dir
+        updated_at = None
+        if stamp_source.exists():
+            updated_at = datetime.utcfromtimestamp(stamp_source.stat().st_mtime).isoformat() + 'Z'
+        owner = project.owner
+        return {
+            'name': project.name,
+            'role': role,
+            'owner_name': (owner.display_name or owner.email.split('@', 1)[0]) if owner else None,
+            'members_count': ProjectMember.query.filter_by(project_id=project.id).count() + 1,
+            'created_at': project.created_at.isoformat() + 'Z' if project.created_at else None,
+            'updated_at': updated_at,
+        }
+
+    owned = Project.query.filter_by(owner_id=current_user.id).order_by(Project.created_at.desc()).all()
+    memberships = ProjectMember.query.filter_by(user_id=current_user.id).all()
+    shared = [m.project for m in memberships if m.project and m.project.owner_id != current_user.id]
+    return jsonify({
+        'owned': [describe(p, 'owner') for p in owned],
+        'shared': [describe(p, 'editor') for p in shared],
+    })
 
 
 @app.route('/api/projects/list', methods=['GET'])

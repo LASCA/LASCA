@@ -1,0 +1,230 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { ArrowLeft, Camera, FolderOpen, Loader2, LogOut, Users } from 'lucide-react';
+import { API_BASE_URL } from '../config';
+import { apiErrorMessage, useAuth } from '../auth/AuthContext';
+import { BrandMark } from '../components/auth/AuthLayout';
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function Avatar({ url, name, size = 96 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  const initials = (name || 'U').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  if (!url || failed) {
+    return (
+      <div style={{ width: size, height: size }}
+        className="flex items-center justify-center rounded-full bg-gradient-to-br from-[#d93a44] to-[#3b5bdb] text-2xl font-black text-white">
+        {initials}
+      </div>
+    );
+  }
+  return <img src={url} alt="" style={{ width: size, height: size }} onError={() => setFailed(true)}
+    className="rounded-full object-cover" />;
+}
+
+export default function Profile() {
+  const { user, setUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const fileInput = useRef(null);
+
+  const [displayName, setDisplayName] = useState(user?.display_name || '');
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const [projects, setProjects] = useState({ owned: [], shared: [] });
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [tab, setTab] = useState('owned');
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/api/me/projects`)
+      .then(({ data }) => setProjects({ owned: data.owned || [], shared: data.shared || [] }))
+      .catch((err) => toast.error(apiErrorMessage(err, 'Αποτυχία φόρτωσης projects')))
+      .finally(() => setProjectsLoading(false));
+  }, []);
+
+  // Καθαρισμός του προσωρινού URL της προεπισκόπησης.
+  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
+
+  const dirty = useMemo(
+    () => Boolean(avatarFile) || displayName.trim() !== (user?.display_name || ''),
+    [avatarFile, displayName, user]
+  );
+
+  const pickAvatar = (file) => {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Επιτρέπονται μόνο εικόνες PNG, JPG ή WEBP');
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error('Η εικόνα πρέπει να είναι μικρότερη από 2MB');
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!displayName.trim()) {
+      toast.error('Το όνομα χρήστη δεν μπορεί να είναι κενό');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = new FormData();
+      payload.append('display_name', displayName.trim());
+      if (avatarFile) payload.append('avatar', avatarFile);
+      const { data } = await axios.put(`${API_BASE_URL}/api/me`, payload);
+      setUser(data);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      toast.success('Το προφίλ αποθηκεύτηκε');
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Αποτυχία αποθήκευσης'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openProject = (name) => {
+    // Το App διαβάζει το ενεργό project από εδώ όταν ανοίγει.
+    localStorage.setItem(`current_active_project_${user.id}`, name);
+    navigate('/app');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/', { replace: true });
+  };
+
+  const list = tab === 'owned' ? projects.owned : projects.shared;
+
+  return (
+    <div className="h-full overflow-y-auto bg-slate-950 text-slate-200">
+      <header className="sticky top-0 z-20 border-b border-slate-800/70 bg-slate-950/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/app" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/80 px-3 text-xs font-bold text-slate-200 hover:bg-slate-800">
+              <ArrowLeft size={15} /> <span className="hidden sm:inline">Πίσω στην εφαρμογή</span>
+            </Link>
+            <BrandMark size={28} withText={false} />
+          </div>
+          <button onClick={handleLogout}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold text-rose-300 hover:bg-rose-500/10">
+            <LogOut size={15} /> Αποσύνδεση
+          </button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 sm:px-6 py-10 grid gap-8 lg:grid-cols-[320px_1fr]">
+        {/* --- Στοιχεία χρήστη --- */}
+        <form onSubmit={save} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+          <div className="flex flex-col items-center text-center">
+            <button type="button" onClick={() => fileInput.current?.click()}
+              className="group relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b5bdb]"
+              aria-label="Αλλαγή εικόνας προφίλ">
+              <Avatar url={avatarPreview || user?.avatar_url} name={displayName || user?.display_name} size={104} />
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/60 opacity-0 transition group-hover:opacity-100">
+                <Camera size={22} className="text-white" />
+              </span>
+            </button>
+            <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+              onChange={(e) => { pickAvatar(e.target.files?.[0]); e.target.value = ''; }} />
+            <p className="mt-3 text-[11px] text-slate-500">PNG, JPG ή WEBP, έως 2MB</p>
+          </div>
+
+          <div className="mt-6 space-y-1.5">
+            <label htmlFor="display_name" className="block text-[11px] font-bold tracking-wider text-slate-400">ΟΝΟΜΑ ΧΡΗΣΤΗ</label>
+            <input id="display_name" value={displayName} maxLength={150}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full h-11 rounded-xl border border-slate-700/70 bg-slate-950/70 px-3.5 text-sm text-slate-100 outline-none focus:border-[#5b74e6] focus:ring-2 focus:ring-[#3b5bdb]/30" />
+          </div>
+          <div className="mt-4 space-y-1.5">
+            <p className="text-[11px] font-bold tracking-wider text-slate-400">EMAIL</p>
+            <p className="truncate text-sm text-slate-300" title={user?.email}>{user?.email}</p>
+          </div>
+
+          <button type="submit" disabled={!dirty || saving}
+            className="mt-6 w-full h-11 rounded-xl bg-gradient-to-r from-[#d93a44] to-[#3b5bdb] text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            Αποθήκευση αλλαγών
+          </button>
+        </form>
+
+        {/* --- Projects --- */}
+        <section className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-black text-slate-50">Τα projects μου</h1>
+              <p className="mt-1 text-sm text-slate-400">
+                {projects.owned.length} δικά σου · {projects.shared.length} κοινοποιημένα σε εσένα
+              </p>
+            </div>
+            <div className="inline-flex rounded-xl border border-slate-800 bg-slate-900/60 p-1 text-xs font-bold">
+              {[['owned', 'Δικά μου'], ['shared', 'Κοινά']].map(([key, label]) => (
+                <button key={key} type="button" onClick={() => setTab(key)}
+                  className={`h-8 rounded-lg px-4 transition ${tab === key ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-100'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            {projectsLoading ? (
+              <div className="flex items-center gap-2 py-16 justify-center text-sm text-slate-500">
+                <Loader2 size={16} className="animate-spin" /> Φόρτωση...
+              </div>
+            ) : list.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 py-16 text-center">
+                <FolderOpen size={28} className="mx-auto text-slate-600" />
+                <p className="mt-3 text-sm text-slate-400">
+                  {tab === 'owned' ? 'Δεν έχεις δημιουργήσει ακόμα project.' : 'Κανείς δεν έχει κοινοποιήσει project σε εσένα.'}
+                </p>
+                {tab === 'owned' && (
+                  <Link to="/app" className="mt-4 inline-block text-sm font-bold text-slate-100 hover:underline">
+                    Δημιούργησε το πρώτο σου project
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {list.map((p) => (
+                  <li key={p.name}>
+                    <button type="button" onClick={() => openProject(p.name)}
+                      className="w-full text-left rounded-2xl border border-slate-800 bg-slate-900/40 p-4 transition hover:border-slate-600 hover:bg-slate-900/80">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-bold text-slate-100 truncate">{p.name}</p>
+                        {p.members_count > 1 && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-300">
+                            <Users size={11} /> {p.members_count}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {tab === 'shared' && p.owner_name ? `Από ${p.owner_name} · ` : ''}
+                        Τελευταία αλλαγή {formatDate(p.updated_at || p.created_at)}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}

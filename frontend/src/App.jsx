@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from './config';
-import { Toaster } from 'react-hot-toast';
+import { useAuth } from './auth/AuthContext';
 import { FolderKanban } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
@@ -21,21 +21,28 @@ import UserMenu from './components/layout/UserMenu';
 import ShareProjectModal from './components/ShareProjectModal';
 
 function App() {
+  // Ο συνδεδεμένος χρήστης έρχεται από το AuthProvider (main.jsx).
+  const { user: currentUser } = useAuth();
+  // Το ενεργό project αποθηκεύεται ανά χρήστη, ώστε σε κοινό browser
+  // ο επόμενος χρήστης να μην προσπαθεί να ανοίξει το project του προηγούμενου.
+  const projectStorageKey = `current_active_project_${currentUser?.id ?? 'anon'}`;
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // --- APP BOOT STATES (ΓΙΑ ΤΟ LASCA INTRO) ---
-  const [isAppBooting, setIsAppBooting] = useState(true);
-  const [showIntroElement, setShowIntroElement] = useState(true);
+  // Το intro παίζει μία φορά ανά καρτέλα browser, όχι κάθε φορά που γυρνάς από το Προφίλ.
+  const introAlreadySeen = sessionStorage.getItem('lasca_intro_seen') === '1';
+  const [isAppBooting, setIsAppBooting] = useState(!introAlreadySeen);
+  const [showIntroElement, setShowIntroElement] = useState(!introAlreadySeen);
 
   // --- PROJECT MANAGEMENT STATES ---
   const [currentProject, setCurrentProject] = useState(() => {
-    return localStorage.getItem('current_active_project') || null;
+    return localStorage.getItem(projectStorageKey) || null;
   });
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isShareProjectOpen, setIsShareProjectOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
-  const [currentUser, setCurrentUser] = useState(null);
 
   // --- LOADER STATE (ΜΟΝΟ ΓΙΑ ΑΛΛΑΓΗ/ΔΗΜΙΟΥΡΓΙΑ PROJECT) ---
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
@@ -80,6 +87,8 @@ function App() {
 
   // --- 00. ΕΛΕΓΧΟΣ ΤΟΥ APP BOOT INTRO ---
   useEffect(() => {
+    if (introAlreadySeen) return undefined;
+    sessionStorage.setItem('lasca_intro_seen', '1');
     const fadeTimer = setTimeout(() => {
       setIsAppBooting(false);
     }, 4200);
@@ -130,12 +139,6 @@ function App() {
     setTrigHeightData([]);
   };
 
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/api/me`, { credentials: 'same-origin' })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => setCurrentUser(data || null))
-      .catch(() => setCurrentUser(null));
-  }, []);
 
   // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ) ---
   useEffect(() => {
@@ -215,7 +218,7 @@ function App() {
 
     savedProjects[currentProject] = projectState;
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
-    localStorage.setItem('current_active_project', currentProject);
+    localStorage.setItem(projectStorageKey, currentProject);
 
     // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
     fetch(`${API_BASE_URL}/api/projects/save`, {
@@ -349,9 +352,6 @@ function App() {
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans relative">
-      <Toaster position="bottom-right" toastOptions={{
-          style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
-      }} />
 
       {/* --- 🎬 INITIAL APP BOOT (LASCA INTRO) --- */}
       {showIntroElement && (

@@ -3,10 +3,6 @@ Lasca.venv/
 venv/
 ENV/
 .env
-<<<<<<< HEAD
-=======
-
->>>>>>> exe-try-2
 # Python cache (Αρχεία που φτιάχνει η Python για να τρέχει πιο γρήγορα)
 **/__pycache__/
 *.py[cod]
@@ -34,3 +30,9 @@ desktop.ini
 
 not_4_git/
 Topo_Workspace/
+# Δεδομένα web έκδοσης: ΠΟΤΕ στο git (emails, κωδικοί, projects χρηστών)
+*.db
+code/lasca_data/
+code/feedback_uploads/
+local_data/
+code/.env

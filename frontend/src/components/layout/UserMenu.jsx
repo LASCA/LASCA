@@ -1,33 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import axios from 'axios';
-import { API_BASE_URL } from '../../config';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { ChevronDown, LogOut, Share2, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const UserMenu = ({ user, currentProject, onOpenShareProject }) => {
+const UserMenu = ({ currentProject, onOpenShareProject }) => {
+  const navigate = useNavigate();
+  const { user: currentUser, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(user || null);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
-    setCurrentUser(user || null);
     setAvatarFailed(false);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) {
-      let isMounted = true;
-      axios.get(`${API_BASE_URL}/api/me`)
-        .then((response) => {
-          if (isMounted) setCurrentUser(response.data || null);
-        })
-        .catch(() => {
-          if (isMounted) setCurrentUser(null);
-        });
-      return () => { isMounted = false; };
-    }
-  }, [user]);
+  }, [currentUser?.avatar_url]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -61,9 +47,7 @@ const UserMenu = ({ user, currentProject, onOpenShareProject }) => {
 
   const handleProfileClick = () => {
     setMenuOpen(false);
-    if (typeof window !== 'undefined') {
-      window.location.assign('/profile');
-    }
+    navigate('/profile');
   };
 
   const handleShareClick = () => {
@@ -75,14 +59,11 @@ const UserMenu = ({ user, currentProject, onOpenShareProject }) => {
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API_BASE_URL}/api/logout`);
-      setCurrentUser(null);
+      await logout();
       toast.success('Αποσυνδεθήκατε επιτυχώς');
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Αποτυχία αποσύνδεσης');
+      navigate('/', { replace: true });
+    } catch {
+      toast.error('Αποτυχία αποσύνδεσης');
     } finally {
       setMenuOpen(false);
     }
