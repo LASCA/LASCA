@@ -4857,13 +4857,7 @@ def export_trig_leveling_report():
         return jsonify({'error': str(e)}), 500
     
 if __name__ == '__main__':
-    port = find_free_port()
-
-    def run_server():
-        app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
-
-    server_thread = threading.Thread(target=run_server, daemon=True)
-    server_thread.start()
-
-    webview.create_window('LASCA', f'http://127.0.0.1:{port}', maximized=True)
-    webview.start(debug=False)
+    port = 5000
+    print(f"\n🚀 LASCA backend τρέχει στο http://127.0.0.1:{port}")
+    print(f"👉 Frontend: http://localhost:5173 (npm run dev)\n")
+    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)

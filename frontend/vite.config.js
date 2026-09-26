@@ -5,8 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     watch: {
-      // Εξαιρεί ρητά όλο τον φάκελο του backend ή οποιοδήποτε json αρχείο εκτός frontend
-      ignored: ['**/backend/**', '**/*.json'] 
+      ignored: ['**/backend/**', '**/*.json']
+    },
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      }
     }
   }
 })
