@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './topbar';
 import { ChevronDown, LogOut, Share2, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -74,26 +75,27 @@ const UserMenu = ({ currentProject, onOpenShareProject }) => {
       <button
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
-        className="flex items-center gap-2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/50 text-slate-200 text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-lg backdrop-blur-sm max-w-[220px]"
+        title={displayName}
+        className={`${TOPBAR_ITEM} ${TOPBAR_NEUTRAL} max-w-[220px] px-1.5 md:px-3`}
       >
         {!currentUser?.avatar_url || avatarFailed ? (
-          <div className="w-6 h-6 rounded-full bg-slate-700 text-[10px] font-bold text-slate-100 flex items-center justify-center border border-slate-600">
+          <div className="w-6 h-6 shrink-0 rounded-full bg-slate-700 text-[10px] font-bold text-slate-100 flex items-center justify-center border border-slate-600">
             {initials}
           </div>
         ) : (
           <img
             src={currentUser.avatar_url}
             alt={displayName}
-            className="w-6 h-6 object-cover rounded-full border border-slate-600"
+            className="w-6 h-6 shrink-0 object-cover rounded-full border border-slate-600"
             onError={() => setAvatarFailed(true)}
           />
         )}
-        <span className="truncate max-w-[140px]">{displayName}</span>
-        <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+        <span className="hidden md:inline truncate max-w-[140px]">{displayName}</span>
+        <ChevronDown size={14} className={`hidden md:block shrink-0 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-700/60 bg-slate-950/95 shadow-2xl backdrop-blur-sm overflow-hidden z-[70]">
+        <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-700/60 bg-slate-950/95 shadow-2xl backdrop-blur-sm overflow-hidden z-[70]">
           <button
             type="button"
             onClick={handleProfileClick}

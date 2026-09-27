@@ -18,6 +18,7 @@ import TrigonometricHeight from './components/calculations/Levelings/trig_leveli
 import LascaLoader from './components/animations/LascaLoader';
 import LascaIntro from './components/animations/LascaIntro';
 import UserMenu from './components/layout/UserMenu';
+import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './components/layout/topbar';
 import ShareProjectModal from './components/ShareProjectModal';
 
 function App() {
@@ -390,25 +391,45 @@ function App() {
 
       <div className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         
-        <div className="absolute top-4 right-6 z-50 flex items-center gap-3">
-          {currentProject && (
-            <span className="text-[10px] font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 rounded-lg shadow-sm">
-              Project: {currentProject}
-            </span>
-          )}
-          <button 
-            onClick={() => setIsProjectModalOpen(true)}
-            className="flex items-center gap-2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/50 text-slate-300 text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-lg backdrop-blur-sm group"
-          >
-            <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
-            {currentProject ? "Αλλαγή Project" : "Επιλογή Project"}
-          </button>
-          <UserMenu user={currentUser} currentProject={currentProject} onOpenShareProject={() => setIsShareProjectOpen(true)} />
-        </div>
+        {/* Μπάρα πάνω δεξιά: είναι κανονική γραμμή (όχι absolute), οπότε το περιεχόμενο
+            περνάει από κάτω της στο scroll και δεν πέφτει ποτέ πάνω της. */}
+        {(() => {
+          const topActions = (
+            <div className="flex items-center gap-2 sm:gap-3 flex-nowrap min-w-0">
+              {currentProject && (
+                <div className="hidden lg:block min-w-0">
+                  <span
+                    title={currentProject}
+                    className={`${TOPBAR_ITEM} px-3.5 max-w-[260px] border-emerald-500/25 bg-emerald-500/10 text-emerald-300`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="font-medium text-emerald-500/80">Project</span>
+                    <span className="truncate">{currentProject}</span>
+                  </span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsProjectModalOpen(true)}
+                title={currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}
+                className={`${TOPBAR_ITEM} ${TOPBAR_NEUTRAL} px-2.5 md:px-3.5 group`}
+              >
+                <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                <span className="hidden md:inline">{currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}</span>
+              </button>
+              <UserMenu currentProject={currentProject} onOpenShareProject={() => setIsShareProjectOpen(true)} />
+            </div>
+          );
+          return activeTab === 'dashboard' ? (
+            <div className="h-16 shrink-0 px-6 flex items-center justify-end border-b border-slate-800/60 bg-[#0b1120]/70 relative z-20">
+              {topActions}
+            </div>
+          ) : (
+            <Header activeTab={activeTab}>{topActions}</Header>
+          );
+        })()}
 
-        {activeTab !== 'dashboard' && <Header activeTab={activeTab} />}
-
-        <main className={`flex-1 p-8 pl-12 overflow-y-auto ${activeTab === 'dashboard' ? 'pt-12' : ''}`}>
+        <main className="flex-1 p-8 pl-12 overflow-y-auto">
           <div className="max-w-[1800px] mx-auto h-full">
             
             {activeTab === 'dashboard' && (

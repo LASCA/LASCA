@@ -7,8 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import { 
   Plus, FolderOpen, Upload, 
   FileSpreadsheet, LayoutGrid,
-  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User,
-  RefreshCw
+  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User
 } from 'lucide-react';
 import { 
   ResponsiveContainer, ScatterChart, Scatter, 
@@ -549,16 +548,6 @@ const Dashboard = ({
                       {stakeoutCount}
                     </span>
                  </div>
-              </div>
-
-              {/* Status Indicators at the bottom */}
-              <div className="flex flex-col gap-1.5 shrink-0 pt-2 border-t border-slate-800/50">
-                  <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-colors ${hasData ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
-                     <RefreshCw size={13} />
-                     <span className="text-[10px] font-bold tracking-wide">
-                       {hasData ? 'Συγχρονισμός: OK' : 'Απαιτείται Εισαγωγή'}
-                     </span>
-                  </div>
               </div>
 
             </div>

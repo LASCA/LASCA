@@ -15,7 +15,7 @@ import {
   VasikoiYpologismoiIcon
 } from '../icons';
 
-const Header = ({ activeTab }) => {
+const Header = ({ activeTab, children }) => {
   // Ενημερωμένο configuration με τα νέα custom εικονίδια
   const getHeaderConfig = () => {
     switch(activeTab) {
@@ -96,6 +96,9 @@ const Header = ({ activeTab }) => {
         </div>
 
       </div>
+
+      {/* ΔΕΞΙ ΚΟΜΜΑΤΙ: Project / Αλλαγή Project / Χρήστης */}
+      {children && <div className="z-10 flex items-center min-w-0 ml-4">{children}</div>}
 
     </header>
   );
