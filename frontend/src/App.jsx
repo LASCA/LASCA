@@ -421,7 +421,9 @@ function App() {
             </div>
           );
           return activeTab === 'dashboard' ? (
-            <div className="h-16 shrink-0 px-6 flex items-center justify-end border-b border-slate-800/60 bg-[#0b1120]/70 relative z-20">
+            // Χωρίς πλαίσιο: διάφανη γραμμή, ίδιο φόντο με τη σελίδα. Επειδή είναι έξω από το
+            // κομμάτι που κάνει scroll, το περιεχόμενο δεν περνάει ποτέ πάνω από τα widgets.
+            <div className="shrink-0 px-6 pt-4 flex items-center justify-end relative z-20">
               {topActions}
             </div>
           ) : (
@@ -429,7 +431,7 @@ function App() {
           );
         })()}
 
-        <main className="flex-1 p-8 pl-12 overflow-y-auto">
+        <main className={`flex-1 p-8 pl-12 overflow-y-auto ${activeTab === 'dashboard' ? 'pt-2' : ''}`}>
           <div className="max-w-[1800px] mx-auto h-full">
             
             {activeTab === 'dashboard' && (
