@@ -1,22 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Cloud, FileDown, Users } from 'lucide-react';
+// Γραμματοσειρά Archivo για τη λέξη LASCA (τοπικά, χωρίς κλήση στους servers της Google).
+// Εγκατάσταση μία φορά: cd frontend && npm install @fontsource/archivo
+import '@fontsource/archivo/800.css';
 import { useAuth } from '../auth/AuthContext';
-import { BrandMark, SurveyGrid } from '../components/auth/AuthLayout';
+import { SurveyGrid } from '../components/auth/AuthLayout';
 import {
   GoniometriseisIcon, SynorthosiStathmouIcon, TrigonometrikiYpsometriaIcon, GeometrikiChorostathmisiIcon,
   VasikoiYpologismoiIcon, OdefsiIcon, TachymetriaIcon, CharaxiIcon,
 } from '../components/icons';
 
 const MODULES = [
-  { Icon: OdefsiIcon, title: 'Όδευση', text: 'Οριζοντιογραφία (X,Y) και υψομετρία (H), με κλείσιμο και διόρθωση σφαλμάτων.' },
+  { Icon: OdefsiIcon, title: 'Όδευση', text: 'Οριζοντιογραφία (X,Y) και υψομετρία (H), με διαγράμματα σε κλίμακα.' },
   { Icon: GeometrikiChorostathmisiIcon, title: 'Γεωμετρική Χωροστάθμηση', text: 'Μετάβαση-επιστροφή, σφάλμα κλεισίματος και υψόμετρα σημείων.' },
   { Icon: TrigonometrikiYpsometriaIcon, title: 'Τριγωνομετρική Υψομετρία', text: 'Υψομετρικές διαφορές από ζενίθιες γωνίες και αποστάσεις.' },
-  { Icon: TachymetriaIcon, title: 'Αποτύπωση', text: 'Ταχυμετρία από Excel, συντεταγμένες σημείων και σχέδιο.' },
-  { Icon: CharaxiIcon, title: 'Χάραξη', text: 'Στοιχεία χάραξης γωνίας και απόστασης από στάση και προσανατολισμό.' },
+  { Icon: TachymetriaIcon, title: 'Αποτύπωση', text: 'Υπολογισμός συντεταγμένων από μετρήσεις πεδίου, και εξαγωγή σημείων σε σχέδιο.' },
+  { Icon: CharaxiIcon, title: 'Χάραξη', text: 'Χάραξη σημείων από συντεταγμένες και δημιουργία διαγράμματος.' },
   { Icon: SynorthosiStathmouIcon, title: 'Συνόρθωση Σταθμού', text: 'Συνόρθωση παρατηρήσεων σταθμού και ακρίβειες.' },
-  { Icon: GoniometriseisIcon, title: 'Γωνιομετρήσεις', text: 'Μέσοι όροι κύκλων, διευθύνσεις και έλεγχοι.' },
-  { Icon: VasikoiYpologismoiIcon, title: 'Βασικοί Υπολογισμοί', text: 'Θεμελιώδη προβλήματα, εμπροσθοτομία, οπισθοτομία, κλίμακα.' },
+  { Icon: GoniometriseisIcon, title: 'Γωνιομετρήσεις', text: 'Μέσοι όροι, αναγωγές και στατιστικοί έλεγχοι.' },
+  { Icon: VasikoiYpologismoiIcon, title: 'Βασικοί Υπολογισμοί', text: 'Θεμελιώδη προβλήματα, εμπροσθοτομία, οπισθοτομία, υπολογισμός συντελεστή κλίμακας.' },
 ];
 
 const FEATURES = [
@@ -24,6 +27,34 @@ const FEATURES = [
   { Icon: Users, title: 'Κοινά projects', text: 'Μοιράσου ένα project με την ομάδα της άσκησης και δουλέψτε στα ίδια δεδομένα.' },
   { Icon: FileDown, title: 'Εξαγωγή αποτελεσμάτων', text: 'Αναφορές PDF, σχέδια DXF, Excel, GeoJSON και KML με ένα κλικ.' },
 ];
+
+// Κοινό στυλ για τα widgets: μικρό μεγάλωμα στο hover (και στο focus με πληκτρολόγιο).
+// Το motion-reduce το απενεργοποιεί για όσους έχουν ζητήσει λιγότερη κίνηση στο λειτουργικό τους.
+const WIDGET_HOVER =
+  'transition duration-200 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:border-slate-600 ' +
+  'hover:bg-slate-900/80 hover:shadow-xl hover:shadow-black/40 motion-reduce:transition-none motion-reduce:hover:transform-none';
+
+// Το λογότυπο της LASCA (όχι το app icon) με τη λέξη LASCA σε Archivo.
+function LascaLogo({ height = 30, withText = true, textClass = 'text-xl' }) {
+  return (
+    <Link to="/" className="inline-flex items-center gap-2.5" aria-label="LASCA αρχική">
+      <img
+        src="../public/LASCA-logo-red-blue-1024.png"
+        alt=""
+        style={{ height, width: 'auto' }}
+        draggable="false"
+      />
+      {withText && (
+        <span
+          className={`${textClass} font-extrabold tracking-[0.12em] text-slate-100 leading-none`}
+          style={{ fontFamily: "'Archivo', sans-serif" }}
+        >
+          LASCA
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function Landing() {
   const { user } = useAuth();
@@ -33,7 +64,7 @@ export default function Landing() {
       {/* --- Μπάρα πλοήγησης --- */}
       <header className="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <BrandMark size={32} />
+          <LascaLogo height={30} />
           <nav className="flex items-center gap-2 sm:gap-3">
             <a href="#modules" className="hidden sm:inline px-3 text-sm text-slate-400 hover:text-slate-100">Εργαλεία</a>
             {user ? (
@@ -59,16 +90,13 @@ export default function Landing() {
       <section className="relative overflow-hidden">
         <SurveyGrid />
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 text-center">
-          <p className="inline-block rounded-full border border-slate-700/70 bg-slate-900/70 px-3 py-1 text-[11px] font-mono tracking-[0.25em] text-slate-400">
-            ΑΓΡΟΝΟΜΩΝ-ΤΟΠΟΓΡΑΦΩΝ ΜΗΧΑΝΙΚΩΝ ΑΠΘ
-          </p>
-          <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-black leading-[1.1] text-slate-50 sm:text-6xl">
+          <h1 className="mx-auto max-w-3xl text-4xl font-black leading-[1.1] text-slate-50 sm:text-6xl">
             Όλοι οι τοπογραφικοί υπολογισμοί,{' '}
-            <span className="bg-gradient-to-r from-[#e0424a] to-[#4d6bef] bg-clip-text text-transparent">σε ένα εργαλείο.</span>
+            <span className="bg-gradient-to-r from-[#e0424a] to-[#4d6bef] bg-clip-text text-transparent">σε μια εφαρμογή</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-slate-400 sm:text-lg">
-            Η LASCA κάνει οδεύσεις, χωροσταθμήσεις, αποτυπώσεις και χαράξεις από τον browser σου,
-            κρατάει τα projects σου και σε αφήνει να τα μοιράζεσαι με την ομάδα σου.
+            Λύσε οδεύσεις, χωροσταθμήσεις, αποτυπώσεις και χαράξεις από τον browser σου,
+            μοιράσου τα project με την ομάδα σου, και εξήγαγε τα αποτελέσματά σου.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {user ? (
@@ -97,8 +125,9 @@ export default function Landing() {
           <p className="mt-2 max-w-xl text-slate-400">Όσα χρειάζεσαι για τις ασκήσεις και τις εργασίες πεδίου.</p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {MODULES.map(({ Icon, title, text }) => (
-              <div key={title} className="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 transition hover:border-slate-700 hover:bg-slate-900/80">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-950 text-slate-300 group-hover:text-white">
+              <div key={title} tabIndex={0}
+                className={`group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 outline-none focus-visible:ring-2 focus-visible:ring-[#3b5bdb]/50 ${WIDGET_HOVER}`}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-950 text-slate-300 transition-colors group-hover:text-white">
                   <Icon size={20} color="currentColor" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-100">{title}</h3>
@@ -111,9 +140,10 @@ export default function Landing() {
 
       {/* --- Χαρακτηριστικά --- */}
       <section className="border-t border-slate-800/70">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 py-20 md:grid-cols-3">
+        <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:px-6 py-20 md:grid-cols-3">
           {FEATURES.map(({ Icon, title, text }) => (
-            <div key={title}>
+            <div key={title} tabIndex={0}
+              className={`rounded-2xl border border-slate-800/60 bg-slate-900/20 p-6 outline-none focus-visible:ring-2 focus-visible:ring-[#3b5bdb]/50 ${WIDGET_HOVER}`}>
               <Icon size={22} className="text-[#6d85f0]" />
               <h3 className="mt-4 font-bold text-slate-100">{title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{text}</p>
@@ -126,7 +156,7 @@ export default function Landing() {
       {!user && (
         <section className="border-t border-slate-800/70">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 py-20 text-center">
-            <h2 className="text-2xl font-black text-slate-50 sm:text-3xl">Έτοιμος για την επόμενη άσκηση;</h2>
+            <h2 className="text-2xl font-black text-slate-50 sm:text-3xl">Αυτοματοποίησε την δουλειά σου!</h2>
             <Link to="/signup" className="mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-slate-100 px-7 text-sm font-bold text-slate-900 hover:bg-white">
               Ξεκίνα δωρεάν <ArrowRight size={16} />
             </Link>
@@ -136,7 +166,7 @@ export default function Landing() {
 
       <footer className="border-t border-slate-800/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:px-6 py-8 text-xs text-slate-500 sm:flex-row">
-          <BrandMark size={22} />
+          <LascaLogo height={22} textClass="text-sm" />
           <p>© {new Date().getFullYear()} LASCA · Land Surveying Computations Application</p>
           <a href="/LASCA_Manual.pdf" target="_blank" rel="noreferrer" className="hover:text-slate-300">Εγχειρίδιο χρήσης</a>
         </div>
