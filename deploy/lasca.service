@@ -1,0 +1,17 @@
+# systemd service: κρατάει τη LASCA να τρέχει πάντα και την ξεκινάει μόνη της μετά από restart.
+# Αντιγραφή:  sudo cp deploy/lasca.service /etc/systemd/system/lasca.service
+[Unit]
+Description=LASCA web (gunicorn)
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/lasca
+# Οι ρυθμίσεις (SECRET_KEY κ.λπ.) διαβάζονται από το /srv/lasca/code/.env
+ExecStart=/srv/lasca/venv/bin/gunicorn --pythonpath code --workers 2 --threads 4 --timeout 120 --bind 127.0.0.1:8000 main_4_app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

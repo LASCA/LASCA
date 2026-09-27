@@ -181,8 +181,33 @@ def create_survey_cad_drawing(
     drawing.add(String(width - 25, height - 7, 'N', fontName='Helvetica-Bold', fontSize=9, textAnchor='middle', fillColor=colors.HexColor('#475569')))
     return drawing
 
+def _find_pdf_fonts():
+    """Βρίσκει γραμματοσειρά με ελληνικά για τα PDF, σε Windows και σε Linux.
+
+    Στα Windows χρησιμοποιεί την Arial. Στον Linux server (Oracle) τη Liberation Sans,
+    που έχει ακριβώς τις ίδιες διαστάσεις με την Arial, οπότε οι αναφορές βγαίνουν ίδιες.
+    Εγκατάσταση στον server: sudo apt install fonts-liberation fonts-dejavu-core
+    Μπορείς να ορίσεις δικά σου αρχεία με PDF_FONT και PDF_FONT_BOLD στο .env.
+    """
+    candidates = [
+        (os.getenv('PDF_FONT', ''), os.getenv('PDF_FONT_BOLD', '')),
+        ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf'),
+        ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'),
+        ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+         '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+    ]
+    for regular, bold in candidates:
+        if regular and bold and os.path.isfile(regular) and os.path.isfile(bold):
+            return regular, bold
+    print("Προσοχή: δεν βρέθηκε γραμματοσειρά με ελληνικά για τα PDF (π.χ. fonts-liberation).")
+    return 'arial.ttf', 'arialbd.ttf'
+
+
+PDF_FONT_PATH, PDF_FONT_BOLD_PATH = _find_pdf_fonts()
+
 try:
-    pdfmetrics.registerFont(TTFont('ArialGreek', 'arial.ttf'))
+    pdfmetrics.registerFont(TTFont('ArialGreek', PDF_FONT_PATH))
     font_name = 'ArialGreek'
 except:
     print("Προσοχή: Δεν βρέθηκε η γραμματοσειρά Arial. Τα Ελληνικά μπορεί να μην εμφανίζονται σωστά.")
@@ -366,6 +391,25 @@ class ProjectMember(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+
+# Endpoints που επιτρέπονται χωρίς σύνδεση. Όλα τα υπόλοιπα /api/* (υπολογισμοί,
+# αναφορές, projects) θέλουν συνδεδεμένο χρήστη, ώστε κανείς να μην μπορεί να
+# χρησιμοποιεί τον server ή να γράφει σε φακέλους projects χωρίς λογαριασμό.
+PUBLIC_API_PATHS = {
+    '/api/login', '/api/register', '/api/logout', '/api/me',
+    '/api/auth/config', '/api/auth/google',
+}
+
+
+@app.before_request
+def require_login_for_api():
+    if request.method == 'OPTIONS':
+        return None
+    if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS \
+            and not current_user.is_authenticated:
+        return jsonify({"error": "Απαιτείται σύνδεση"}), 401
+    return None
 
 
 with app.app_context():
@@ -1215,8 +1259,8 @@ def export_goniometry_report():
         proj_location = extract_field(['location', 'place', 'address'])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
@@ -1612,8 +1656,8 @@ def export_adjustment_report():
                 raw_observations = observations
         
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
@@ -2048,8 +2092,8 @@ def export_traverse_report():
         proj_location = extract_field(['location', 'place', 'address'])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
 
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
@@ -3882,8 +3926,8 @@ def export_stakeout_report():
         proj_location = extract_field(['location', 'place', 'address'])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
         try:
             pdfmetrics.registerFont(TTFont('GreekFont', font_path))
             pdfmetrics.registerFont(TTFont('GreekFont-Bold', font_bold_path))
@@ -4325,8 +4369,8 @@ def export_intersection_report():
         proj_location = extract_field(["location", "place", "address"])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
         try:
             pdfmetrics.registerFont(TTFont("GreekFont", font_path))
             pdfmetrics.registerFont(TTFont("GreekFont-Bold", font_bold_path))
@@ -4683,8 +4727,8 @@ def export_resection_report():
         proj_location = extract_field(["location", "place", "address"])
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold_path = "C:/Windows/Fonts/arialbd.ttf"
+        font_path = PDF_FONT_PATH
+        font_bold_path = PDF_FONT_BOLD_PATH
         try:
             pdfmetrics.registerFont(TTFont("GreekFont", font_path))
             pdfmetrics.registerFont(TTFont("GreekFont-Bold", font_bold_path))
@@ -5134,8 +5178,8 @@ def export_trig_leveling_report():
 
         # --- ΕΓΓΡΑΦΗ ΓΡΑΜΜΑΤΟΣΕΙΡΩΝ ---
         try:
-            pdfmetrics.registerFont(TTFont('TrigGreekFont', 'C:/Windows/Fonts/arial.ttf'))
-            pdfmetrics.registerFont(TTFont('TrigGreekFont-Bold', 'C:/Windows/Fonts/arialbd.ttf'))
+            pdfmetrics.registerFont(TTFont('TrigGreekFont', PDF_FONT_PATH))
+            pdfmetrics.registerFont(TTFont('TrigGreekFont-Bold', PDF_FONT_BOLD_PATH))
             registerFontFamily('TrigGreekFont', normal='TrigGreekFont', bold='TrigGreekFont-Bold')
             my_font, my_font_bold = 'TrigGreekFont', 'TrigGreekFont-Bold'
         except Exception:
