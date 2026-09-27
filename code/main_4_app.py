@@ -387,7 +387,18 @@ def user_has_project_access(user, project):
 def project_record_by_name(project_name):
     if not project_name:
         return None
-    return Project.query.filter(db.func.lower(Project.name) == str(project_name).strip().lower()).first()
+    name = str(project_name).strip()
+    project = Project.query.filter_by(name=name).first()
+    if project is not None:
+        return project
+    # Αναζήτηση χωρίς διάκριση κεφαλαίων/πεζών. Γίνεται στην Python και όχι με το
+    # lower() της SQLite, γιατί εκείνο δεν μετατρέπει ελληνικά (π.χ. «Άσκηση» ≠ «άσκηση»),
+    # οπότε ένα project με ελληνικό όνομα δεν βρισκόταν ποτέ.
+    target = name.casefold()
+    for candidate in Project.query.all():
+        if candidate.name.casefold() == target:
+            return candidate
+    return None
 
 
 def project_access_error(project_name):
@@ -1086,6 +1097,8 @@ def load_project():
             db.session.commit()
         elif not user_has_project_access(current_user, project):
             return project_access_error(project_name)
+        # Πάντα το όνομα όπως είναι αποθηκευμένο, ώστε να ανοίγει ο ίδιος φάκελος.
+        project_name = project.name
 
         project_dir = resolve_project_dir(WORKSPACE_DIR, project_name)
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -1116,6 +1129,7 @@ def save_project():
             return jsonify({"error": "Το project δεν βρέθηκε ή δεν είναι διαθέσιμο"}), 404
         if not user_has_project_access(current_user, project):
             return project_access_error(project_name)
+        project_name = project.name
 
         topo_project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
         topo_project.save_state(current_state)
