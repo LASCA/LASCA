@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Camera, FolderOpen, Loader2, LogOut, Users } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiErrorMessage, useAuth } from '../auth/AuthContext';
-import { BrandMark } from '../components/auth/AuthLayout';
+import LascaLogo, { WIDGET_HOVER } from '../components/brand/LascaLogo';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
@@ -119,7 +119,8 @@ export default function Profile() {
             <Link to="/app" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/80 px-3 text-xs font-bold text-slate-200 hover:bg-slate-800">
               <ArrowLeft size={15} /> <span className="hidden sm:inline">Πίσω στην εφαρμογή</span>
             </Link>
-            <BrandMark size={28} withText={false} />
+            <span className="hidden sm:inline-flex"><LascaLogo height={26} textClass="text-lg" /></span>
+            <span className="sm:hidden inline-flex"><LascaLogo height={26} withText={false} /></span>
           </div>
           <button onClick={handleLogout}
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold text-rose-300 hover:bg-rose-500/10">
@@ -204,7 +205,7 @@ export default function Profile() {
                 {list.map((p) => (
                   <li key={p.name}>
                     <button type="button" onClick={() => openProject(p.name)}
-                      className="w-full text-left rounded-2xl border border-slate-800 bg-slate-900/40 p-4 transition hover:border-slate-600 hover:bg-slate-900/80">
+                      className={`w-full text-left rounded-2xl border border-slate-800 bg-slate-900/40 p-4 ${WIDGET_HOVER}`}>
                       <div className="flex items-start justify-between gap-3">
                         <p className="font-bold text-slate-100 truncate">{p.name}</p>
                         {p.members_count > 1 && (

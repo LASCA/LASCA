@@ -1,11 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Cloud, FileDown, Users } from 'lucide-react';
-// Γραμματοσειρά Archivo για τη λέξη LASCA (τοπικά, χωρίς κλήση στους servers της Google).
-// Εγκατάσταση μία φορά: cd frontend && npm install @fontsource/archivo
-import '@fontsource/archivo/800.css';
 import { useAuth } from '../auth/AuthContext';
 import { SurveyGrid } from '../components/auth/AuthLayout';
+import LascaLogo, { WIDGET_HOVER } from '../components/brand/LascaLogo';
 import {
   GoniometriseisIcon, SynorthosiStathmouIcon, TrigonometrikiYpsometriaIcon, GeometrikiChorostathmisiIcon,
   VasikoiYpologismoiIcon, OdefsiIcon, TachymetriaIcon, CharaxiIcon,
@@ -27,34 +25,6 @@ const FEATURES = [
   { Icon: Users, title: 'Κοινά projects', text: 'Μοιράσου ένα project με την ομάδα της άσκησης και δουλέψτε στα ίδια δεδομένα.' },
   { Icon: FileDown, title: 'Εξαγωγή αποτελεσμάτων', text: 'Αναφορές PDF, σχέδια DXF, Excel, GeoJSON και KML με ένα κλικ.' },
 ];
-
-// Κοινό στυλ για τα widgets: μικρό μεγάλωμα στο hover (και στο focus με πληκτρολόγιο).
-// Το motion-reduce το απενεργοποιεί για όσους έχουν ζητήσει λιγότερη κίνηση στο λειτουργικό τους.
-const WIDGET_HOVER =
-  'transition duration-200 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:border-slate-600 ' +
-  'hover:bg-slate-900/80 hover:shadow-xl hover:shadow-black/40 motion-reduce:transition-none motion-reduce:hover:transform-none';
-
-// Το λογότυπο της LASCA (όχι το app icon) με τη λέξη LASCA σε Archivo.
-function LascaLogo({ height = 30, withText = true, textClass = 'text-xl' }) {
-  return (
-    <Link to="/" className="inline-flex items-center gap-2.5" aria-label="LASCA αρχική">
-      <img
-        src="../public/LASCA-logo-red-blue-1024.png"
-        alt=""
-        style={{ height, width: 'auto' }}
-        draggable="false"
-      />
-      {withText && (
-        <span
-          className={`${textClass} font-extrabold tracking-[0.12em] text-slate-100 leading-none`}
-          style={{ fontFamily: "'Archivo', sans-serif" }}
-        >
-          LASCA
-        </span>
-      )}
-    </Link>
-  );
-}
 
 export default function Landing() {
   const { user } = useAuth();
@@ -126,7 +96,7 @@ export default function Landing() {
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {MODULES.map(({ Icon, title, text }) => (
               <div key={title} tabIndex={0}
-                className={`group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 outline-none focus-visible:ring-2 focus-visible:ring-[#3b5bdb]/50 ${WIDGET_HOVER}`}>
+                className={`group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 ${WIDGET_HOVER}`}>
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-950 text-slate-300 transition-colors group-hover:text-white">
                   <Icon size={20} color="currentColor" />
                 </div>
@@ -143,7 +113,7 @@ export default function Landing() {
         <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:px-6 py-20 md:grid-cols-3">
           {FEATURES.map(({ Icon, title, text }) => (
             <div key={title} tabIndex={0}
-              className={`rounded-2xl border border-slate-800/60 bg-slate-900/20 p-6 outline-none focus-visible:ring-2 focus-visible:ring-[#3b5bdb]/50 ${WIDGET_HOVER}`}>
+              className={`rounded-2xl border border-slate-800/60 bg-slate-900/20 p-6 ${WIDGET_HOVER}`}>
               <Icon size={22} className="text-[#6d85f0]" />
               <h3 className="mt-4 font-bold text-slate-100">{title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{text}</p>

@@ -1,23 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-
-// Το σήμα της LASCA (το εικονίδιο από το public/).
-export function BrandMark({ size = 36, withText = true, className = '' }) {
-  return (
-    <Link to="/" className={`inline-flex items-center gap-2.5 ${className}`} aria-label="LASCA αρχική">
-      <img
-        src="/LASCA-icon-red-blue-1024.png"
-        alt=""
-        width={size}
-        height={size}
-        className="rounded-[22%] shadow-lg shadow-black/40"
-      />
-      {withText && (
-        <span className="text-lg font-black tracking-[0.2em] text-slate-100">LASCA</span>
-      )}
-    </Link>
-  );
-}
+import LascaLogo from '../brand/LascaLogo';
 
 // Κοινό πλαίσιο για Σύνδεση / Εγγραφή: αριστερά η ταυτότητα, δεξιά η φόρμα.
 export default function AuthLayout({ title, subtitle, children, footer }) {
@@ -27,24 +9,24 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
         {/* Αριστερό πάνελ: μόνο σε μεγάλες οθόνες */}
         <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-slate-800/80 p-12">
           <SurveyGrid />
-          <div className="relative"><BrandMark size={40} /></div>
+          <div className="relative"><LascaLogo height={36} textClass="text-2xl" /></div>
           <div className="relative max-w-md">
             <p className="text-[11px] font-mono tracking-[0.3em] text-slate-500 mb-4">LAND SURVEYING COMPUTATIONS</p>
             <h2 className="text-4xl font-black leading-tight text-slate-50">
-              Οι υπολογισμοί της Τοπογραφίας,{' '}
-              <span className="bg-gradient-to-r from-[#e0424a] to-[#3b5bdb] bg-clip-text text-transparent">σε ένα μέρος.</span>
+              Όλοι οι τοπογραφικοί υπολογισμοί,{' '}
+              <span className="bg-gradient-to-r from-[#e0424a] to-[#4d6bef] bg-clip-text text-transparent">σε μια εφαρμογή</span>
             </h2>
             <p className="mt-5 text-slate-400 leading-relaxed">
-              Οδεύσεις, χωροστάθμηση, ταχυμετρία, χάραξη και συνορθώσεις, με αποθήκευση στο cloud
-              και κοινά projects με την ομάδα σου.
+              Λύσε οδεύσεις, χωροσταθμήσεις, αποτυπώσεις και χαράξεις από τον browser σου,
+              μοιράσου τα project με την ομάδα σου, και εξήγαγε τα αποτελέσματά σου.
             </p>
           </div>
-          <p className="relative text-xs text-slate-600">Για φοιτητές Αγρονόμων-Τοπογράφων Μηχανικών ΑΠΘ</p>
+          <p className="relative text-xs text-slate-600">© {new Date().getFullYear()} LASCA · Land Surveying Computations Application</p>
         </aside>
 
         {/* Φόρμα */}
         <main className="flex flex-col px-5 py-8 sm:px-10">
-          <div className="lg:hidden mb-10"><BrandMark size={34} /></div>
+          <div className="lg:hidden mb-10"><LascaLogo height={28} /></div>
           <div className="flex-1 flex items-center justify-center">
             <div className="w-full max-w-sm">
               <h1 className="text-2xl font-black text-slate-50">{title}</h1>
