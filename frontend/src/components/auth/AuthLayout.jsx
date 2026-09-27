@@ -11,7 +11,7 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
           <SurveyGrid />
           <div className="relative"><LascaLogo height={36} textClass="text-2xl" /></div>
           <div className="relative max-w-md">
-            <p className="text-[11px] font-mono tracking-[0.3em] text-slate-500 mb-4">LAND SURVEYING COMPUTATIONS</p>
+            <p className="text-[11px] font-mono tracking-[0.3em] text-slate-500 mb-4">LAND SURVEYING COMPUTATIONS APP</p>
             <h2 className="text-4xl font-black leading-tight text-slate-50">
               Όλοι οι τοπογραφικοί υπολογισμοί,{' '}
               <span className="bg-gradient-to-r from-[#e0424a] to-[#4d6bef] bg-clip-text text-transparent">σε μια εφαρμογή</span>
