@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { API_BASE_URL } from './config';
 import { Toaster } from 'react-hot-toast';
 import { FolderKanban } from 'lucide-react';
@@ -17,10 +17,14 @@ import BasicCalculations from './components/calculations/general/Basic_Calc';
 import TrigonometricHeight from './components/calculations/Levelings/trig_leveling';
 import LascaLoader from './components/animations/LascaLoader';
 import LascaIntro from './components/animations/LascaIntro';
+import useUpdateChecker from './utils/useUpdateChecker';
+import UpdateNotification from './components/UpdateNotification';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const updateInfo = useUpdateChecker();
 
   // --- APP BOOT STATES (ΓΙΑ ΤΟ LASCA INTRO) ---
   const [isAppBooting, setIsAppBooting] = useState(true);
@@ -90,6 +94,7 @@ function App() {
     };
   }, []);
 
+  /*
   useEffect(() => {
     const blockDevToolsShortcuts = (event) => {
       if (event.key === 'F12' || (event.shiftKey && event.ctrlKey && event.key.toLowerCase() === 'i') || (event.shiftKey && event.metaKey && event.key.toLowerCase() === 'i')) {
@@ -101,7 +106,7 @@ function App() {
     document.addEventListener('keydown', blockDevToolsShortcuts, true);
     return () => document.removeEventListener('keydown', blockDevToolsShortcuts, true);
   }, []);
-
+*/
 
   // --- ΚΑΘΑΡΙΣΜΟΣ STATE (RESET ALL DATA) ---
   const resetAllData = () => {
@@ -134,7 +139,6 @@ function App() {
       setIsDataLoaded(false);
       resetAllData();
       
-      // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
       fetch(`${API_BASE_URL}/api/projects/load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -206,7 +210,6 @@ function App() {
     localStorage.setItem('survey_projects', JSON.stringify(savedProjects));
     localStorage.setItem('current_active_project', currentProject);
 
-    // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
     fetch(`${API_BASE_URL}/api/projects/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -341,6 +344,7 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
           style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #1e293b', fontSize: '12px' }
       }} />
+      <UpdateNotification updateInfo={updateInfo} />
 
       {/* --- 🎬 INITIAL APP BOOT (LASCA INTRO) --- */}
       {showIntroElement && (

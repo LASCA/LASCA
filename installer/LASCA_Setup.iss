@@ -23,6 +23,10 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=..\code\assets\lasca-icon.ico
 ChangesAssociations=no
 
+; 🟢 Διασφάλιση ομαλής ενημέρωσης όταν η εφαρμογή είναι ήδη ανοιχτή
+CloseApplications=yes
+RestartApplications=yes
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
