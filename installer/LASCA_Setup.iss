@@ -10,10 +10,15 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 LicenseFile=..\LICENSE
-DefaultDirName={autopf}\LASCA
+
+; 🟢 Αλλαγή 1: Εγκατάσταση στο AppData του χρήστη (αποφεύγει το Program Files)
+DefaultDirName={userappdata}\LASCA
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-PrivilegesRequired=admin
+
+; 🟢 Αλλαγή 2: Δεν απαιτούνται δικαιώματα Admin (αποφεύγει το UAC block)
+PrivilegesRequired=lowest
+
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\installer-output
 OutputBaseFilename=LASCA_Setup
