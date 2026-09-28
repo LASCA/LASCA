@@ -4,7 +4,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8.0.10-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Flask](https://img.shields.io/badge/Flask-3.1.3-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: Source-Available](https://img.shields.io/badge/License-Source--Available-purple.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-success)]()
 
 LASCA is a desktop-oriented surveying and geodetic computation platform for field and office workflows. It combines a modern React interface with a Python and Flask backend to manage survey projects, compute measurements, generate engineering reports, and export CAD and PDF outputs for common geodetic tasks.
@@ -213,7 +213,7 @@ survey_project/
 
 ## License
 
-This project is distributed under the MIT License. See the [LICENSE](LICENSE) file for the full legal text.
+This project is distributed under the **LASCA Source-Available License**. Copyright (c) 2026 LASCA Team. Personal and educational use is permitted subject to the terms in the [LICENSE](LICENSE) file. Commercial Use and use to create or support Competing Products are strictly prohibited without prior written permission from the LASCA Team.
 
 ## Project Credits
 
