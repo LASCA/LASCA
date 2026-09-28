@@ -4,6 +4,7 @@ import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from 'react-hot-toast';
+import { saveBlobFile } from '../../../utils/save_blob_file';
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
   Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText,
@@ -178,36 +179,6 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     return isNaN(num) ? val : num.toFixed(decimals);
   };
 
-  const saveBlobFile = async (blob, defaultFileName, acceptedExtensions = ['.pdf', '.dxf', '.png']) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: 'File', accept: { '*/*': acceptedExtensions } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to download link:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = defaultFileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleRunTraverse = async () => {
     setIsLoading(true);
     try {
@@ -270,16 +241,17 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!plotImage) return;
     const imageData = plotImage.startsWith('data:') ? plotImage : `data:image/png;base64,${plotImage}`;
-    fetch(imageData)
-      .then(res => res.blob())
-      .then(blob => saveBlobFile(blob, 'traverse_plot.png'))
-      .catch(err => {
-        console.error('Σφάλμα λήψης εικόνας:', err);
-        alert('Αποτυχία λήψης γραφήματος.');
-      });
+    try {
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+      if (!await saveBlobFile(blob, 'traverse_plot.png', 'PNG Image', ['.png'], 'image/png')) return;
+    } catch (error) {
+      console.error('Σφάλμα λήψης εικόνας:', error);
+      alert('Αποτυχία λήψης γραφήματος.');
+    }
   };
 
   const handleDownloadDXF = async () => {
@@ -302,7 +274,10 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       }
 
       const blob = await response.blob();
-      await saveBlobFile(blob, 'Traverse_Diagram.dxf');
+      if (!await saveBlobFile(blob, 'Traverse_Diagram.dxf', 'DXF Drawing', ['.dxf'])) {
+        toast.dismiss(toastId);
+        return;
+      }
       toast.success('Το αρχείο DXF κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
       console.error('Σφάλμα κατά τη λήψη του DXF:', error);
@@ -331,7 +306,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Αποτυχία δημιουργίας GeoJSON');
       }
-      await saveBlobFile(await response.blob(), 'traverse_network.geojson', ['.geojson', '.json']);
+      if (!await saveBlobFile(await response.blob(), 'traverse_network.geojson', 'GeoJSON', ['.geojson', '.json'])) return;
       toast.success('Το GeoJSON κατέβηκε επιτυχώς!');
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή GeoJSON:', error);
@@ -362,7 +337,7 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Αποτυχία δημιουργίας KML');
       }
-      await saveBlobFile(await response.blob(), 'traverse_network.kml', ['.kml']);
+      if (!await saveBlobFile(await response.blob(), 'traverse_network.kml', 'KML', ['.kml'])) return;
       toast.success('Το KML κατέβηκε επιτυχώς!');
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή KML:', error);
@@ -416,7 +391,10 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
         ? `${sanitizedProjectName}_Traverse_Report.pdf`
         : 'Traverse_Report.pdf';
 
-      await saveBlobFile(blob, fileName);
+      if (!await saveBlobFile(blob, fileName, 'PDF Report', ['.pdf'], 'application/pdf')) {
+        toast.dismiss(toastId);
+        return;
+      }
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
       console.error('Σφάλμα κατά τη δημιουργία του Report:', error);

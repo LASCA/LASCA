@@ -4,6 +4,7 @@ import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cp
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import InputField from '../../InputField';
+import { saveBlobFile } from '../../../utils/save_blob_file';
 
 const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const { station, backsight, points, mij } = stakeoutData;
@@ -127,36 +128,6 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
     }
   };
 
-  const saveBlobFile = async (blob, defaultFileName) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, using fallback download flow:', error);
-      } else {
-        console.info('Save dialog was canceled by user.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleGenerateReport = async () => {
     if (!isCalculated || !stakeoutData.plot) {
       toast.error("Παρακαλώ υπολογίστε πρώτα τη χάραξη!");
@@ -190,7 +161,10 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
         ? `${sanitizedProjectName}_charaxi_report.pdf`
         : 'charaxi_report.pdf';
 
-      await saveBlobFile(blob, fileName);
+      if (!await saveBlobFile(blob, fileName, 'PDF Document', ['.pdf'], 'application/pdf')) {
+        toast.dismiss(loadingToast);
+        return;
+      }
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: loadingToast });
     } catch (err) {
       console.error('Σφάλμα κατά τη δημιουργία του report:', err);
@@ -211,15 +185,18 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
     }));
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!stakeoutData.plot) return;
-    const link = document.createElement('a');
-    link.href = stakeoutData.plot;
-    link.download = `Skarifima_Charaxis_${station.name || 'Station'}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(stakeoutData.plot);
+      const blob = await response.blob();
+      const saved = await saveBlobFile(blob, `Skarifima_Charaxis_${station.name || 'Station'}.png`, 'PNG Image', ['.png'], 'image/png');
+      if (!saved) return;
     toast.success("Το σκαρίφημα κατέβηκε επιτυχώς!");
+    } catch (error) {
+      console.error('Σφάλμα λήψης σκαριφήματος:', error);
+      toast.error('Αποτυχία λήψης σκαριφήματος.');
+    }
   };
 
   const noSpinnersClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { Trash2, PlusCircle, Play, Cpu, ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { saveBlobFile } from '../../../utils/save_blob_file';
 
 const Goniometry = ({ rows = [], setRows, projectInfo }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -220,36 +221,6 @@ const Goniometry = ({ rows = [], setRows, projectInfo }) => {
     setShowZenithResults(true);
   };
 
-  const saveBlobFile = async (blob, defaultFileName) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
-
   // ---------------------------------------------------------
   // EXPORT REPORT HANDLER (Σύνδεση με το Backend Endpoint)
   // ---------------------------------------------------------
@@ -286,7 +257,10 @@ const Goniometry = ({ rows = [], setRows, projectInfo }) => {
         ? `${sanitizedProjectName}_Angle_Measurements_Report.pdf`
         : 'Angle_Measurements_Report.pdf';
 
-      await saveBlobFile(blob, fileName);
+      if (!await saveBlobFile(blob, fileName, 'PDF Document', ['.pdf'], 'application/pdf')) {
+        toast.dismiss(toastId);
+        return;
+      }
       toast.success('Το Report κατέβηκε επιτυχώς!', { id: toastId });
     } catch (error) {
       console.error('Export Report Error:', error);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { Calculator, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
+import { saveBlobFile } from '../../../utils/save_blob_file';
 
 const TrigonometricHeight = ({ 
   data = [], 
@@ -12,36 +13,6 @@ const TrigonometricHeight = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [calculationInput, setCalculationInput] = useState([]);
-
-  const saveBlobFile = async (blob, defaultFileName) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: 'PDF Report', accept: { 'application/pdf': ['.pdf'] } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to download link:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
 
   // --- HELPERS ΣΤΡΟΓΓΥΛΟΠΟΙΗΣΗΣ ---
   const to3 = (val) => {
@@ -212,7 +183,7 @@ const TrigonometricHeight = ({
         ? `${sanitizedProjectName}_Trig_Leveling_Report.pdf`
         : 'Trig_Leveling_Report.pdf';
 
-      await saveBlobFile(response.data, fileName);
+      if (!await saveBlobFile(response.data, fileName, 'PDF Report', ['.pdf'], 'application/pdf')) return;
     } catch (error) {
       const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία δημιουργίας PDF Report.';
       console.error('Σφάλμα κατά την εξαγωγή του Report:', error);

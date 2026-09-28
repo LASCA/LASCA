@@ -1,5 +1,6 @@
 import XLSX from 'xlsx-js-style';
 import { toast } from 'react-hot-toast';
+import { saveBlobFile } from './save_blob_file';
 
 /**
  * Βοηθητική συνάρτηση που μορφοποιεί αυτόματα τις επικεφαλίδες.
@@ -114,37 +115,14 @@ export const downloadSurveyTemplate = async () => {
     });
     const defaultFileName = 'Surveying_Data_Template.xlsx';
 
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{
-            description: 'Excel Workbook',
-            accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
-          }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        toast.success('Το πρότυπο αρχείο αποθηκεύτηκε επιτυχώς!');
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    const saved = await saveBlobFile(
+      blob,
+      defaultFileName,
+      'Excel Workbook',
+      ['.xlsx'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    if (!saved) return;
     toast.success('Το πρότυπο αρχείο κατέβηκε επιτυχώς!');
   } catch (error) {
     console.error('Template Download Error:', error);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { saveBlobFile } from '../utils/save_blob_file';
 import { X, Code2, Mail, User, FileText } from 'lucide-react';
 
 // Το αυθεντικό SVG "βιβλιαράκι" (Repository Icon) του GitHub
@@ -57,31 +58,7 @@ const About = ({ isOpen, onClose }) => {
       if (!response.ok) throw new Error('Network response was not ok');
       const blob = await response.blob();
 
-      // Αν υποστηρίζεται το Native Save File Picker API
-      if ('showSaveFilePicker' in window) {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: 'LASCA_Manual.pdf',
-          types: [
-            {
-              description: 'PDF Document',
-              accept: { 'application/pdf': ['.pdf'] },
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } else {
-        // Fallback λήψη μέσω Blob URL
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'LASCA_Manual.pdf';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
+      if (!await saveBlobFile(blob, 'LASCA_Manual.pdf', 'PDF Document', ['.pdf'], 'application/pdf')) return;
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error('Σφάλμα κατά την αποθήκευση του εγχειριδίου:', err);

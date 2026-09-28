@@ -7,6 +7,7 @@ import {
   Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown, FileText, Layers
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { saveBlobFile } from '../../../utils/save_blob_file';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ value, onChange, options, disabled, icon: Icon }) => {
@@ -256,36 +257,6 @@ const Tachymetry = ({
     }
   };
 
-  const saveBlobFile = async (blob, defaultFileName, fileTypeDescription = 'File', acceptedExtensions = ['.txt']) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: fileTypeDescription, accept: { '*/*': acceptedExtensions } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
-
   // 3. ΕΞΑΓΩΓΗ ΟΛΩΝ ΤΩΝ ΣΗΜΕΙΩΝ ΣΕ .TXT
   const handleExportAll = async () => {
     if (!measurements.length) {
@@ -306,7 +277,7 @@ const Tachymetry = ({
       if (response.data && response.data.txt_content) {
         const blob = new Blob([response.data.txt_content], { type: 'text/plain;charset=utf-8' });
         const defaultFileName = response.data.filename || 'tachymetry_all_points.txt';
-        await saveBlobFile(blob, defaultFileName, 'Text file', ['.txt']);
+        if (!await saveBlobFile(blob, defaultFileName, 'Text file', ['.txt'])) return;
 
         toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .txt!`);
       } else {
@@ -340,7 +311,7 @@ const Tachymetry = ({
       if (response.data && response.data.dxf_content) {
         const blob = new Blob([response.data.dxf_content], { type: 'application/dxf' });
         const defaultFileName = response.data.filename || 'tachymetry_all_points.dxf';
-        await saveBlobFile(blob, defaultFileName, 'DXF Drawing', ['.dxf']);
+        if (!await saveBlobFile(blob, defaultFileName, 'DXF Drawing', ['.dxf'])) return;
 
         toast.success(`Εξήχθησαν ${response.data.total_points || 0} σημεία επιτυχώς σε .dxf!`);
       } else {
@@ -371,7 +342,7 @@ const Tachymetry = ({
       const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
       const filename = filenameMatch?.[1] || 'tachymetry_detail_points.geojson';
       const blob = new Blob([response.data], { type: 'application/geo+json' });
-      await saveBlobFile(blob, filename, 'GeoJSON', ['.geojson', '.json']);
+      if (!await saveBlobFile(blob, filename, 'GeoJSON', ['.geojson', '.json'])) return;
       toast.success('Η εξαγωγή GeoJSON ολοκληρώθηκε επιτυχώς.');
     } catch (error) {
       console.error("Σφάλμα κατά την εξαγωγή GeoJSON:", error);
@@ -398,7 +369,7 @@ const Tachymetry = ({
       const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
       const filename = filenameMatch?.[1] || 'tachymetry_detail_points.kml';
       const blob = new Blob([response.data], { type: 'application/vnd.google-earth.kml+xml' });
-      await saveBlobFile(blob, filename, 'KML', ['.kml']);
+      if (!await saveBlobFile(blob, filename, 'KML', ['.kml'])) return;
       toast.success('Η εξαγωγή KML ολοκληρώθηκε επιτυχώς.');
     } catch (error) {
       console.error("Σφάλμα κατά την εξαγωγή KML:", error);
@@ -415,7 +386,7 @@ const Tachymetry = ({
       const response = await fetch(plotImage);
       const blob = await response.blob();
       const defaultFileName = `tachymetry_plot_${activeStation}_${activeOrientation}.png`;
-      await saveBlobFile(blob, defaultFileName, 'PNG Image', ['.png']);
+      if (!await saveBlobFile(blob, defaultFileName, 'PNG Image', ['.png'])) return;
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή γραφήματος:', error);
       toast.error('Αποτυχία αποθήκευσης γραφήματος.');

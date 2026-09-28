@@ -1,3 +1,4 @@
+import { saveBlobFile } from '../../../utils/save_blob_file';
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
@@ -151,36 +152,6 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     setObservations(updated);
   };
 
-  const saveBlobFile = async (blob, defaultFileName) => {
-    try {
-      if (window.showSaveFilePicker) {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [{ description: 'File', accept: { '*/*': ['.pdf', '.png'] } }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-      } else {
-        console.info('Save dialog canceled by user, using fallback download flow.');
-      }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = defaultFileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
-
   const runAdjustment = async () => {
     setIsLoading(true);
     try {
@@ -219,15 +190,16 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!plotImage) return;
-    fetch(`data:image/png;base64,${plotImage}`)
-      .then(res => res.blob())
-      .then(blob => saveBlobFile(blob, 'Network_Preview_Plot.png'))
-      .catch(err => {
-        console.error('Σφάλμα λήψης γραφήματος:', err);
-        alert('Αποτυχία λήψης γραφήματος.');
-      });
+    try {
+      const response = await fetch(`data:image/png;base64,${plotImage}`);
+      const blob = await response.blob();
+      if (!await saveBlobFile(blob, 'Network_Preview_Plot.png', 'PNG Image', ['.png'], 'image/png')) return;
+    } catch (error) {
+      console.error('Σφάλμα λήψης γραφήματος:', error);
+      alert('Αποτυχία λήψης γραφήματος.');
+    }
   };
 
   const handleBackToEdit = () => {
@@ -266,7 +238,7 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
         ? `${sanitizedProjectName}_Adjustment_Report.pdf`
         : 'Adjustment_Report.pdf';
 
-      await saveBlobFile(response.data, fileName);
+      if (!await saveBlobFile(response.data, fileName, 'PDF Document', ['.pdf'], 'application/pdf')) return;
     } catch (error) {
       const backendMessage = error?.response?.data?.error || error?.message || 'Αποτυχία δημιουργίας PDF Report.';
       console.error('Σφάλμα κατά την εξαγωγή του Report:', error);

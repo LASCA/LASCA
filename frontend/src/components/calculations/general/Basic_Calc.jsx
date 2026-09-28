@@ -22,37 +22,7 @@ import {
 
 import { toast } from 'react-hot-toast';
 import InputField from '../../InputField';
-
-// Helper για την ασφαλή αποθήκευση/κατέβασμα αρχείων PDF
-const saveBlobFile = async (blob, defaultFileName) => {
-  try {
-    if (window.showSaveFilePicker) {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: defaultFileName,
-        types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }]
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return;
-    }
-  } catch (error) {
-    if (error?.name !== 'AbortError') {
-      console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-    } else {
-      return;
-    }
-  }
-
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = defaultFileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
+import { saveBlobFile } from '../../../utils/save_blob_file';
 
 // ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: SVG Διάγραμμα Αλληλοτομιών
@@ -530,7 +500,7 @@ const BasicCalculations = ({ projectInfo }) => {
       const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
       const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Intersection_Report.pdf` : 'Intersection_Report.pdf';
 
-      await saveBlobFile(response.data, fileName);
+      if (!await saveBlobFile(response.data, fileName, 'PDF Document', ['.pdf'], 'application/pdf')) return;
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή του Report Εμπροσθοτομίας:', error);
       toast.error('Αποτυχία δημιουργίας PDF Report.');
@@ -601,7 +571,7 @@ const BasicCalculations = ({ projectInfo }) => {
       const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
       const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Resection_Report.pdf` : 'Resection_Report.pdf';
 
-      await saveBlobFile(response.data, fileName);
+      if (!await saveBlobFile(response.data, fileName, 'PDF Document', ['.pdf'], 'application/pdf')) return;
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή του Report Οπισθοτομίας:', error);
       toast.error('Αποτυχία δημιουργίας PDF Report.');
