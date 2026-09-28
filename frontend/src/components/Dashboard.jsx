@@ -213,18 +213,42 @@ const Dashboard = ({
           
           if (measSheetName) {
             const rawMeas = XLSX.utils.sheet_to_json(wb.Sheets[measSheetName]);
-            
+
+            // Αριστερό μπλοκ: στοιχεία στάσης (Station, Orientation, HZ_O, Station_Height)
+            const norm = v => String(v ?? '').trim().toUpperCase();
+            const isSet = v => v !== undefined && v !== null && String(v).trim() !== '';
+            const setupByPair = {};
+            const setupsByStation = {};
+            rawMeas.forEach(row => {
+              if (!isSet(row['Station'])) return;
+              const setup = { HZ_O: row['HZ_O'], Station_Height: row['Station_Height'] };
+              setupByPair[`${norm(row['Station'])}|${norm(row['Orientation'])}`] = setup;
+              (setupsByStation[norm(row['Station'])] ||= []).push(setup);
+            });
+
+            // Δεξί μπλοκ: μετρήσεις σημείων (με fill-down στάσης/προσανατολισμού)
+            let lastFrom = '';
+            let lastO = '';
             cleanMeasurements = rawMeas
-              .filter(row => row['From'] !== undefined && row['Point_ID'] !== undefined)
-              .map(row => ({
-                From: String(row['From']).trim(),
-                O: row['O'],
-                Point_ID: row['Point_ID'],
-                Hz: row['Hz'],
-                Z: row['Z'],
-                SD: row['SD'],
-                TargetHeight: row['TargetHeight']
-              }));
+              .filter(row => isSet(row['Point_ID']))
+              .map(row => {
+                if (isSet(row['From'])) lastFrom = String(row['From']).trim();
+                if (isSet(row['O'])) lastO = String(row['O']).trim();
+                const setup = setupByPair[`${norm(lastFrom)}|${norm(lastO)}`]
+                  || (setupsByStation[norm(lastFrom)]?.length === 1 ? setupsByStation[norm(lastFrom)][0] : {});
+                return {
+                  From: lastFrom,
+                  O: lastO,
+                  HZ_O: setup.HZ_O ?? 0,
+                  Station_Height: setup.Station_Height ?? 0,
+                  Point_ID: row['Point_ID'],
+                  Hz: row['Hz'],
+                  Z: row['Z'],
+                  SD: row['SD'],
+                  TargetHeight: row['TargetHeight']
+                };
+              })
+              .filter(row => row.From !== '');
           }
 
           setTachymetryData({
