@@ -9,6 +9,7 @@ AppId={{524E0A33-E211-41E0-9E4D-74CEE971A1EE}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+LicenseFile=..\LICENSE
 DefaultDirName={autopf}\LASCA
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
