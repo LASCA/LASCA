@@ -24,6 +24,8 @@ import ezdxf
 import json, io, traceback
 import re
 import uuid
+import hashlib
+import secrets
 from html import escape
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -245,6 +247,9 @@ if not LOGO_PATH.exists():
     print(f"Warning: Logo not found at {LOGO_PATH}")
 
 app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
+# Πίσω από το nginx: παίρνουμε το σωστό https/domain από τις κεφαλίδες X-Forwarded-*
+from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'lasca-web-secret-key')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('FEEDBACK_MAX_SIZE_MB', '5')) * 1024 * 1024
 
@@ -344,6 +349,15 @@ class User(db.Model, UserMixin):
     display_name = db.Column(db.String(150), nullable=False, default='')
     avatar_path = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Αυξάνεται σε «Αποσύνδεση από όλες τις συσκευές» / αλλαγή κωδικού: ακυρώνει όλα τα
+    # παλιά cookies σύνδεσης (και τα «Να με θυμάσαι») χωρίς να ξέρουμε ποια είναι.
+    session_version = db.Column(db.Integer, nullable=False, default=0)
+    # False για λογαριασμούς που φτιάχτηκαν με Google (δεν ξέρουν κωδικό).
+    has_password = db.Column(db.Boolean, nullable=False, default=True)
+    last_seen_at = db.Column(db.DateTime, nullable=True)
+
+    def get_id(self):
+        return f"{self.id}:{self.session_version or 0}"
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -366,6 +380,12 @@ class User(db.Model, UserMixin):
             'avatar_url': self.avatar_url,
         }
 
+    def to_me_dict(self):
+        data = self.to_public_dict()
+        data['has_password'] = bool(self.has_password)
+        data['created_at'] = self.created_at.isoformat() + 'Z' if self.created_at else None
+        return data
+
 
 class Project(db.Model):
     __tablename__ = 'projects'
@@ -373,7 +393,14 @@ class Project(db.Model):
     name = db.Column(db.String(255), unique=True, nullable=False, index=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    owner = db.relationship('User', backref=db.backref('owned_projects', lazy=True))
+    # Σταθερό αναγνωριστικό για links πρόσκλησης και για το exe (δεν αλλάζει με μετονομασία).
+    public_id = db.Column(db.String(32), unique=True, index=True, default=lambda: secrets.token_urlsafe(9))
+    # Αυξάνεται σε κάθε αποθήκευση: έτσι καταλαβαίνουμε αν κάποιος άλλος άλλαξε το project.
+    version = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, nullable=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    owner = db.relationship('User', foreign_keys=[owner_id], backref=db.backref('owned_projects', lazy=True))
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
 
 
 class ProjectMember(db.Model):
@@ -382,15 +409,100 @@ class ProjectMember(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     role = db.Column(db.String(50), nullable=False, default='editor')
+    added_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    added_by_id = db.Column(db.Integer, nullable=True)
     project = db.relationship('Project', backref=db.backref('members', lazy=True))
-    user = db.relationship('User', backref=db.backref('project_memberships', lazy=True))
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('project_memberships', lazy=True))
 
     __table_args__ = (db.UniqueConstraint('project_id', 'user_id', name='uq_project_user_member'),)
 
 
+class ProjectInvite(db.Model):
+    """Σύνδεσμος πρόσκλησης: όποιος τον ανοίξει (με λογαριασμό) μπαίνει στο project."""
+    __tablename__ = 'project_invites'
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
+    role = db.Column(db.String(20), nullable=False, default='editor')
+    created_by_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    max_uses = db.Column(db.Integer, nullable=True)
+    uses = db.Column(db.Integer, nullable=False, default=0)
+    revoked = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class ProjectActivity(db.Model):
+    """Ιστορικό: ποιος έκανε τι σε ένα project."""
+    __tablename__ = 'project_activity'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, nullable=True)
+    action = db.Column(db.String(40), nullable=False)
+    detail = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class ProjectPresence(db.Model):
+    """Ποιος έχει ανοιχτό το project αυτή τη στιγμή και σε ποιο εργαλείο."""
+    __tablename__ = 'project_presence'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    tool = db.Column(db.String(40), nullable=True)
+    client = db.Column(db.String(20), nullable=True)
+    seen_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('project_id', 'user_id', name='uq_presence_project_user'),)
+
+
+class DeviceToken(db.Model):
+    """Κλειδί σύνδεσης για το πρόγραμμα των Windows (exe). Αποθηκεύεται μόνο το hash του."""
+    __tablename__ = 'device_tokens'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+
+
+def hash_device_token(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    # Το id στο cookie είναι «id:έκδοση». Αν η έκδοση άλλαξε (αποσύνδεση από όλες τις
+    # συσκευές ή αλλαγή κωδικού), το παλιό cookie δεν ισχύει πια.
+    raw_id, _, raw_version = str(user_id).partition(':')
+    try:
+        user = db.session.get(User, int(raw_id))
+    except (TypeError, ValueError):
+        return None
+    if user is None:
+        return None
+    if raw_version != '' and str(user.session_version or 0) != raw_version:
+        return None
+    return user
+
+
+@login_manager.request_loader
+def load_user_from_device_token(req):
+    """Σύνδεση του exe: κεφαλίδα «Authorization: Bearer <token>»."""
+    header = req.headers.get('Authorization', '')
+    if not header.startswith('Bearer '):
+        return None
+    token = header[7:].strip()
+    if not token:
+        return None
+    record = DeviceToken.query.filter_by(token_hash=hash_device_token(token)).first()
+    if record is None:
+        return None
+    now = datetime.utcnow()
+    if record.last_used_at is None or (now - record.last_used_at).total_seconds() > 300:
+        record.last_used_at = now
+        db.session.commit()
+    return db.session.get(User, record.user_id)
 
 
 # Endpoints που επιτρέπονται χωρίς σύνδεση. Όλα τα υπόλοιπα /api/* (υπολογισμοί,
@@ -398,13 +510,18 @@ def load_user(user_id):
 # χρησιμοποιεί τον server ή να γράφει σε φακέλους projects χωρίς λογαριασμό.
 PUBLIC_API_PATHS = {
     '/api/login', '/api/register', '/api/logout', '/api/me',
-    '/api/auth/config', '/api/auth/google',
+    '/api/auth/config', '/api/auth/google', '/api/auth/device-token',
 }
+# Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
+PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
 
 
 @app.before_request
 def require_login_for_api():
     if request.method == 'OPTIONS':
+        return None
+    if request.method == 'GET' and request.path.startswith(PUBLIC_API_PREFIXES_GET) \
+            and not request.path.endswith('/accept'):
         return None
     if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS \
             and not current_user.is_authenticated:
@@ -412,8 +529,46 @@ def require_login_for_api():
     return None
 
 
+def _migrate_schema():
+    """Προσθέτει στη βάση τις νέες στήλες (το create_all φτιάχνει μόνο νέους πίνακες)."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    wanted = {
+        'users': [
+            ('session_version', 'INTEGER NOT NULL DEFAULT 0'),
+            ('has_password', 'BOOLEAN NOT NULL DEFAULT 1'),
+            ('last_seen_at', 'DATETIME'),
+        ],
+        'projects': [
+            ('public_id', 'VARCHAR(32)'),
+            ('version', 'INTEGER NOT NULL DEFAULT 0'),
+            ('updated_at', 'DATETIME'),
+            ('updated_by_id', 'INTEGER'),
+        ],
+        'project_members': [
+            ('added_at', 'DATETIME'),
+            ('added_by_id', 'INTEGER'),
+        ],
+    }
+    with db.engine.begin() as conn:
+        for table, columns in wanted.items():
+            existing = {c['name'] for c in inspector.get_columns(table)}
+            for name, ddl in columns:
+                if name not in existing:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {ddl}'))
+        conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ix_projects_public_id ON projects (public_id)'))
+    # Projects από πριν την αλλαγή: παίρνουν public_id
+    changed = False
+    for project in Project.query.filter(Project.public_id.is_(None)).all():
+        project.public_id = secrets.token_urlsafe(9)
+        changed = True
+    if changed:
+        db.session.commit()
+
+
 with app.app_context():
     db.create_all()
+    _migrate_schema()
 
 
 def normalize_email(value):
@@ -568,34 +723,6 @@ class UniversalNumberedCanvas(canvas.Canvas):
             self.drawString(30, 22, f"{self.timestamp_str}")
         
         self.restoreState()
-
-@app.route('/api/me', methods=['PUT'])
-@login_required
-def update_current_user():
-    display_name = (request.form.get('display_name') or '').strip()
-    avatar = request.files.get('avatar')
-
-    if display_name:
-        current_user.display_name = display_name[:150]
-    if avatar and avatar.filename:
-        extension = Path(secure_filename(avatar.filename)).suffix.lower()
-        if extension not in {'.png', '.jpg', '.jpeg', '.webp'}:
-            return jsonify({"error": "Μη έγκυρη μορφή εικόνας"}), 400
-        if avatar.content_length and avatar.content_length > 2 * 1024 * 1024:
-            return jsonify({"error": "Η εικόνα πρέπει να είναι μικρότερη από 2MB"}), 400
-        file_name = f"{uuid.uuid4().hex}{extension}"
-        target = USER_AVATAR_DIR / file_name
-        avatar.save(target)
-        if current_user.avatar_path and Path(current_user.avatar_path).exists():
-            try:
-                Path(current_user.avatar_path).unlink()
-            except OSError:
-                pass
-        current_user.avatar_path = str(target)
-
-    db.session.commit()
-    return jsonify(current_user.to_public_dict())
-
 
 @app.route('/')
 def serve_index():
@@ -849,7 +976,7 @@ def register_user():
     db.session.add(user)
     db.session.commit()
     login_user(user, remember=bool(data.get('remember')))
-    return jsonify({"status": "success", "user": user.to_public_dict()}), 201
+    return jsonify({"status": "success", "user": user.to_me_dict()}), 201
 
 
 @app.route('/api/login', methods=['POST'])
@@ -866,7 +993,7 @@ def login_user_route():
         return jsonify({"error": "Λανθασμένο email ή κωδικός"}), 401
 
     login_user(user, remember=bool(data.get('remember')))
-    return jsonify({"status": "success", "user": user.to_public_dict()})
+    return jsonify({"status": "success", "user": user.to_me_dict()})
 
 
 @app.route('/api/auth/config', methods=['GET'])
@@ -904,12 +1031,13 @@ def google_login_route():
         user = User(email=email, display_name=(info.get('name') or email.split('@', 1)[0])[:150])
         # Τυχαίος κωδικός που δεν τον ξέρει κανείς: ο λογαριασμός μπαίνει μόνο μέσω Google.
         user.set_password(uuid.uuid4().hex + uuid.uuid4().hex)
+        user.has_password = False
         db.session.add(user)
         db.session.commit()
         created = True
 
     login_user(user, remember=bool(data.get('remember', True)))
-    return jsonify({"status": "success", "created": created, "user": user.to_public_dict()}), (201 if created else 200)
+    return jsonify({"status": "success", "created": created, "user": user.to_me_dict()}), (201 if created else 200)
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -919,271 +1047,20 @@ def logout_user_route():
     return jsonify({"status": "success", "message": "Αποσυνδεθήκατε επιτυχώς"})
 
 
-@app.route('/api/me', methods=['GET'])
-def get_current_user():
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Δεν είστε συνδεδεμένος"}), 401
-    return jsonify(current_user.to_public_dict())
+# ==========================================
+# Λογαριασμοί, projects, κοινοποίηση και ζωντανή συνεργασία: code/collab.py
+# ==========================================
+from collab import init_collab  # noqa: E402
 
+init_collab(
+    app, db=db, User=User, Project=Project, ProjectMember=ProjectMember, ProjectInvite=ProjectInvite,
+    ProjectActivity=ProjectActivity, ProjectPresence=ProjectPresence, DeviceToken=DeviceToken,
+    hash_device_token=hash_device_token, WORKSPACE_DIR=WORKSPACE_DIR, USER_AVATAR_DIR=USER_AVATAR_DIR,
+    TopoProject=TopoProject, resolve_project_dir=resolve_project_dir, project_record_by_name=project_record_by_name,
+    normalize_email=normalize_email, EMAIL_RE=EMAIL_RE, logger=logger,
+    PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(),
+)
 
-@app.route('/api/users/<int:user_id>/avatar')
-@login_required
-def get_user_avatar(user_id):
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
-    if user.id != current_user.id and not user_has_project_access(current_user, Project.query.filter_by(owner_id=user.id).first()):
-        return jsonify({"error": "Δεν έχετε πρόσβαση"}), 403
-    if not user.avatar_path:
-        return jsonify({"error": "Δεν υπάρχει avatar"}), 404
-
-    avatar_file = Path(user.avatar_path)
-    if not avatar_file.exists() or not avatar_file.is_file():
-        return jsonify({"error": "Το avatar δεν βρέθηκε"}), 404
-    return send_file(avatar_file, mimetype=mimetypes.guess_type(avatar_file.name)[0] or 'image/jpeg')
-
-
-@app.route('/api/me/projects', methods=['GET'])
-@login_required
-def list_my_projects_detailed():
-    """Projects του χρήστη για τη σελίδα Προφίλ: δικά του και κοινοποιημένα σε αυτόν."""
-    def describe(project, role):
-        project_dir = WORKSPACE_DIR / project.name
-        data_file = project_dir / 'project_data.json'
-        stamp_source = data_file if data_file.exists() else project_dir
-        updated_at = None
-        if stamp_source.exists():
-            updated_at = datetime.utcfromtimestamp(stamp_source.stat().st_mtime).isoformat() + 'Z'
-        owner = project.owner
-        return {
-            'name': project.name,
-            'role': role,
-            'owner_name': (owner.display_name or owner.email.split('@', 1)[0]) if owner else None,
-            'members_count': ProjectMember.query.filter_by(project_id=project.id).count() + 1,
-            'created_at': project.created_at.isoformat() + 'Z' if project.created_at else None,
-            'updated_at': updated_at,
-        }
-
-    owned = Project.query.filter_by(owner_id=current_user.id).order_by(Project.created_at.desc()).all()
-    memberships = ProjectMember.query.filter_by(user_id=current_user.id).all()
-    shared = [m.project for m in memberships if m.project and m.project.owner_id != current_user.id]
-    return jsonify({
-        'owned': [describe(p, 'owner') for p in owned],
-        'shared': [describe(p, 'editor') for p in shared],
-    })
-
-
-@app.route('/api/projects/list', methods=['GET'])
-@login_required
-def list_projects():
-    try:
-        if not WORKSPACE_DIR.exists():
-            WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
-            return jsonify([])
-
-        owned = [project.name for project in Project.query.filter_by(owner_id=current_user.id).all()]
-        shared = [
-            project.name for project in Project.query.join(ProjectMember).filter(ProjectMember.user_id == current_user.id, Project.id == ProjectMember.project_id).all()
-        ]
-        projects = sorted(set(owned + shared))
-        return jsonify(projects)
-    except Exception as e:
-        print(f"ERROR: Σφάλμα κατά τη λίστα των projects: {str(e)}")
-        return jsonify({"error": "Αποτυχία ανάγνωσης φακέλων εργασίας"}), 500
-
-@app.route('/api/projects/members', methods=['GET'])
-@login_required
-def get_project_members():
-    project_name = request.args.get('project_name') or get_active_project_name()
-    if not project_name:
-        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
-
-    project = project_record_by_name(project_name)
-    if project is None:
-        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
-    if not user_has_project_access(current_user, project):
-        return project_access_error(project_name)
-
-    members = []
-    owner = project.owner
-    if owner:
-        members.append({
-            'id': owner.id,
-            'email': owner.email,
-            'display_name': owner.display_name or owner.email.split('@', 1)[0],
-            'avatar_url': owner.avatar_url,
-            'role': 'owner',
-            'is_owner': True,
-        })
-    for member in ProjectMember.query.filter_by(project_id=project.id).all():
-        user = member.user
-        if not user or user.id == owner.id:
-            continue
-        members.append({
-            'id': user.id,
-            'email': user.email,
-            'display_name': user.display_name or user.email.split('@', 1)[0],
-            'avatar_url': user.avatar_url,
-            'role': member.role,
-            'is_owner': False,
-        })
-    return jsonify({"project_name": project.name, "members": members})
-
-
-@app.route('/api/projects/share', methods=['POST'])
-@login_required
-def share_project():
-    data = request.get_json(silent=True) or {}
-    project_name = str(data.get('project_name') or get_active_project_name() or '').strip()
-    email = normalize_email(data.get('email'))
-
-    if not project_name:
-        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
-    if not email:
-        return jsonify({"error": "Το email είναι υποχρεωτικό"}), 400
-
-    project = project_record_by_name(project_name)
-    if project is None:
-        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
-    if project.owner_id != current_user.id:
-        return jsonify({"error": "Μόνο ο owner του project μπορεί να το κοινοποιήσει"}), 403
-
-    target_user = User.query.filter(db.func.lower(User.email) == email).first()
-    if target_user is None:
-        return jsonify({"error": "Δεν υπάρχει χρήστης με αυτό το email"}), 404
-    if target_user.id == current_user.id:
-        return jsonify({"error": "Δεν μπορείτε να κοινοποιήσετε το project στον εαυτό σας"}), 400
-    if ProjectMember.query.filter_by(project_id=project.id, user_id=target_user.id).first():
-        return jsonify({"error": "Ο χρήστης έχει ήδη πρόσβαση στο project"}), 409
-
-    db.session.add(ProjectMember(project_id=project.id, user_id=target_user.id, role='editor'))
-    db.session.commit()
-    return jsonify({"status": "success", "message": f"Το project κοινοποιήθηκε στον {target_user.email}"})
-
-
-@app.route('/api/projects/members', methods=['DELETE'])
-@login_required
-def remove_project_member():
-    data = request.get_json(silent=True) or {}
-    project_name = str(data.get('project_name') or get_active_project_name() or '').strip()
-    email = normalize_email(data.get('email'))
-
-    if not project_name:
-        return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
-    if not email:
-        return jsonify({"error": "Το email είναι υποχρεωτικό"}), 400
-
-    project = project_record_by_name(project_name)
-    if project is None:
-        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
-    if project.owner_id != current_user.id:
-        return jsonify({"error": "Μόνο ο owner του project μπορεί να αφαιρέσει μέλη"}), 403
-
-    target_user = User.query.filter(db.func.lower(User.email) == email).first()
-    if target_user is None:
-        return jsonify({"error": "Δεν υπάρχει χρήστης με αυτό το email"}), 404
-    if target_user.id == project.owner_id:
-        return jsonify({"error": "Ο owner δεν μπορεί να αφαιρεθεί από το project"}), 400
-
-    membership = ProjectMember.query.filter_by(project_id=project.id, user_id=target_user.id).first()
-    if membership is None:
-        return jsonify({"error": "Ο χρήστης δεν έχει πρόσβαση στο project"}), 404
-
-    db.session.delete(membership)
-    db.session.commit()
-    return jsonify({"status": "success", "message": f"Ο χρήστης {target_user.email} αφαιρέθηκε από το project"})
-
-
-@app.route('/api/projects/<project_name>', methods=['DELETE'])
-@login_required
-def delete_project(project_name):
-    project = project_record_by_name(project_name)
-    if project is None:
-        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
-    if project.owner_id != current_user.id:
-        return jsonify({"error": "Μόνο ο owner μπορεί να διαγράψει το project"}), 403
-
-    project_dir = (WORKSPACE_DIR / project.name).resolve()
-    try:
-        project_dir.relative_to(WORKSPACE_DIR.resolve())
-    except ValueError:
-        return jsonify({"error": "Μη έγκυρο όνομα project"}), 400
-
-    if not project_dir.is_dir():
-        return jsonify({"error": "Το project δεν βρέθηκε"}), 404
-
-    try:
-        shutil.rmtree(project_dir)
-        db.session.delete(project)
-        ProjectMember.query.filter_by(project_id=project.id).delete()
-        db.session.commit()
-        return jsonify({"status": "success", "message": f"Το project '{project_name}' διαγράφηκε."})
-    except OSError as e:
-        print(f"ERROR: Σφάλμα διαγραφής project: {str(e)}")
-        return jsonify({"error": "Αποτυχία διαγραφής project"}), 500
-
-
-@app.route('/api/projects/load', methods=['POST'])
-@login_required
-def load_project():
-    try:
-        req = request.get_json(silent=True) or {}
-        project_name = str(req.get("project_name") or '').strip()
-        settings = req.get("settings", {})
-
-        if not project_name:
-            return jsonify({"error": "Το όνομα του project είναι υποχρεωτικό"}), 400
-
-        project = project_record_by_name(project_name)
-        if project is None:
-            project = Project(name=project_name, owner_id=current_user.id)
-            db.session.add(project)
-            db.session.commit()
-        elif not user_has_project_access(current_user, project):
-            return project_access_error(project_name)
-        # Πάντα το όνομα όπως είναι αποθηκευμένο, ώστε να ανοίγει ο ίδιος φάκελος.
-        project_name = project.name
-
-        project_dir = resolve_project_dir(WORKSPACE_DIR, project_name)
-        project_dir.mkdir(parents=True, exist_ok=True)
-        topo_project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
-        project_state = topo_project.setup_project_structure(initial_settings=settings)
-
-        return jsonify(project_state)
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
-    except Exception as e:
-        print(f"ERROR: Σφάλμα κατά τη φόρτωση του project: {str(e)}")
-        return jsonify({"error": "Αποτυχία αρχικοποίησης/φόρτωσης project"}), 500
-
-
-@app.route('/api/projects/save', methods=['POST'])
-@login_required
-def save_project():
-    try:
-        req = request.get_json(silent=True) or {}
-        project_name = str(req.get("project_name") or '').strip()
-        current_state = req.get("state")
-
-        if not project_name or not current_state:
-            return jsonify({"error": "Λείπουν απαραίτητα δεδομένα"}), 400
-
-        project = project_record_by_name(project_name)
-        if project is None:
-            return jsonify({"error": "Το project δεν βρέθηκε ή δεν είναι διαθέσιμο"}), 404
-        if not user_has_project_access(current_user, project):
-            return project_access_error(project_name)
-        project_name = project.name
-
-        topo_project = TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=project_name)
-        topo_project.save_state(current_state)
-
-        return jsonify({"status": "success", "message": f"Το project '{project_name}' αποθηκεύτηκε!"})
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
-    except Exception as e:
-        print(f"ERROR: Σφάλμα κατά την αποθήκευση του project: {str(e)}")
-        return jsonify({"error": "Αποτυχία αποθήκευσης δεδομένων"}), 500
 
 # ==========================================
 # 4. ENDPOINT ΓΙΑ ΓΩΝΙΟΜΕΤΡΗΣΕΙΣ (GONIOMETRY)

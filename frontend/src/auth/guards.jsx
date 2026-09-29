@@ -25,8 +25,10 @@ export function RequireAuth({ children }) {
 // Σελίδες μόνο για μη συνδεδεμένους (/login, /signup): αν είσαι ήδη μέσα, πας στην εφαρμογή.
 export function GuestOnly({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <FullScreenLoader />;
-  if (user) return <Navigate to="/app" replace />;
+  // π.χ. από σύνδεσμο πρόσκλησης: μετά τη σύνδεση γυρνάμε εκεί
+  if (user) return <Navigate to={location.state?.from || '/app'} replace />;
   return children;
 }
 

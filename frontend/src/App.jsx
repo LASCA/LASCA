@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from './config';
 import { useAuth } from './auth/AuthContext';
 import { FolderKanban } from 'lucide-react';
@@ -19,7 +20,10 @@ import LascaLoader from './components/animations/LascaLoader';
 import LascaIntro from './components/animations/LascaIntro';
 import UserMenu from './components/layout/UserMenu';
 import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './components/layout/topbar';
-import ShareProjectModal from './components/ShareProjectModal';
+import ShareDialog from './components/collab/ShareDialog';
+import { LiveBar, ConflictBanner } from './components/collab/LiveBar';
+import useProjectLive from './components/collab/useProjectLive';
+import { createCollabApi } from './components/collab/collabApi';
 
 function App() {
   // Ο συνδεδεμένος χρήστης έρχεται από το AuthProvider (main.jsx).
@@ -44,6 +48,18 @@ function App() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isShareProjectOpen, setIsShareProjectOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({});
+
+  // --- ΚΟΙΝΑ PROJECTS / ΖΩΝΤΑΝΗ ΣΥΝΕΡΓΑΣΙΑ ---
+  // projectMeta: { public_id, role: owner|editor|viewer, version, ... } από τον server
+  const [projectMeta, setProjectMeta] = useState(null);
+  const [conflict, setConflict] = useState(null);      // κάποιος άλλος άλλαξε το project ταυτόχρονα
+  const [resolvingConflict, setResolvingConflict] = useState(false);
+  const versionRef = useRef(0);        // η τελευταία έκδοση του project που ξέρουμε
+  const skipSaveRef = useRef(false);   // μην ξαναστείλεις πίσω δεδομένα που μόλις ήρθαν από άλλον
+  const conflictRef = useRef(null);
+  conflictRef.current = conflict;
+  const collabApi = useMemo(() => createCollabApi(`${API_BASE_URL}/api`), []);
+  const isReadOnly = projectMeta?.role === 'viewer';
 
   // --- LOADER STATE (ΜΟΝΟ ΓΙΑ ΑΛΛΑΓΗ/ΔΗΜΙΟΥΡΓΙΑ PROJECT) ---
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
@@ -140,6 +156,42 @@ function App() {
     setTrigHeightData([]);
   };
 
+  // Περνάει στην οθόνη ολόκληρη την κατάσταση ενός project (όπως τη στέλνει ο server).
+  const applyProjectState = (data) => {
+    setGlobalSettings(data.settings || {});
+    setObservations(data.observations || []);
+    setAdjMetrics(data.adjMetrics || {});
+    setTraverseData(data.traverse_data || []);
+    setTraverseMetrics(data.metrics || {});
+    setTachymetryData(data.tachymetryData || { measurements: [], stations: [], results: [] });
+    setStakeoutData(data.stakeoutData || {
+      station: { name: 'St1', x: '', y: '' },
+      backsight: { name: 'BS1', x: '', y: '' },
+      azimuthBs: '---',
+      points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
+    });
+    setGoniometryData(data.goniometryData || []);
+    setLevelingObservations(data.levelingObservations || []);
+    setLevelingStations(data.levelingStations || []);
+    setLevelingForward(data.levelingForward || []);
+    setLevelingBackward(data.levelingBackward || []);
+    setLevelingMetrics(data.levelingMetrics || {});
+    setTrigHeightData(data.trigHeightData || []);
+  };
+
+  const applyMeta = (meta) => {
+    setProjectMeta(meta || null);
+    versionRef.current = meta?.version || 0;
+    setConflict(null);
+  };
+
+  const closeProject = () => {
+    localStorage.removeItem(projectStorageKey);
+    setCurrentProject(null);
+    applyMeta(null);
+    resetAllData();
+  };
+
 
   // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ) ---
   useEffect(() => {
@@ -157,7 +209,13 @@ function App() {
       })
       .then(res => res.json())
       .then(backendData => {
+        if (backendData && backendData.error) {
+          // π.χ. σε αφαίρεσαν από το project ή διαγράφηκε
+          toast.error(backendData.error);
+          closeProject();
+        }
         if (backendData && !backendData.error) {
+          applyMeta(backendData._meta);
           setGlobalSettings(backendData.settings || {});
           setObservations(backendData.observations || []);
           setAdjMetrics(backendData.adjMetrics || {});      
@@ -197,6 +255,10 @@ function App() {
   // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
   useEffect(() => {
     if (!currentProject || !isDataLoaded) return; 
+    // Δεδομένα που μόλις ήρθαν από συνεργάτη: δεν τα ξαναστέλνουμε πίσω.
+    if (skipSaveRef.current) { skipSaveRef.current = false; return; }
+    // Αναγνώστης: βλέπει αλλά δεν αποθηκεύει. Σε σύγκρουση περιμένουμε την απόφαση του χρήστη.
+    if (isReadOnly || conflictRef.current) return;
 
     const savedProjects = JSON.parse(localStorage.getItem('survey_projects') || '{}');
     const projectState = {
@@ -227,13 +289,16 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         project_name: currentProject,
-        state: projectState 
+        state: projectState,
+        base_version: versionRef.current
       })
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "success") {
-        console.log(`💾 Auto-save: Το αρχείο .json ενημερώθηκε!`);
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.code === 'conflict') {
+        setConflict(data.current);
+      } else if (res.ok && data.status === "success") {
+        if (typeof data.version === 'number') versionRef.current = Math.max(versionRef.current, data.version);
       }
     })
     .catch(err => console.error("❌ Το Auto-save απέτυχε στο Backend:", err));
@@ -256,6 +321,70 @@ function App() {
     levelingMetrics,
     trigHeightData
   ]);
+
+  // --- 1Β. ΖΩΝΤΑΝΗ ΣΥΝΕΡΓΑΣΙΑ (ποιος είναι online, αλλαγές άλλων, ιστορικό) ---
+  const lastRemoteToastRef = useRef(0);
+  const live = useProjectLive({
+    enabled: Boolean(currentProject && projectMeta?.public_id && isDataLoaded),
+    sync: (body) => collabApi.sync(projectMeta.public_id, body),
+    tool: activeTab,
+    client: 'web',
+    getVersion: () => versionRef.current,
+    onProject: (project) => {
+      setProjectMeta((prev) => (prev && prev.public_id === project.public_id
+        ? { ...prev, role: project.role, role_label: project.role_label, owner: project.owner } : prev));
+    },
+    onRemoteState: (state, project) => {
+      if (conflictRef.current) return;
+      skipSaveRef.current = true;
+      applyProjectState(state);
+      versionRef.current = project?.version || versionRef.current;
+      const now = Date.now();
+      if (now - lastRemoteToastRef.current > 8000) {
+        lastRemoteToastRef.current = now;
+        toast(`${project?.updated_by?.display_name || 'Ένας συνεργάτης'} ενημέρωσε το project`, { icon: '🔄' });
+      }
+    },
+    onLostAccess: () => {
+      toast.error('Δεν έχεις πια πρόσβαση σε αυτό το project.');
+      closeProject();
+    },
+  });
+
+  const buildProjectState = () => ({
+    project_name: currentProject,
+    settings: globalSettings, observations, adjMetrics, traverse_data: traverseData, metrics: traverseMetrics,
+    tachymetryData, stakeoutData, goniometryData, levelingObservations, levelingStations,
+    levelingForward, levelingBackward, levelingMetrics, trigHeightData,
+  });
+
+  const loadTheirChanges = () => {
+    if (!conflict) return;
+    skipSaveRef.current = true;
+    applyProjectState(conflict.state || {});
+    versionRef.current = conflict.version || versionRef.current;
+    setConflict(null);
+  };
+
+  const keepMyChanges = async () => {
+    setResolvingConflict(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/projects/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_name: currentProject, state: buildProjectState(), force: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Αποτυχία αποθήκευσης');
+      versionRef.current = data.version;
+      setConflict(null);
+      toast.success('Κρατήθηκαν οι δικές σου αλλαγές');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
 
   // --- 2. GLOBAL TOOLTIP LOGIC ---
   useEffect(() => {
@@ -319,7 +448,8 @@ function App() {
     setIsDataLoaded(false); 
     resetAllData();
 
-    const pName = projectData.project_name;
+    const pName = projectData._meta?.name || projectData.project_name;
+    applyMeta(projectData._meta);
     setCurrentProject(pName);
     setGlobalSettings(projectData.settings || {});
     setObservations(projectData.observations || []);
@@ -381,11 +511,17 @@ function App() {
         onProjectLoaded={handleProjectLoaded}
         currentProject={currentProject}
       />
-      <ShareProjectModal
+      <ShareDialog
         isOpen={isShareProjectOpen}
         onClose={() => setIsShareProjectOpen(false)}
+        api={collabApi}
+        projectId={projectMeta?.public_id}
         projectName={currentProject}
+        currentUserId={currentUser?.id}
+        onRoleChanged={(role) => role && setProjectMeta((prev) => (prev ? { ...prev, role } : prev))}
+        onLeft={closeProject}
       />
+      <ConflictBanner conflict={conflict} onLoadTheirs={loadTheirChanges} onKeepMine={keepMyChanges} busy={resolvingConflict} />
 
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
@@ -396,6 +532,10 @@ function App() {
         {(() => {
           const topActions = (
             <div className="flex items-center gap-2 sm:gap-3 flex-nowrap min-w-0">
+              {currentProject && projectMeta && (
+                <LiveBar presence={live.presence} activity={live.activity} online={live.online}
+                  readOnly={isReadOnly} asset={collabApi.asset} itemClass={TOPBAR_ITEM} />
+              )}
               {currentProject && (
                 <div className="hidden lg:block min-w-0">
                   <span

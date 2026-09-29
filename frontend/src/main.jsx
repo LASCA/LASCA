@@ -10,6 +10,7 @@ import Landing from './pages/Landing.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Profile from './pages/Profile.jsx'
+import Invite from './pages/Invite.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="/signup" element={<GuestOnly><Signup /></GuestOnly>} />
             <Route path="/app" element={<RequireAuth><App /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+            <Route path="/invite/:token" element={<Invite />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </GoogleProviderGate>

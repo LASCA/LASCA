@@ -47,7 +47,7 @@ SEED_PROJECTS = [
      'settings': {'designer': 'Μαρία', 'employer': 'ΑΠΘ', 'location': 'Πανεπιστημιούπολη'}},
     {'name': 'Αποτύπωση Κτιρίου', 'owner': 'ilias@lasca.test', 'shared_with': [],
      'settings': {'designer': 'Μαρία', 'employer': 'ΑΠΘ', 'location': 'Θεσσαλονίκη'}},
-    {'name': 'Χωροστάθμηση Campus', 'owner': 'alex@lasca.test', 'shared_with': ['savvas@lasca.test', 'ilias@lasca.test'],
+    {'name': 'Χωροστάθμηση Campus', 'owner': 'alex@lasca.test', 'shared_with': ['savvas@lasca.test', ('ilias@lasca.test', 'viewer')],
      'settings': {'designer': 'Νίκος', 'employer': 'ΑΠΘ', 'location': 'Πανεπιστημιούπολη'}},
 ]
 
@@ -111,11 +111,13 @@ def seed():
                 print(f'✔ Project «{spec["name"]}» του {spec["owner"]}')
             TopoProject(workspace_dir=str(WORKSPACE_DIR), project_name=spec['name']) \
                 .setup_project_structure(initial_settings=spec['settings'])
-            for email in spec['shared_with']:
+            for entry in spec['shared_with']:
+                # 'email' (επεξεργαστής) ή ('email', 'viewer') για αναγνώστη
+                email, role = (entry, 'editor') if isinstance(entry, str) else entry
                 member = users[email]
                 if not ProjectMember.query.filter_by(project_id=project.id, user_id=member.id).first():
-                    db.session.add(ProjectMember(project_id=project.id, user_id=member.id, role='editor'))
-                    print(f'  ↳ κοινό με {email}')
+                    db.session.add(ProjectMember(project_id=project.id, user_id=member.id, role=role))
+                    print(f'  ↳ κοινό με {email} ({role})')
         db.session.commit()
 
     print(f'\nΌλοι οι χρήστες δοκιμής έχουν κωδικό: {SEED_PASSWORD}')
@@ -128,7 +130,7 @@ def show():
             print(f'  #{u.id}  {u.email}  ({u.display_name})')
         print('Projects:')
         for p in Project.query.order_by(Project.id).all():
-            members = [m.user.email for m in ProjectMember.query.filter_by(project_id=p.id).all() if m.user]
+            members = [f'{m.user.email} ({m.role})' for m in ProjectMember.query.filter_by(project_id=p.id).all() if m.user]
             shared = f'  κοινό με: {", ".join(members)}' if members else ''
             print(f'  «{p.name}»  owner: {p.owner.email if p.owner else "?"}{shared}')
     print(f'Φάκελος projects: {WORKSPACE_DIR}')

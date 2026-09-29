@@ -38,7 +38,7 @@ export default function Login() {
       title="Σύνδεση"
       subtitle="Συνέχισε από εκεί που σταμάτησες."
       footer={<>Δεν έχεις λογαριασμό;{' '}
-        <Link to="/signup" className="font-bold text-slate-100 hover:underline">Δημιουργία λογαριασμού</Link></>}
+        <Link to="/signup" state={location.state} className="font-bold text-slate-100 hover:underline">Δημιουργία λογαριασμού</Link></>}
     >
       <GoogleSection remember={remember} onSuccess={goNext} text="signin_with" />
       <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>

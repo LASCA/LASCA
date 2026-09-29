@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AuthLayout from '../components/auth/AuthLayout';
 import { FormError, GoogleSection, RememberMe, SubmitButton, TextField } from '../components/auth/FormParts';
@@ -8,6 +8,7 @@ import { apiErrorMessage, useAuth } from '../auth/AuthContext';
 export default function Signup() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +19,7 @@ export default function Signup() {
 
   const welcome = (user) => {
     toast.success(`Ο λογαριασμός δημιουργήθηκε. Καλώς ήρθες, ${user.display_name}!`);
-    navigate('/app', { replace: true });
+    navigate(location.state?.from || '/app', { replace: true });
   };
 
   const handleSubmit = async (e) => {
@@ -43,7 +44,7 @@ export default function Signup() {
       title="Δημιουργία λογαριασμού"
       subtitle="Δωρεάν, για όλους τους φοιτητές."
       footer={<>Έχεις ήδη λογαριασμό;{' '}
-        <Link to="/login" className="font-bold text-slate-100 hover:underline">Σύνδεση</Link></>}
+        <Link to="/login" state={location.state} className="font-bold text-slate-100 hover:underline">Σύνδεση</Link></>}
     >
       <GoogleSection remember={remember} onSuccess={welcome} text="signup_with" />
       <form onSubmit={handleSubmit} className="space-y-4">
