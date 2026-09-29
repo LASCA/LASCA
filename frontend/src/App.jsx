@@ -331,7 +331,7 @@ function App() {
     client: 'web',
     getVersion: () => versionRef.current,
     onProject: (project) => {
-      setProjectMeta((prev) => (prev && prev.public_id === project.public_id
+      setProjectMeta((prev) => (prev && prev.public_id === project.public_id && prev.role !== project.role
         ? { ...prev, role: project.role, role_label: project.role_label, owner: project.owner } : prev));
     },
     onRemoteState: (state, project) => {
@@ -518,7 +518,7 @@ function App() {
         projectId={projectMeta?.public_id}
         projectName={currentProject}
         currentUserId={currentUser?.id}
-        onRoleChanged={(role) => role && setProjectMeta((prev) => (prev ? { ...prev, role } : prev))}
+        onRoleChanged={(role) => role && setProjectMeta((prev) => (prev && prev.role !== role ? { ...prev, role } : prev))}
         onLeft={closeProject}
       />
       <ConflictBanner conflict={conflict} onLoadTheirs={loadTheirChanges} onKeepMine={keepMyChanges} busy={resolvingConflict} />

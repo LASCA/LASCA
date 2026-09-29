@@ -40,6 +40,10 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
   const [copiedId, setCopiedId] = useState(null);
   const [confirm, setConfirm] = useState(null); // { kind: 'transfer'|'remove'|'leave', member }
   const lookupTimer = useRef(null);
+  // Το callback κρατιέται σε ref: αν ήταν εξάρτηση του load, κάθε νέα απόδοση του γονέα θα
+  // ξαναφόρτωνε τα μέλη → ατελείωτος κύκλος (το παράθυρο «αναβόσβηνε»).
+  const onRoleChangedRef = useRef(onRoleChanged);
+  onRoleChangedRef.current = onRoleChanged;
 
   const isOwner = myRole === 'owner';
 
@@ -50,7 +54,7 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
       const data = await api.members(projectId);
       setMembers(data.members || []);
       setMyRole(data.project?.role || null);
-      onRoleChanged?.(data.project?.role || null);
+      onRoleChangedRef.current?.(data.project?.role || null);
       if (data.project?.role === 'owner') {
         const inv = await api.invites(projectId);
         setInvites(inv.invites || []);
@@ -62,7 +66,7 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
     } finally {
       setLoading(false);
     }
-  }, [api, projectId, onRoleChanged]);
+  }, [api, projectId]);
 
   useEffect(() => {
     if (isOpen) { load(); setConfirm(null); }
@@ -126,7 +130,7 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
         const data = await api.transfer(projectId, member.id);
         setMembers(data.members || []);
         setMyRole(data.project?.role || 'editor');
-        onRoleChanged?.(data.project?.role || 'editor');
+        onRoleChangedRef.current?.(data.project?.role || 'editor');
         setInvites([]);
         toast.success(`Ο/Η ${member.display_name} είναι πλέον ιδιοκτήτης`);
       } else if (kind === 'leave') {
