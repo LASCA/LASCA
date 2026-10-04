@@ -78,8 +78,11 @@ ok("'unsafe-eval'" not in h['Content-Security-Policy'] and "script-src 'self'" i
    'no inline/eval scripts allowed by CSP')
 
 # ---------------------------------------------------------------- CSRF / origin
-ok(client(origin=None).post('/api/login', json={'email': 'a@b.cc', 'password': 'x'}).status_code == 403,
-   'POST without Origin is blocked')
+nocookie = client(origin=None).post('/api/login', json={'email': 'a@b.cc', 'password': 'x'})
+ok(nocookie.status_code == 401, 'non-browser client without cookies can call the API (desktop app)')
+noorigin = m.app.test_client()
+noorigin.set_cookie('lasca_session', alice.get_cookie('lasca_session').value)
+ok(noorigin.post('/api/me/logout-all').status_code == 403, 'POST with session cookie but without Origin is blocked')
 evil = alice.post('/api/me/logout-all', headers={'Origin': 'https://evil.example'})
 ok(evil.status_code == 403 and evil.json['code'] == 'bad_origin', 'cross-site POST with session cookie is blocked')
 ok(alice.get('/api/me').status_code == 200, 'session still valid after blocked CSRF')

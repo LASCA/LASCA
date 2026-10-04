@@ -192,7 +192,13 @@ def init_origin_guard(app, allowed_origins, *, exempt_bearer=True):
         # Μια ξένη σελίδα δεν μπορεί να στείλει κεφαλίδα Authorization χωρίς CORS (που δεν δίνουμε).
         if exempt_bearer and request.headers.get('Authorization', '').startswith('Bearer '):
             return None
-        origin = origin_of(request.headers.get('Origin')) or origin_of(request.headers.get('Referer'))
+        raw_origin = request.headers.get('Origin')
+        if raw_origin is None and not request.cookies:
+            # Όχι browser (π.χ. το πρόγραμμα των Windows με το requests): χωρίς cookies δεν
+            # μπορεί να «καβαλήσει» τη σύνδεση κάποιου χρήστη, άρα δεν υπάρχει κίνδυνος CSRF.
+            # Οι browsers στέλνουν ΠΑΝΤΑ Origin σε POST από άλλη σελίδα, οπότε ελέγχονται παρακάτω.
+            return None
+        origin = origin_of(raw_origin) or origin_of(request.headers.get('Referer'))
         allowed = allowed_origins()
         if origin is None or origin not in allowed:
             logger.warning('Blocked cross-site %s %s from origin=%s ip=%s',
