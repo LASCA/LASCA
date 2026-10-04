@@ -27,8 +27,21 @@ UNSAFE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
 # Βοηθητικά
 # ---------------------------------------------------------------------------
 def client_ip() -> str:
-    # Πίσω από nginx το ProxyFix έχει ήδη βάλει τη σωστή IP στο remote_addr.
-    return (request.remote_addr or 'unknown')[:64]
+    """IP του επισκέπτη για όρια και logs. Πίσω από nginx το ProxyFix έχει βάλει τη σωστή IP.
+    IPv6: μετράμε ανά δίκτυο /64 (ένας πάροχος δίνει σε κάθε σπίτι εκατομμύρια διευθύνσεις /64,
+    άρα ανά διεύθυνση το όριο θα παρακαμπτόταν εύκολα)."""
+    ip = (request.remote_addr or 'unknown')[:64]
+    if ':' in ip:
+        try:
+            import ipaddress
+            addr = ipaddress.ip_address(ip)
+            if addr.version == 6:
+                if addr.ipv4_mapped:
+                    return str(addr.ipv4_mapped)
+                return str(ipaddress.ip_network(f'{addr}/64', strict=False))
+        except ValueError:
+            pass
+    return ip
 
 
 def origin_of(url: str | None) -> str | None:

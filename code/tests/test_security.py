@@ -130,11 +130,20 @@ ok(client().post('/api/auth/password-check', json={'password': 'Password123!'}).
 # ---------------------------------------------------------------- brute force protection
 carol, _ = signup('carol@lasca.test')
 attacker = client(ip='66.66.66.66')
-codes = [attacker.post('/api/login', json={'email': 'carol@lasca.test', 'password': f'wrong{i}'}).status_code
+# Διαφορετικό email σε κάθε προσπάθεια: έτσι μετράει ΜΟΝΟ το όριο ανά IP (όχι η αναμονή ανά λογαριασμό).
+codes = [attacker.post('/api/login', json={'email': f'spray{i}@lasca.test', 'password': 'wrong'}).status_code
          for i in range(7)]
-ok(codes[:3] == [401, 401, 401] and 429 in codes, f'IP limited after 5 failures / backoff kicks in ({codes})')
+ok(codes[:5] == [401] * 5 and codes[5:] == [429, 429], f'IP blocked after exactly 5 failures in 15 min ({codes})')
 r = attacker.post('/api/login', json={'email': 'carol@lasca.test', 'password': PW})
-ok(r.status_code == 429, 'even the right password is refused from the blocked IP')
+ok(r.status_code == 429 and r.json['code'] == 'rate_limited', 'even the right password is refused from the blocked IP')
+slow = client()
+sc = [slow.post('/api/login', json={'email': 'carol@lasca.test', 'password': f'w{i}'}).status_code for i in range(4)]
+ok(sc == [401, 401, 401, 429], f'per-account backoff after 3 failures ({sc})')
+ipv6a, ipv6b = client(ip='2001:db8:1:1::1'), client(ip='2001:db8:1:1::ffff')
+for i in range(5):
+    ipv6a.post('/api/login', json={'email': f'v6-{i}@lasca.test', 'password': 'x'})
+ok(ipv6b.post('/api/login', json={'email': 'v6-x@lasca.test', 'password': 'x'}).status_code == 429,
+   'IPv6 limits apply per /64 network (address rotation does not help)')
 frank, _ = signup('frank@lasca.test')
 r = client().post('/api/login', json={'email': 'nobody@lasca.test', 'password': 'whatever'})
 r2 = client().post('/api/login', json={'email': 'frank@lasca.test', 'password': 'whatever'})
@@ -172,10 +181,18 @@ r = ec.post('/api/login', json={'email': 'erin@lasca.test', 'password': PW, 'cap
 ok(r.status_code == 200, 'login works with solved CAPTCHA')
 _, r = signup('nocaptcha@lasca.test')
 ok(r.status_code == 400 and r.json['code'] == 'captcha_required', 'signup needs CAPTCHA when configured')
+r = client().post('/api/login', json={'email': 'dave@lasca.test', 'password': PW})
+ok(r.status_code == 400 and r.json['code'] == 'captcha_required', 'locked account: CAPTCHA required instead of hard lock')
+r = client().post('/api/login', json={'email': 'dave@lasca.test', 'password': PW, 'captcha_token': 'good-token'})
+ok(r.status_code == 200, 'locked account: real owner still gets in with password + CAPTCHA (no lockout DoS)')
 sec.A.turnstile_site = sec.A.turnstile_secret = ''
 
 # ---------------------------------------------------------------- 2FA
-r = alice.post('/api/me/2fa/setup')
+pre = client()
+r = pre.post('/api/auth/device-token', json={'email': 'alice@lasca.test', 'password': PW})
+pre_token = r.json['token']
+ok(alice.post('/api/me/2fa/setup', json={}).status_code == 403, '2FA setup needs the account password (stolen cookie is not enough)')
+r = alice.post('/api/me/2fa/setup', json={'password': PW})
 secret = r.json['secret']
 ok(r.status_code == 200 and r.json['otpauth_uri'].startswith('otpauth://totp/') and (r.json['qr'] or '').startswith('data:image/svg'),
    '2FA setup returns secret + QR')
@@ -184,6 +201,8 @@ step = int(time.time()) // 30
 r = alice.post('/api/me/2fa/enable', json={'code': sec.totp_at(secret, step)})
 backup = r.json.get('backup_codes', [])
 ok(r.status_code == 200 and len(backup) == 10, '2FA enabled, 10 backup codes shown once')
+ok(client().get('/api/me', headers={'Authorization': 'Bearer ' + pre_token}).status_code == 401,
+   'enabling 2FA revokes desktop-app tokens created before')
 with m.app.app_context():
     u = m.User.query.filter_by(email='alice@lasca.test').first()
     ok(secret not in (u.totp_secret_enc or '') and all(c not in (u.backup_codes or '') for c in backup),
@@ -196,6 +215,8 @@ a2 = client()
 r = a2.post('/api/login', json={'email': 'alice@lasca.test', 'password': PW})
 ok(r.status_code == 200 and r.json.get('requires_2fa') and a2.get('/api/me').status_code == 401,
    'password alone is not enough when 2FA is on')
+ok('email' not in r.json['methods'], 'TOTP users are not offered email codes (mailbox access cannot bypass 2FA)')
+ok(a2.post('/api/auth/2fa/email').status_code == 400, 'email code endpoint refuses TOTP users')
 ok(a2.post('/api/auth/2fa/verify', json={'code': '123456'}).status_code == 401, 'wrong TOTP rejected')
 r = a2.post('/api/auth/2fa/verify', json={'code': sec.totp_at(secret, step)})
 ok(r.status_code == 401, 'TOTP code cannot be replayed')
@@ -205,10 +226,6 @@ a3 = client()
 a3.post('/api/login', json={'email': 'alice@lasca.test', 'password': PW})
 ok(a3.post('/api/auth/2fa/verify', json={'code': backup[0], 'method': 'backup'}).status_code == 401,
    'backup code works only once')
-r = a3.post('/api/auth/2fa/email')
-code = re.search(r'>(\d{6})<', SENT[-1][2]).group(1) if SENT else ''
-ok(r.status_code == 200 and code, 'email OTP sent')
-ok(a3.post('/api/auth/2fa/verify', json={'code': code, 'method': 'email'}).status_code == 200, 'email OTP completes login')
 a4 = client()
 a4.post('/api/login', json={'email': 'alice@lasca.test', 'password': PW})
 results = [a4.post('/api/auth/2fa/verify', json={'code': f'{i:06d}'}).status_code for i in range(7)]
@@ -223,6 +240,26 @@ r = dev.post('/api/auth/device-token', json={'email': 'alice@lasca.test', 'passw
 ok(r.status_code == 201, 'desktop app login with backup code')
 ok(alice.post('/api/me/2fa/disable', json={'password': 'wrong', 'code': backup[2]}).status_code == 403,
    'disabling 2FA needs the password')
+ok(alice.post('/api/me/2fa/disable', json={'password': PW, 'code': '000000'}).status_code == 403,
+   'disabling 2FA also needs a valid 2FA code')
+ok(alice.get('/api/me/2fa').json['enabled'] is True, '2FA still enabled after failed disable attempts')
+
+# 2FA μέσω email (για όσους δεν έχουν εφαρμογή authenticator)
+gina, _ = signup('gina@lasca.test')
+with m.app.app_context():
+    m.User.query.filter_by(email='gina@lasca.test').update({'email_verified': True}); m.db.session.commit()
+SENT.clear()
+ok(gina.post('/api/me/2fa/email/setup', json={'password': PW}).status_code == 200, 'email 2FA setup sends a code')
+c1 = re.search(r'>(\d{6})<', SENT[-1][2]).group(1)
+r = gina.post('/api/me/2fa/email/enable', json={'code': c1})
+ok(r.status_code == 200 and r.json['method'] == 'email', 'email 2FA enabled')
+g2 = client()
+SENT.clear()
+r = g2.post('/api/login', json={'email': 'gina@lasca.test', 'password': PW})
+ok(r.json.get('method') == 'email' and SENT, 'login sends the email code automatically')
+c2 = re.search(r'>(\d{6})<', SENT[-1][2]).group(1)
+ok(g2.post('/api/auth/2fa/verify', json={'code': c2}).status_code == 200, 'email code completes login')
+ok(c2 not in SENT[-1][1], 'code is not in the email subject')
 
 # ---------------------------------------------------------------- forgot / reset password
 SENT.clear()
@@ -277,7 +314,10 @@ ok(not bad, f'another user cannot read/modify a private project ({bad})')
 ok(all('traverse_data' not in (v.get_data(as_text=True)) for v in attempts.values()), 'no project data leaks in errors')
 ok(owner.get(f'/api/projects/{pid}/state').json['state']['traverse_data'] == [{'x': 1}], 'owner data untouched')
 mid = owner.get('/api/me').json['id']
-ok(mallory.get(f'/api/users/{mid}/avatar').status_code in (403, 404), 'cannot fetch avatar of a stranger')
+from PIL import Image as _Img  # noqa: E402
+_b = io.BytesIO(); _Img.new('RGB', (64, 64), (9, 9, 9)).save(_b, 'PNG'); _b.seek(0)
+ok(owner.put('/api/me', data={'avatar': (_b, 'a.png')}, content_type='multipart/form-data').status_code == 200, 'owner uploads avatar')
+ok(mallory.get(f'/api/users/{mid}/avatar').status_code == 403, 'cannot fetch avatar of a stranger (403)')
 lk = mallory.get('/api/users/lookup?q=owner').json['users']
 ok(lk == [], 'user lookup does not list strangers by partial name')
 
@@ -340,6 +380,35 @@ codes = [burst.post('/api/register', json={}).status_code for _ in range(45)]
 ok(429 in codes, 'auth endpoints throttled per IP (in-memory layer)')
 limiter.reset()
 
+# ---------------------------------------------------------------- Google: προστασία από «κατάληψη» λογαριασμού
+import types  # noqa: E402
+_g = types.ModuleType('google'); _go = types.ModuleType('google.oauth2'); _gi = types.ModuleType('google.oauth2.id_token')
+_ga = types.ModuleType('google.auth'); _gt = types.ModuleType('google.auth.transport'); _gr = types.ModuleType('google.auth.transport.requests')
+_gr.Request = lambda: None
+_gi.verify_oauth2_token = lambda cred, req, cid: {'email': cred, 'email_verified': True, 'name': 'Victim'}
+_go.id_token = _gi; _gt.requests = _gr; _ga.transport = _gt; _g.oauth2 = _go; _g.auth = _ga
+sys.modules.update({'google': _g, 'google.oauth2': _go, 'google.oauth2.id_token': _gi, 'google.auth': _ga,
+                    'google.auth.transport': _gt, 'google.auth.transport.requests': _gr})
+sec.A.GOOGLE_CLIENT_ID = 'test-client'
+squatter, r = signup('victim@lasca.test')          # ο επιτιθέμενος γράφεται πρώτος με ξένο email
+ok(r.json['user']['email_verified'] is False, 'password signup starts unverified (verification email sent)')
+real = client()
+r = real.post('/api/auth/google', json={'credential': 'victim@lasca.test'})
+ok(r.status_code == 200, 'real owner signs in with Google')
+r = client().post('/api/login', json={'email': 'victim@lasca.test', 'password': PW})
+ok(r.status_code == 401, 'squatter password no longer works after Google proves ownership')
+ok(squatter.get('/api/me').status_code == 401, 'squatter sessions are logged out')
+ok(real.get('/api/me').json['email_verified'] is True, 'account now verified')
+r = real.post('/api/me/password', json={'new_password': 'Owner-Sets-A-Pass-91!'})
+ok(r.status_code == 200, 'fresh Google login can set a password')
+newcomer = client()
+newcomer.post('/api/auth/google', json={'credential': 'fresh@lasca.test', 'accept_terms': True, 'age_confirmed': True})
+with newcomer.session_transaction() as sess:
+    sess['login_at'] = 0                        # σαν να συνδέθηκε πριν από ώρες (κλεμμένο cookie)
+r = newcomer.delete('/api/me', json={'confirm': 'ΔΙΑΓΡΑΦΗ'})
+ok(r.status_code == 403 and r.json['code'] == 'reauth_required', 'Google-only account: old session cannot delete the account')
+sec.A.GOOGLE_CLIENT_ID = ''
+
 # ---------------------------------------------------------------- logout really logs out
 rc = client()
 rc.post('/api/login', json={'email': 'frank@lasca.test', 'password': PW, 'remember': True})
@@ -353,7 +422,10 @@ ok(r.status_code == 404 and b'<div id="root">' in r.data if r.status_code == 404
    'unknown page returns the app 404 page with status 404')
 ok(client().get('/api/nope').status_code == 401 and owner.get('/api/nope').status_code == 404,
    'unknown API route: 401 for guests (nothing revealed), JSON 404 for users')
-ok(client().get('/login').status_code in (200, 404), 'SPA route served')
+ok(client().get('/login').status_code == 200, 'SPA route served with 200')
+for path, method in [('/api/me/password', 'post'), ('/api/me', 'delete'), ('/api/me', 'put'), (f'/api/projects/{pid}/invites', 'post')]:
+    r = getattr(owner, method)(path, json=['a', 'list'])
+    ok(r.status_code < 500, f'JSON list body does not crash {method.upper()} {path} ({r.status_code})')
 r = client().get('/robots.txt')
 ok(r.status_code == 200 and 'Disallow: /api/' in r.get_data(as_text=True) and 'Sitemap:' in r.get_data(as_text=True), 'robots.txt')
 r = client().get('/sitemap.xml')

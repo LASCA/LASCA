@@ -26,7 +26,7 @@ from types import SimpleNamespace
 from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required, login_user, logout_user
 
-from auth_security import clean_display_name, record as record_auth_event, validate_new_password
+from auth_security import clean_display_name, reauthenticate, record as record_auth_event, validate_new_password
 
 bp = Blueprint('collab', __name__)
 C = SimpleNamespace()  # τα μοντέλα/βοηθητικά του main_4_app (γεμίζει στην init_collab)
@@ -67,7 +67,8 @@ def _handle_api_error(err):
 
 
 def body():
-    return request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
 
 
 def iso(dt):
@@ -406,6 +407,9 @@ def change_password():
     if user.has_password and not user.check_password(str(data.get('current_password') or '')[:1024]):
         record_auth_event('password_change_failed', user=user)
         raise ApiError('Ο τρέχων κωδικός δεν είναι σωστός.', 403)
+    if not user.has_password:
+        # Λογαριασμός Google που ορίζει πρώτο κωδικό: κωδικός 2FA ή πρόσφατη σύνδεση (όχι μόνο ένα cookie).
+        reauthenticate(user, data)
     if user.has_password and user.check_password(new_password):
         raise ApiError('Ο νέος κωδικός πρέπει να είναι διαφορετικός από τον τωρινό.')
     validate_new_password(new_password, user.email, user.display_name)
@@ -440,6 +444,8 @@ def delete_account():
     if user.has_password and not user.check_password(str(data.get('password') or '')[:1024]):
         record_auth_event('delete_account_failed', user=user)
         raise ApiError('Ο κωδικός δεν είναι σωστός.', 403)
+    if not user.has_password:
+        reauthenticate(user, data)
     if str(data.get('confirm') or '').strip().upper() != 'ΔΙΑΓΡΑΦΗ':
         raise ApiError('Γράψε ΔΙΑΓΡΑΦΗ για επιβεβαίωση.')
 

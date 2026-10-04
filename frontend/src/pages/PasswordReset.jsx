@@ -138,3 +138,34 @@ export function ResetPassword() {
     </AuthLayout>
   );
 }
+
+/** Επιβεβαίωση email από τον σύνδεσμο του email (/verify-email#token=...). */
+export function VerifyEmail() {
+  usePageMeta({ title: 'Επιβεβαίωση email', noindex: true });
+  const { user, refresh } = useAuth();
+  const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') || '');
+  const [state, setState] = useState('loading');
+
+  useEffect(() => {
+    if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
+    if (!token) { setState('invalid'); return; }
+    axios.post(`${API_BASE_URL}/api/auth/verify-email`, { token })
+      .then(() => { setState('ok'); refresh(); })
+      .catch(() => setState('invalid'));
+  }, [token, refresh]);
+
+  if (state === 'loading') return <AuthLayout title="Επιβεβαίωση…"><Loader2 className="mx-auto animate-spin text-fog" /></AuthLayout>;
+  if (state === 'invalid') {
+    return (
+      <AuthLayout eyebrow="Email" title="Ο σύνδεσμος δεν ισχύει"
+        subtitle="Μπορεί να έληξε (ισχύει 48 ώρες) ή να χρησιμοποιήθηκε ήδη. Ζήτησε νέο από το Προφίλ.">
+        <Link to={user ? '/profile' : '/login'} className="l-btn l-btn-primary l-btn-lg w-full">{user ? 'Στο προφίλ' : 'Σύνδεση'}</Link>
+      </AuthLayout>
+    );
+  }
+  return (
+    <AuthLayout eyebrow="Email" title="Το email επιβεβαιώθηκε" subtitle="Ευχαριστούμε! Ο λογαριασμός σου είναι πλέον πλήρως ενεργός.">
+      <Link to={user ? '/app' : '/login'} className="l-btn l-btn-primary l-btn-lg w-full">{user ? 'Άνοιγμα εφαρμογής' : 'Σύνδεση'}</Link>
+    </AuthLayout>
+  );
+}

@@ -20,6 +20,7 @@ const Invite = lazy(() => import('./pages/Invite.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 const ForgotPassword = lazy(() => import('./pages/PasswordReset.jsx').then((m) => ({ default: m.ForgotPassword })))
 const ResetPassword = lazy(() => import('./pages/PasswordReset.jsx').then((m) => ({ default: m.ResetPassword })))
+const VerifyEmail = lazy(() => import('./pages/PasswordReset.jsx').then((m) => ({ default: m.VerifyEmail })))
 const Privacy = lazy(() => import('./pages/Legal.jsx').then((m) => ({ default: m.Privacy })))
 const Terms = lazy(() => import('./pages/Legal.jsx').then((m) => ({ default: m.Terms })))
 const Cookies = lazy(() => import('./pages/Legal.jsx').then((m) => ({ default: m.Cookies })))
@@ -44,6 +45,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="/signup" element={<GuestOnly><Signup /></GuestOnly>} />
               <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/app" element={<RequireAuth><App /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/invite/:token" element={<Invite />} />

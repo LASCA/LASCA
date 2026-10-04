@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
 
   // Επιστρέφει { user } ή { twoFactor: { methods, email_hint } } όταν χρειάζεται δεύτερο βήμα.
   const finish = useCallback((data) => {
-    if (data?.requires_2fa) return { twoFactor: { methods: data.methods || ['totp'], emailHint: data.email_hint } };
+    if (data?.requires_2fa) return { twoFactor: { method: data.method || 'totp', methods: data.methods || ['totp', 'backup'], emailHint: data.email_hint } };
     setUser(data.user);
     return { user: data.user };
   }, []);

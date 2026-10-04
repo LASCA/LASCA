@@ -110,11 +110,12 @@ export default function Login() {
 /** Δεύτερο βήμα: κωδικός από εφαρμογή authenticator, εφεδρικός κωδικός ή κωδικός μέσω email. */
 function TwoFactorStep({ info, onDone, onBack }) {
   const { verifyTwoFactor, sendTwoFactorEmail } = useAuth();
-  const [method, setMethod] = useState('totp');
+  const primary = info.method || 'totp';
+  const [method, setMethod] = useState(primary);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(primary === 'email' ? `Στείλαμε κωδικό 6 ψηφίων στο ${info.emailHint}. Ισχύει 10 λεπτά.` : '');
   const cooldown = useCooldown();
 
   const submit = async (e) => {
@@ -147,7 +148,7 @@ function TwoFactorStep({ info, onDone, onBack }) {
   const meta = {
     totp: { icon: Smartphone, label: 'Κωδικός από την εφαρμογή', hint: 'Άνοιξε το Google Authenticator, Microsoft Authenticator ή όποια εφαρμογή χρησιμοποιείς.', placeholder: '000000', inputMode: 'numeric', max: 6 },
     backup: { icon: KeyRound, label: 'Εφεδρικός κωδικός', hint: 'Ένας από τους 10 κωδικούς που αποθήκευσες. Κάθε κωδικός ισχύει μία φορά.', placeholder: 'xxxxx-xxxxx', inputMode: 'text', max: 11 },
-    email: { icon: Mail, label: 'Κωδικός από το email', hint: notice || 'Πάτα «Αποστολή στο email».', placeholder: '000000', inputMode: 'numeric', max: 6 },
+    email: { icon: Mail, label: 'Κωδικός από το email', hint: notice || `Στείλαμε κωδικό στο ${info.emailHint}.`, placeholder: '000000', inputMode: 'numeric', max: 6 },
   }[method];
 
   return (
@@ -168,16 +169,16 @@ function TwoFactorStep({ info, onDone, onBack }) {
         </SubmitButton>
       </form>
       <div className="mt-6 space-y-2 border-t border-glass-edge pt-5 text-[14px]">
-        {method !== 'totp' && (
-          <button type="button" className="block text-mist hover:text-white" onClick={() => { setMethod('totp'); setCode(''); }}>Χρήση εφαρμογής authenticator</button>
+        {method !== primary && (
+          <button type="button" className="block text-mist hover:text-white" onClick={() => { setMethod(primary); setCode(''); }}>
+            {primary === 'email' ? 'Χρήση κωδικού από το email' : 'Χρήση εφαρμογής authenticator'}
+          </button>
         )}
         {method !== 'backup' && (
           <button type="button" className="block text-mist hover:text-white" onClick={() => { setMethod('backup'); setCode(''); }}>Χρήση εφεδρικού κωδικού</button>
         )}
-        {info.methods?.includes('email') && (
-          <button type="button" className="block text-mist hover:text-white" onClick={sendEmail}>
-            {method === 'email' ? 'Αποστολή νέου κωδικού' : `Αποστολή κωδικού στο email (${info.emailHint})`}
-          </button>
+        {primary === 'email' && method === 'email' && (
+          <button type="button" className="block text-mist hover:text-white" onClick={sendEmail}>Αποστολή νέου κωδικού</button>
         )}
       </div>
     </AuthLayout>

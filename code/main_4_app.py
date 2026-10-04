@@ -435,6 +435,8 @@ class User(db.Model, UserMixin):
     terms_accepted_at = db.Column(db.DateTime, nullable=True)
     age_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
+    twofa_method = db.Column(db.String(10), nullable=False, default='totp')   # totp | email
+    email_verified = db.Column(db.Boolean, nullable=False, default=False)
 
     def get_id(self):
         return f"{self.id}:{self.session_version or 0}"
@@ -464,6 +466,7 @@ class User(db.Model, UserMixin):
         data = self.to_public_dict()
         data['has_password'] = bool(self.has_password)
         data['two_factor_enabled'] = bool(self.totp_enabled)
+        data['email_verified'] = bool(self.email_verified)
         data['created_at'] = self.created_at.isoformat() + 'Z' if self.created_at else None
         return data
 
@@ -610,7 +613,8 @@ def load_user(user_id):
         return None
     if user is None:
         return None
-    if raw_version != '' and str(user.session_version or 0) != raw_version:
+    # Χωρίς «:έκδοση» (παλιά cookies) ή με παλιά έκδοση: η σύνδεση δεν ισχύει.
+    if str(user.session_version or 0) != raw_version:
         return None
     return user
 
@@ -648,7 +652,7 @@ PUBLIC_API_PATHS = {
     '/api/login', '/api/register', '/api/logout', '/api/me',
     '/api/auth/config', '/api/auth/google', '/api/auth/device-token',
     '/api/auth/2fa/verify', '/api/auth/2fa/email', '/api/auth/forgot', '/api/auth/reset',
-    '/api/auth/reset/check', '/api/auth/password-check',
+    '/api/auth/reset/check', '/api/auth/password-check', '/api/auth/verify-email',
 }
 # Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
 PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
@@ -700,6 +704,8 @@ def _migrate_schema():
             ('terms_accepted_at', 'DATETIME'),
             ('age_confirmed', 'BOOLEAN NOT NULL DEFAULT 0'),
             ('password_changed_at', 'DATETIME'),
+            ('twofa_method', "VARCHAR(10) NOT NULL DEFAULT 'totp'"),
+            ('email_verified', 'BOOLEAN NOT NULL DEFAULT 0'),
         ],
         'projects': [
             ('public_id', 'VARCHAR(32)'),
@@ -887,7 +893,7 @@ class UniversalNumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 SPA_ROUTES = {'/', '/login', '/signup', '/app', '/profile', '/forgot-password', '/reset-password',
-              '/privacy', '/terms', '/cookies'}
+              '/verify-email', '/privacy', '/terms', '/cookies'}
 SPA_PREFIXES = ('/invite/',)
 PUBLIC_PAGES = [('/', 'weekly', '1.0'), ('/signup', 'monthly', '0.8'), ('/login', 'monthly', '0.6'),
                 ('/privacy', 'yearly', '0.3'), ('/terms', 'yearly', '0.3'), ('/cookies', 'yearly', '0.2')]
@@ -918,7 +924,7 @@ def robots_txt():
     body = ('User-agent: *\n'
             'Allow: /$\nAllow: /signup\nAllow: /login\nAllow: /privacy\nAllow: /terms\nAllow: /cookies\n'
             'Disallow: /app\nDisallow: /profile\nDisallow: /invite/\nDisallow: /reset-password\n'
-            'Disallow: /forgot-password\nDisallow: /api/\n\n'
+            'Disallow: /forgot-password\nDisallow: /verify-email\nDisallow: /api/\n\n'
             f'Sitemap: {_site_base()}/sitemap.xml\n')
     return Response(body, mimetype='text/plain', headers={'Cache-Control': 'public, max-age=86400'})
 

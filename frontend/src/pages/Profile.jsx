@@ -161,6 +161,7 @@ export default function Profile() {
         </div>
       </header>
 
+      <div className="relative mx-auto max-w-[1100px] px-4 pt-6 sm:px-6"><VerifyEmailBanner user={user} /></div>
       <main id="main" className="relative mx-auto grid max-w-[1100px] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[340px_1fr]">
         <div className="h-fit space-y-6">
           <form onSubmit={save} className="l-card h-fit p-6">
@@ -261,60 +262,73 @@ export default function Profile() {
 // --- Έλεγχος δύο βημάτων ---
 function TwoFactorCard({ user, setUser }) {
   const [status, setStatus] = useState(null);
-  const [setup, setSetup] = useState(null);       // { secret, qr }
+  const [mode, setMode] = useState(null);         // null | 'choose' | 'totp' | 'email'
+  const [setup, setSetup] = useState(null);       // { secret, qr } για εφαρμογή authenticator
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [codes, setCodes] = useState(null);       // εφεδρικοί κωδικοί (εμφανίζονται μία φορά)
-  const [disableOpen, setDisableOpen] = useState(false);
-  const [password, setPassword] = useState('');
+  const [manage, setManage] = useState(null);     // null | 'disable' | 'regenerate'
   const [busy, setBusy] = useState(false);
+  const hasPassword = user?.has_password !== false;
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/api/me/2fa`).then(({ data }) => setStatus(data)).catch(() => setStatus({ enabled: false }));
   }, []);
 
-  const begin = async () => {
-    setBusy(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/setup`);
-      setSetup(data);
+  const reset = () => { setMode(null); setSetup(null); setPassword(''); setCode(''); setManage(null); };
+  const run = async (fn) => { setBusy(true); try { await fn(); } catch (err) { toast.error(apiErrorMessage(err)); } finally { setBusy(false); } };
+
+  // Βήμα 1: επιβεβαίωση κωδικού λογαριασμού (ένα κλεμμένο cookie δεν αρκεί για να αλλάξει το 2FA)
+  const start = (e) => {
+    e.preventDefault();
+    run(async () => {
+      if (mode === 'totp') {
+        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/setup`, { password });
+        setSetup(data);
+      } else {
+        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/email/setup`, { password });
+        setSetup({ email: data.email_hint });
+        toast.success(`Στείλαμε κωδικό στο ${data.email_hint}`);
+      }
       setCode('');
-    } catch (err) { toast.error(apiErrorMessage(err)); } finally { setBusy(false); }
+    });
   };
 
-  const enable = async (e) => {
+  const enable = (e) => {
     e.preventDefault();
-    setBusy(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/enable`, { code });
-      setCodes(data.backup_codes);
-      setStatus(data);
-      setSetup(null);
-      setUser({ ...user, two_factor_enabled: true });
-      toast.success('Ο έλεγχος δύο βημάτων ενεργοποιήθηκε');
-    } catch (err) { toast.error(apiErrorMessage(err, 'Λάθος κωδικός')); setCode(''); } finally { setBusy(false); }
+    run(async () => {
+      const url = mode === 'totp' ? '/api/me/2fa/enable' : '/api/me/2fa/email/enable';
+      try {
+        const { data } = await axios.post(`${API_BASE_URL}${url}`, { code });
+        setCodes(data.backup_codes);
+        setStatus(data);
+        reset();
+        setUser({ ...user, two_factor_enabled: true });
+        toast.success('Ο έλεγχος δύο βημάτων ενεργοποιήθηκε. Οι άλλες συσκευές θα ζητήσουν ξανά σύνδεση.');
+      } catch (err) { setCode(''); throw err; }
+    });
   };
 
-  const regenerate = async () => {
-    const totp = window.prompt('Γράψε τον τωρινό κωδικό από την εφαρμογή authenticator:');
-    if (!totp) return;
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/backup-codes`, { code: totp.trim() });
-      setCodes(data.backup_codes);
-      setStatus(data);
-    } catch (err) { toast.error(apiErrorMessage(err)); }
-  };
+  const sendManageCode = () => run(async () => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/send-code`);
+    toast.success(`Στείλαμε κωδικό στο ${data.email_hint}`);
+  });
 
-  const disable = async (e) => {
+  const submitManage = (e) => {
     e.preventDefault();
-    setBusy(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/disable`, { password, code });
-      setStatus(data);
-      setDisableOpen(false);
-      setPassword(''); setCode('');
-      setUser({ ...user, two_factor_enabled: false });
-      toast.success('Ο έλεγχος δύο βημάτων απενεργοποιήθηκε');
-    } catch (err) { toast.error(apiErrorMessage(err)); } finally { setBusy(false); }
+    run(async () => {
+      if (manage === 'disable') {
+        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/disable`, { password, code });
+        setStatus(data);
+        setUser({ ...user, two_factor_enabled: false });
+        toast.success('Ο έλεγχος δύο βημάτων απενεργοποιήθηκε');
+      } else {
+        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/backup-codes`, { code });
+        setCodes(data.backup_codes);
+        setStatus(data);
+      }
+      reset();
+    });
   };
 
   const copyCodes = async () => {
@@ -329,11 +343,17 @@ function TwoFactorCard({ user, setUser }) {
     URL.revokeObjectURL(a.href);
   };
 
+  const emailMethod = status?.method === 'email';
+  const codeInput = (
+    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={emailMethod || mode === 'email' ? 'Κωδικός από το email' : 'Κωδικός εφαρμογής'}
+      autoComplete="one-time-code" className="l-input" required aria-label="Κωδικός δύο βημάτων" maxLength={11} />
+  );
+
   return (
     <Card title="Έλεγχος δύο βημάτων" icon={ShieldCheck}>
       {codes ? (
         <div className="mt-4 space-y-4 animate-rise">
-          <p className="l-alert l-alert-info">Αποθήκευσε αυτούς τους κωδικούς κάπου ασφαλές. Αν χάσεις το κινητό σου, θα μπεις μόνο με αυτούς. <strong>Δεν θα τους ξαναδείς.</strong></p>
+          <p className="l-alert l-alert-info">Αποθήκευσε αυτούς τους κωδικούς κάπου ασφαλές. Αν χάσεις το κινητό ή την πρόσβαση στο email σου, θα μπεις μόνο με αυτούς. <strong>Δεν θα τους ξαναδείς.</strong></p>
           <ul className="grid grid-cols-2 gap-2 rounded-[10px] bg-input-fill p-4 font-mono text-[14px] text-ice shadow-[var(--shadow-hairline)]">
             {codes.map((c) => <li key={c}>{c}</li>)}
           </ul>
@@ -347,50 +367,97 @@ function TwoFactorCard({ user, setUser }) {
         <Loader2 size={16} className="mt-4 animate-spin text-fog" />
       ) : status.enabled ? (
         <div className="mt-3 space-y-4">
-          <p className="flex items-center gap-2 text-[14px] text-[#7fdcc9]"><ShieldCheck size={15} aria-hidden="true" /> Ενεργός · {status.backup_codes_left} εφεδρικοί κωδικοί</p>
-          {!disableOpen ? (
+          <p className="flex items-center gap-2 text-[14px] text-[#7fdcc9]">
+            <ShieldCheck size={15} aria-hidden="true" /> Ενεργός ({emailMethod ? 'κωδικός στο email' : 'εφαρμογή authenticator'}) · {status.backup_codes_left} εφεδρικοί
+          </p>
+          {!manage ? (
             <div className="flex flex-col gap-2">
-              <button type="button" onClick={regenerate} className="l-btn l-btn-ghost l-btn-sm">Νέοι εφεδρικοί κωδικοί</button>
-              <button type="button" onClick={() => setDisableOpen(true)} className="l-btn l-btn-sm text-fog hover:text-[#ffb8a3]">Απενεργοποίηση</button>
+              <button type="button" onClick={() => setManage('regenerate')} className="l-btn l-btn-ghost l-btn-sm">Νέοι εφεδρικοί κωδικοί</button>
+              <button type="button" onClick={() => setManage('disable')} className="l-btn l-btn-sm text-fog hover:text-[#ffb8a3]">Απενεργοποίηση</button>
             </div>
           ) : (
-            <form onSubmit={disable} className="space-y-3 animate-rise">
-              {user?.has_password && (
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός σου" autoComplete="current-password" className="l-input" required aria-label="Ο κωδικός σου" />
+            <form onSubmit={submitManage} className="space-y-3 animate-rise">
+              {manage === 'disable' && hasPassword && (
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός του λογαριασμού" autoComplete="current-password" className="l-input" required aria-label="Ο κωδικός του λογαριασμού" />
               )}
-              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Κωδικός εφαρμογής ή εφεδρικός" autoComplete="one-time-code" className="l-input" required aria-label="Κωδικός δύο βημάτων" />
+              {codeInput}
+              {emailMethod && <button type="button" onClick={sendManageCode} disabled={busy} className="text-[13px] text-mist hover:text-white">Αποστολή κωδικού στο email</button>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => setDisableOpen(false)} className="l-btn l-btn-outline l-btn-sm flex-1">Άκυρο</button>
-                <button type="submit" disabled={busy} className="l-btn l-btn-danger l-btn-sm flex-1">{busy && <Loader2 size={14} className="animate-spin" />} Απενεργοποίηση</button>
+                <button type="button" onClick={reset} className="l-btn l-btn-outline l-btn-sm flex-1">Άκυρο</button>
+                <button type="submit" disabled={busy} className={`l-btn l-btn-sm flex-1 ${manage === 'disable' ? 'l-btn-danger' : 'l-btn-primary'}`}>
+                  {busy && <Loader2 size={14} className="animate-spin" />} {manage === 'disable' ? 'Απενεργοποίηση' : 'Δημιουργία'}
+                </button>
               </div>
             </form>
           )}
         </div>
-      ) : setup ? (
-        <form onSubmit={enable} className="mt-4 space-y-4 animate-rise">
-          <ol className="space-y-2 text-[13.5px] text-mist [&>li]:ml-4 [&>li]:list-decimal">
-            <li>Άνοιξε μια εφαρμογή authenticator (Google Authenticator, Microsoft Authenticator, Authy, 1Password…).</li>
-            <li>Σκάναρε τον κωδικό QR ή γράψε το κλειδί.</li>
-            <li>Γράψε τον 6ψήφιο κωδικό που εμφανίζεται.</li>
-          </ol>
-          {setup.qr && <img src={setup.qr} alt="Κωδικός QR για την εφαρμογή authenticator" className="mx-auto h-44 w-44 rounded-[12px] bg-white p-2" />}
-          <p className="break-all rounded-[8px] bg-input-fill p-2.5 text-center font-mono text-[12.5px] tracking-wider text-frost shadow-[var(--shadow-hairline)]" aria-label="Κλειδί για χειροκίνητη εισαγωγή">{setup.secret.match(/.{1,4}/g).join(" ")}</p>
-          <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={6}
-            autoComplete="one-time-code" placeholder="000000" className="l-input l-input-code" aria-label="Κωδικός 6 ψηφίων" required />
+      ) : !mode ? (
+        <div className="mt-3 space-y-4">
+          <p className="text-[13.5px] leading-relaxed text-fog">Ακόμα κι αν κάποιος μάθει τον κωδικό σου, δεν θα μπορεί να μπει χωρίς τον δεύτερο κωδικό.</p>
+          <button type="button" onClick={() => setMode('choose')} className="l-btn l-btn-primary w-full">Ενεργοποίηση</button>
+        </div>
+      ) : mode === 'choose' ? (
+        <div className="mt-4 space-y-2 animate-rise">
+          <button type="button" onClick={() => setMode('totp')} className="l-card l-lift w-full p-4 text-left">
+            <p className="font-medium text-ice">Εφαρμογή authenticator <span className="l-badge ml-1">Προτείνεται</span></p>
+            <p className="mt-1 text-[13px] text-fog">Google / Microsoft Authenticator, Authy, 1Password. Η πιο ασφαλής επιλογή.</p>
+          </button>
+          <button type="button" onClick={() => setMode('email')} disabled={!status.email_available || !user?.email_verified} className="l-card l-lift w-full p-4 text-left disabled:opacity-50">
+            <p className="font-medium text-ice">Κωδικός στο email</p>
+            <p className="mt-1 text-[13px] text-fog">{user?.email_verified ? 'Σε κάθε σύνδεση στέλνουμε κωδικό 6 ψηφίων στο email σου.' : 'Επιβεβαίωσε πρώτα το email σου.'}</p>
+          </button>
+          <button type="button" onClick={reset} className="l-btn l-btn-sm w-full text-fog hover:text-white">Άκυρο</button>
+        </div>
+      ) : !setup ? (
+        <form onSubmit={start} className="mt-4 space-y-3 animate-rise">
+          <p className="text-[13.5px] text-mist">{hasPassword ? 'Για ασφάλεια, γράψε τον κωδικό του λογαριασμού σου.' : 'Επιβεβαίωσε ότι είσαι εσύ (σύνδεση με Google τα τελευταία 10 λεπτά).'}</p>
+          {hasPassword && (
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Κωδικός λογαριασμού" autoComplete="current-password" className="l-input" required autoFocus aria-label="Κωδικός λογαριασμού" />
+          )}
           <div className="flex gap-2">
-            <button type="button" onClick={() => setSetup(null)} className="l-btn l-btn-outline flex-1">Άκυρο</button>
-            <button type="submit" disabled={busy || code.length !== 6} className="l-btn l-btn-primary flex-1">{busy && <Loader2 size={15} className="animate-spin" />} Ενεργοποίηση</button>
+            <button type="button" onClick={reset} className="l-btn l-btn-outline flex-1">Άκυρο</button>
+            <button type="submit" disabled={busy} className="l-btn l-btn-primary flex-1">{busy && <Loader2 size={15} className="animate-spin" />} Συνέχεια</button>
           </div>
         </form>
       ) : (
-        <div className="mt-3 space-y-4">
-          <p className="text-[13.5px] leading-relaxed text-fog">Ακόμα κι αν κάποιος μάθει τον κωδικό σου, δεν θα μπορεί να μπει χωρίς τον κωδικό από το κινητό σου.</p>
-          <button type="button" onClick={begin} disabled={busy} className="l-btn l-btn-primary w-full">
-            {busy && <Loader2 size={15} className="animate-spin" />} Ενεργοποίηση
-          </button>
-        </div>
+        <form onSubmit={enable} className="mt-4 space-y-4 animate-rise">
+          {mode === 'totp' ? (
+            <>
+              <ol className="space-y-2 text-[13.5px] text-mist [&>li]:ml-4 [&>li]:list-decimal">
+                <li>Άνοιξε μια εφαρμογή authenticator (Google Authenticator, Microsoft Authenticator, Authy, 1Password…).</li>
+                <li>Σκάναρε τον κωδικό QR ή γράψε το κλειδί.</li>
+                <li>Γράψε τον 6ψήφιο κωδικό που εμφανίζεται.</li>
+              </ol>
+              {setup.qr && <img src={setup.qr} alt="Κωδικός QR για την εφαρμογή authenticator" className="mx-auto h-44 w-44 rounded-[12px] bg-white p-2" />}
+              <p className="break-all rounded-[8px] bg-input-fill p-2.5 text-center font-mono text-[12.5px] tracking-wider text-frost shadow-[var(--shadow-hairline)]" aria-label="Κλειδί για χειροκίνητη εισαγωγή">{setup.secret.match(/.{1,4}/g).join(' ')}</p>
+            </>
+          ) : (
+            <p className="text-[13.5px] text-mist">Γράψε τον κωδικό που στείλαμε στο {setup.email}.</p>
+          )}
+          <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={6}
+            autoComplete="one-time-code" placeholder="000000" className="l-input l-input-code" aria-label="Κωδικός 6 ψηφίων" required />
+          <div className="flex gap-2">
+            <button type="button" onClick={reset} className="l-btn l-btn-outline flex-1">Άκυρο</button>
+            <button type="submit" disabled={busy || code.length !== 6} className="l-btn l-btn-primary flex-1">{busy && <Loader2 size={15} className="animate-spin" />} Ενεργοποίηση</button>
+          </div>
+        </form>
       )}
     </Card>
+  );
+}
+
+// --- Επιβεβαίωση email ---
+function VerifyEmailBanner({ user }) {
+  const [sent, setSent] = useState(false);
+  if (!user || user.email_verified) return null;
+  const resend = async () => {
+    try { await axios.post(`${API_BASE_URL}/api/me/verify-email`); setSent(true); } catch (err) { toast.error(apiErrorMessage(err)); }
+  };
+  return (
+    <div role="status" className="l-alert l-alert-info flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <span>Επιβεβαίωσε το email σου ({user.email}) για να προστατέψεις τον λογαριασμό σου.</span>
+      <button type="button" onClick={resend} disabled={sent} className="l-btn l-btn-ghost l-btn-sm shrink-0">{sent ? 'Στάλθηκε' : 'Αποστολή συνδέσμου'}</button>
+    </div>
   );
 }
 

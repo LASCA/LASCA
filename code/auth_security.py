@@ -75,7 +75,7 @@ def init_auth(app, **refs):
     A.dev = A.is_development
     key_material = os.getenv('TOTP_ENCRYPTION_KEY', '').strip() or app.config['SECRET_KEY']
     A.fernet_key = base64.urlsafe_b64encode(hashlib.sha256(('lasca-totp:' + key_material).encode()).digest())
-    A.hmac_key = hashlib.sha256(('lasca-codes:' + app.config['SECRET_KEY']).encode()).digest()
+    A.hmac_key = hashlib.sha256(('lasca-codes:' + key_material).encode()).digest()
     if not A.turnstile_secret and not A.dev:
         A.logger.warning('TURNSTILE_SECRET_KEY is not set: CAPTCHA is disabled (rate limits still apply)')
     app.register_blueprint(bp)
@@ -397,6 +397,13 @@ def guard_login_attempt(email, data, allow_captcha=True):
     fails, last_fail = _fail_state(email)
     locked = lock_remaining(fails, last_fail)
     if locked:
+        if allow_captcha and captcha_enabled():
+            # «Μαλακό» κλείδωμα: ο πραγματικός χρήστης μπαίνει με σωστό κωδικό + CAPTCHA, ώστε κανείς
+            # να μην μπορεί να κρατάει κλειδωμένο τον λογαριασμό κάποιου άλλου (lockout DoS).
+            if not verify_captcha(data.get('captcha_token')):
+                raise AuthError('Πολλές αποτυχημένες προσπάθειες σε αυτόν τον λογαριασμό. Επιβεβαίωσε ότι δεν είσαι ρομπότ.',
+                                400, code='captcha_required', captcha_site_key=A.turnstile_site)
+            return fails
         record('login_blocked', email=email, detail={'reason': 'locked'})
         raise AuthError('Ο λογαριασμός κλειδώθηκε προσωρινά λόγω πολλών λάθος κωδικών. '
                         'Δοκίμασε αργότερα ή κάνε επαναφορά κωδικού.', 423, code='account_locked',
@@ -416,7 +423,7 @@ def login_failed(email, user=None, reason='bad_password'):
     extra = {}
     if captcha_enabled() and (fails >= CAPTCHA_AFTER or ip_fails >= CAPTCHA_AFTER):
         extra = {'captcha_required': True, 'captcha_site_key': A.turnstile_site}
-    if fails >= LOCK_AFTER:
+    if fails >= LOCK_AFTER and not captcha_enabled():
         raise AuthError('Ο λογαριασμός κλειδώθηκε προσωρινά λόγω πολλών λάθος κωδικών. '
                         'Δοκίμασε αργότερα ή κάνε επαναφορά κωδικού.', 423, code='account_locked',
                         retry_after=lock_remaining(fails, utcnow()), **extra)
@@ -503,9 +510,11 @@ def store_backup_codes(user, codes):
 
 
 def use_backup_code(user, code):
+    """Επιστρέφει τη νέα λίστα (JSON) χωρίς τον κωδικό που χρησιμοποιήθηκε, ή None αν δεν ταιριάζει.
+    ΔΕΝ αλλάζει τον χρήστη: η αλλαγή γίνεται ατομικά στη βάση (check_second_factor)."""
     norm = _norm_backup(code)
     if len(norm) != 10:
-        return False
+        return None
     try:
         hashes = json.loads(user.backup_codes or '[]')
     except ValueError:
@@ -514,9 +523,8 @@ def use_backup_code(user, code):
     for h in hashes:
         if hmac.compare_digest(h, target):
             hashes.remove(h)
-            user.backup_codes = json.dumps(hashes)
-            return True
-    return False
+            return json.dumps(hashes)
+    return None
 
 
 def backup_codes_left(user):
@@ -526,31 +534,80 @@ def backup_codes_left(user):
         return 0
 
 
+def _atomic_update(table_model, where_sql, params, set_sql):
+    """UPDATE ... WHERE ...: επιτυγχάνει μόνο για ΕΝΑ από δύο ταυτόχρονα αιτήματα (κανένας κωδικός δύο φορές)."""
+    from sqlalchemy import text
+    res = A.db.session.execute(text(f'UPDATE {table_model.__tablename__} SET {set_sql} WHERE {where_sql}'), params)
+    return res.rowcount == 1
+
+
 def check_second_factor(user, code, method):
-    """method: totp | backup | email. Επιστρέφει True αν ο κωδικός είναι σωστός."""
+    """method: totp | backup | email. Επιστρέφει True αν ο κωδικός είναι σωστός.
+    Όλοι οι έλεγχοι είναι «ατομικοί» στη βάση: δύο παράλληλα αιτήματα με τον ίδιο κωδικό δεν περνάνε και τα δύο."""
+    if not user.totp_enabled:
+        return False
     if method == 'backup':
-        if use_backup_code(user, code):
-            record('backup_code_used', user=user, commit=False, detail={'left': backup_codes_left(user)})
-            return True
-        return False
-    if method == 'email':
-        code = re.sub(r'\s', '', str(code or ''))
-        otp = A.EmailOtp.query.filter_by(user_id=user.id, purpose='login', used=False) \
-            .order_by(A.EmailOtp.id.desc()).first()
-        if otp is None or otp.expires_at < utcnow() or otp.attempts >= 5:
+        old = user.backup_codes or '[]'
+        new = use_backup_code(user, code)
+        if new is None:
             return False
-        otp.attempts += 1
-        if hmac.compare_digest(otp.code_hash, keyed_hash(f'{user.id}:{code}')):
-            otp.used = True
-            return True
+        if not _atomic_update(A.User, 'id = :id AND backup_codes = :old', {'id': user.id, 'old': old, 'new': new},
+                              'backup_codes = :new'):
+            return False
+        A.db.session.refresh(user)
+        record('backup_code_used', user=user, commit=False, detail={'left': backup_codes_left(user)})
+        return True
+    if method == 'email':
+        # Κωδικός μέσω email: μόνο αν ο χρήστης διάλεξε email ως δεύτερο βήμα. Αν έχει εφαρμογή
+        # authenticator, το email ΔΕΝ είναι εναλλακτική (αλλιώς όποιος έχει το mailbox παρακάμπτει το 2FA).
+        if (user.twofa_method or 'totp') != 'email':
+            return False
+        return check_email_code(user, code, 'login')
+    if (user.twofa_method or 'totp') != 'totp' or not user.totp_secret_enc:
         return False
-    if not user.totp_enabled or not user.totp_secret_enc:
+    try:
+        secret = decrypt_secret(user.totp_secret_enc)
+    except Exception:
+        A.logger.error('Cannot decrypt TOTP secret for user %s (SECRET_KEY/TOTP_ENCRYPTION_KEY changed?)', user.id)
         return False
-    step = totp_match(decrypt_secret(user.totp_secret_enc), code, user.totp_last_step)
+    step = totp_match(secret, code, user.totp_last_step)
     if step is None:
+        return False
+    if not _atomic_update(A.User, 'id = :id AND (totp_last_step IS NULL OR totp_last_step < :step)',
+                          {'id': user.id, 'step': step}, 'totp_last_step = :step'):
         return False
     user.totp_last_step = step
     return True
+
+
+def check_email_code(user, code, purpose):
+    code = re.sub(r'\s', '', str(code or ''))
+    otp = A.EmailOtp.query.filter_by(user_id=user.id, purpose=purpose, used=False) \
+        .order_by(A.EmailOtp.id.desc()).first()
+    if otp is None or otp.expires_at < utcnow() or otp.attempts >= 5:
+        return False
+    otp.attempts += 1
+    A.db.session.commit()
+    if not hmac.compare_digest(otp.code_hash, keyed_hash(f'{user.id}:{code}')):
+        return False
+    return _atomic_update(A.EmailOtp, 'id = :id AND used = 0', {'id': otp.id}, 'used = 1')
+
+
+def issue_email_code(user, purpose, title, intro):
+    """Στέλνει κωδικό 6 ψηφίων στο email του χρήστη (ισχύει 10 λεπτά). Επιστρέφει True αν στάλθηκε."""
+    throttle(f'otpmail:{purpose}:{user.id}', EMAIL_OTP_SEND_LIMIT, timedelta(minutes=15),
+             'Στάλθηκαν ήδη αρκετοί κωδικοί. Περίμενε λίγα λεπτά.')
+    code = f'{secrets.randbelow(1_000_000):06d}'
+    A.EmailOtp.query.filter_by(user_id=user.id, purpose=purpose, used=False).update({'used': True})
+    A.db.session.add(A.EmailOtp(user_id=user.id, purpose=purpose, code_hash=keyed_hash(f'{user.id}:{code}'),
+                                created_at=utcnow(), expires_at=utcnow() + EMAIL_OTP_TTL))
+    A.db.session.commit()
+    html = _email_layout(title, (
+        f'<p>{escape(intro)}</p>'
+        f'<p style="font-family:monospace;font-size:30px;letter-spacing:.3em;color:#d8ecf8">{code}</p>'
+        '<p>Ισχύει για 10 λεπτά.</p>'))
+    # Ο κωδικός ΔΕΝ μπαίνει στο θέμα (φαίνεται σε ειδοποιήσεις και logs).
+    return send_email(user.email, title + ' · LASCA', html, dev_hint=f'{purpose} code {code}')
 
 
 # ---------------------------------------------------------------------------
@@ -561,8 +618,10 @@ def email_enabled():
 
 
 def send_email(to, subject, html, dev_hint=None):
+    """Όρια κόστους (ανά ημέρα / ανά παραλήπτη) και αποστολή στο παρασκήνιο (ίδιος χρόνος απάντησης
+    είτε υπάρχει λογαριασμός είτε όχι). Στα logs δεν γράφεται ποτέ θέμα, κωδικός ή σύνδεσμος."""
     if db_hit('email:global', A.max_emails_day, timedelta(days=1)):
-        A.logger.error('Daily email cap (%s) reached: not sending "%s"', A.max_emails_day, subject)
+        A.logger.error('Daily email cap (%s) reached: email not sent', A.max_emails_day)
         return False
     if db_hit(f'email:to:{keyed_hash(to.lower())}', 6, timedelta(hours=1)):
         A.logger.warning('Per-recipient email cap reached for %s', mask_email(to))
@@ -572,15 +631,19 @@ def send_email(to, subject, html, dev_hint=None):
             # ΜΟΝΟ τοπικά (LASCA_ENV=development): για δοκιμή χωρίς Resend.
             A.logger.info('[dev] email to %s: %s', to, dev_hint)
         else:
-            A.logger.error('Email not configured: could not send "%s"', subject)
+            A.logger.error('Email not configured (RESEND_API_KEY): email not sent')
         return False
-    try:
-        A.resend.api_key = os.getenv('RESEND_API_KEY', '').strip()
-        A.resend.Emails.send({'from': A.email_from, 'to': [to], 'subject': subject, 'html': html})
-        return True
-    except Exception as exc:
-        A.logger.error('Resend email failed: %s', type(exc).__name__)
-        return False
+
+    def _deliver():
+        try:
+            A.resend.api_key = os.getenv('RESEND_API_KEY', '').strip()
+            A.resend.Emails.send({'from': A.email_from, 'to': [to], 'subject': subject, 'html': html})
+        except Exception as exc:
+            A.logger.error('Resend email failed: %s', type(exc).__name__)
+
+    import threading
+    threading.Thread(target=_deliver, daemon=True).start()
+    return True
 
 
 def _email_layout(title, body_html):
@@ -606,6 +669,7 @@ def start_session(user, remember, via):
     session.pop('pending_2fa', None)
     login_user(user, remember=bool(remember))
     session.permanent = False
+    session['login_at'] = utcnow().timestamp()
     record('login_success', user=user, detail={'via': via})
     return jsonify({'status': 'success', 'user': user.to_me_dict()})
 
@@ -616,9 +680,11 @@ def begin_login(user, remember, via):
         session['pending_2fa'] = {'uid': user.id, 'sv': user.session_version or 0, 'remember': bool(remember),
                                   'via': via, 'exp': (utcnow() + TWOFA_PENDING_TTL).timestamp()}
         record('2fa_challenge', user=user, detail={'via': via})
-        return jsonify({'status': '2fa_required', 'requires_2fa': True,
-                        'methods': ['totp', 'backup'] + (['email'] if email_enabled() or A.dev else []),
-                        'email_hint': mask_email(user.email)}), 200
+        method = user.twofa_method or 'totp'
+        if method == 'email':
+            issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στη LASCA:')
+        return jsonify({'status': '2fa_required', 'requires_2fa': True, 'method': method,
+                        'methods': [method, 'backup'], 'email_hint': mask_email(user.email)}), 200
     return start_session(user, remember, via)
 
 
@@ -692,6 +758,7 @@ def register_user():
     A.db.session.add(user)
     A.db.session.commit()
     record('signup', user=user)
+    send_verification(user)
     return start_session(user, data.get('remember'), 'signup')
 
 
@@ -742,18 +809,26 @@ def google_login_route():
             raise AuthError('Για νέο λογαριασμό αποδέξου πρώτα τους όρους στη σελίδα εγγραφής.', 403,
                             code='terms_required')
         user = A.User(email=email, display_name=clean_display_name(info.get('name') or email.split('@', 1)[0]),
-                      terms_accepted_at=utcnow(), age_confirmed=True)
+                      terms_accepted_at=utcnow(), age_confirmed=True, email_verified=True)
         user.set_password(secrets.token_hex(32))   # κανείς δεν τον ξέρει: μπαίνει μόνο με Google
         user.has_password = False
         A.db.session.add(user)
         A.db.session.commit()
         record('signup', user=user, detail={'via': 'google'})
-    else:
-        fails, last_fail = _fail_state(email)
-        locked = lock_remaining(fails, last_fail)
-        if locked:
-            raise AuthError('Ο λογαριασμός είναι προσωρινά κλειδωμένος.', 423, code='account_locked',
-                            retry_after=locked)
+    elif not user.email_verified:
+        # Κάποιος έφτιαξε λογαριασμό με αυτό το email χωρίς να το επιβεβαιώσει (πιθανή «κατάληψη»
+        # λογαριασμού). Το Google αποδεικνύει ότι ο κάτοχος του email είναι αυτός: σβήνουμε κάθε
+        # διαπιστευτήριο που έβαλε ο άλλος (κωδικό, 2FA, συσκευές, συνδέσεις).
+        user.set_password(secrets.token_hex(32))
+        user.has_password = False
+        user.totp_enabled, user.totp_secret_enc, user.totp_pending_enc = False, None, None
+        user.backup_codes, user.totp_last_step, user.twofa_method = None, None, 'totp'
+        user.session_version = (user.session_version or 0) + 1
+        user.email_verified = True
+        A.DeviceToken.query.filter_by(user_id=user.id).delete()
+        A.db.session.commit()
+        record('unverified_account_reclaimed', user=user)
+    # Οι λάθος κωδικοί δεν μπλοκάρουν τη σύνδεση με Google (το Google είναι ήδη ισχυρή ταυτοποίηση).
     return begin_login(user, data.get('remember', True), 'google')
 
 
@@ -761,7 +836,7 @@ def google_login_route():
 def verify_2fa():
     data = body()
     user, pending = pending_user()
-    method = text_field(data, 'method', 10) or 'totp'
+    method = text_field(data, 'method', 10) or (user.twofa_method or 'totp')
     if method not in {'totp', 'backup', 'email'}:
         raise AuthError('Μη έγκυρη μέθοδος.', 400)
     Ev = A.AuthEvent
@@ -783,23 +858,15 @@ def verify_2fa():
 
 @bp.post('/api/auth/2fa/email')
 def send_2fa_email():
+    """Νέος κωδικός στο email (μόνο για όσους έχουν διαλέξει email ως δεύτερο βήμα)."""
     user, _ = pending_user()
-    throttle(f'otpmail:{user.id}', EMAIL_OTP_SEND_LIMIT, timedelta(minutes=15),
-             'Στάλθηκαν ήδη αρκετοί κωδικοί. Περίμενε λίγα λεπτά.')
-    code = f'{secrets.randbelow(1_000_000):06d}'
-    A.EmailOtp.query.filter_by(user_id=user.id, purpose='login', used=False).update({'used': True})
-    A.db.session.add(A.EmailOtp(user_id=user.id, purpose='login', code_hash=keyed_hash(f'{user.id}:{code}'),
-                                created_at=utcnow(), expires_at=utcnow() + EMAIL_OTP_TTL))
-    A.db.session.commit()
-    html = _email_layout('Κωδικός σύνδεσης', (
-        '<p>Ο κωδικός για να ολοκληρώσεις τη σύνδεση στη LASCA:</p>'
-        f'<p style="font-family:monospace;font-size:30px;letter-spacing:.3em;color:#d8ecf8">{code}</p>'
-        '<p>Ισχύει για 10 λεπτά.</p>'))
-    sent = send_email(user.email, f'Κωδικός σύνδεσης LASCA: {code}', html, dev_hint=f'login code {code}')
+    if (user.twofa_method or 'totp') != 'email':
+        raise AuthError('Ο λογαριασμός σου χρησιμοποιεί εφαρμογή authenticator.', 400, code='wrong_method')
+    sent = issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στη LASCA:')
     record('2fa_email_sent', user=user, detail={'sent': sent})
     if not sent and not A.dev:
-        raise AuthError('Δεν ήταν δυνατή η αποστολή email. Χρησιμοποίησε την εφαρμογή ή έναν εφεδρικό κωδικό.',
-                        503, code='email_unavailable')
+        raise AuthError('Δεν ήταν δυνατή η αποστολή email. Χρησιμοποίησε έναν εφεδρικό κωδικό.', 503,
+                        code='email_unavailable')
     return jsonify({'status': 'sent', 'email_hint': mask_email(user.email)})
 
 
@@ -871,6 +938,7 @@ def reset_password():
     validate_new_password(password, user.email, user.display_name)
     user.set_password(password)
     user.has_password = True
+    user.email_verified = True                                       # ο σύνδεσμος ήρθε στο email του
     user.password_changed_at = utcnow()
     user.session_version = (user.session_version or 0) + 1          # αποσύνδεση από παντού
     A.DeviceToken.query.filter_by(user_id=user.id).delete()
@@ -891,7 +959,8 @@ def create_device_token():
     password = text_field(data, 'password', 1024)
     if not email or not password:
         raise AuthError('Το email και ο κωδικός είναι υποχρεωτικά.')
-    # Στο exe δεν υπάρχει CAPTCHA: ισχύουν όριο IP, αναμονή και κλείδωμα.
+    # Στο exe δεν υπάρχει CAPTCHA: αυστηρότερο όριο ανά IP, αναμονή και κλείδωμα.
+    throttle(f'devtoken:{client_ip()}', 10, timedelta(minutes=15))
     guard_login_attempt(email, data, allow_captcha=False)
     user = find_user(email)
     if user is None:
@@ -904,15 +973,20 @@ def create_device_token():
                         403, code='no_password')
     if user.totp_enabled:
         code = text_field(data, 'otp', 64)
+        method = user.twofa_method or 'totp'
         if not code:
-            raise AuthError('Γράψε τον κωδικό από την εφαρμογή authenticator (ή έναν εφεδρικό κωδικό).', 401,
-                            code='2fa_required', requires_2fa=True)
+            if method == 'email':
+                issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να συνδέσεις το πρόγραμμα των Windows:')
+                msg = f'Στείλαμε κωδικό στο {mask_email(user.email)}. Γράψ\' τον εδώ (ή έναν εφεδρικό κωδικό).'
+            else:
+                msg = 'Γράψε τον κωδικό από την εφαρμογή authenticator (ή έναν εφεδρικό κωδικό).'
+            raise AuthError(msg, 401, code='2fa_required', requires_2fa=True, method=method)
         recent = A.AuthEvent.query.filter(A.AuthEvent.user_id == user.id, A.AuthEvent.event == '2fa_failed',
                                           A.AuthEvent.created_at > utcnow() - IP_FAIL_WINDOW).count()
         if recent >= TWOFA_FAIL_LIMIT:
             raise AuthError('Πάρα πολλοί λάθος κωδικοί. Δοκίμασε ξανά σε 15 λεπτά.', 429, code='rate_limited',
                             retry_after=900)
-        method = 'backup' if len(_norm_backup(code)) == 10 and not code.strip().isdigit() else 'totp'
+        method = _method_for_code(user, code)
         if not check_second_factor(user, code, method):
             A.db.session.commit()
             record('2fa_failed', user=user, detail={'method': method, 'client': 'desktop'})
@@ -929,22 +1003,58 @@ def create_device_token():
 # ---------------------------------------------------------------------------
 # Ρυθμίσεις ασφαλείας του χρήστη (σελίδα Προφίλ)
 # ---------------------------------------------------------------------------
-def _require_password_or_2fa(user, data):
-    """Ευαίσθητες αλλαγές: ζητάμε κωδικό (ή, για λογαριασμούς Google, κωδικό 2FA)."""
+FRESH_LOGIN = timedelta(minutes=10)
+
+
+def reauthenticate(user, data):
+    """Ευαίσθητες αλλαγές (2FA, κωδικός, διαγραφή): απόδειξη ότι είναι ο ίδιος ο χρήστης και όχι κάποιος
+    με κλεμμένο cookie. Κωδικός· ή (λογαριασμοί Google) κωδικός 2FA· ή σύνδεση τα τελευταία 10 λεπτά."""
     throttle(f'reauth:{user.id}', 10, timedelta(minutes=15))
     if user.has_password:
         if not user.check_password(text_field(data, 'password', 1024)):
             record('reauth_failed', user=user)
             raise AuthError('Ο κωδικός δεν είναι σωστός.', 403, code='bad_password')
-    elif user.totp_enabled:
-        if not check_second_factor(user, text_field(data, 'code', 64), 'totp'):
+        return
+    if user.totp_enabled:
+        code = text_field(data, 'code', 64)
+        if not check_second_factor(user, code, _method_for_code(user, code)):
+            A.db.session.commit()
             record('reauth_failed', user=user)
             raise AuthError('Λάθος κωδικός δύο βημάτων.', 403, code='bad_code')
+        return
+    login_at = session.get('login_at') or 0
+    if utcnow().timestamp() - float(login_at) > FRESH_LOGIN.total_seconds():
+        raise AuthError('Για ασφάλεια, αποσυνδέσου και συνδέσου ξανά με Google και δοκίμασε μέσα σε 10 λεπτά.',
+                        403, code='reauth_required')
+
+
+def _method_for_code(user, code):
+    code = str(code or '').strip()
+    if len(_norm_backup(code)) == 10 and not code.isdigit():
+        return 'backup'
+    return user.twofa_method or 'totp'
 
 
 def two_factor_status(user):
-    return {'enabled': bool(user.totp_enabled), 'backup_codes_left': backup_codes_left(user) if user.totp_enabled else 0,
-            'email_available': email_enabled()}
+    return {'enabled': bool(user.totp_enabled), 'method': (user.twofa_method or 'totp') if user.totp_enabled else None,
+            'backup_codes_left': backup_codes_left(user) if user.totp_enabled else 0,
+            'email_available': email_enabled() or A.dev}
+
+
+def _finish_enable(user, method, step=None):
+    codes = new_backup_codes()
+    user.totp_enabled, user.twofa_method = True, method
+    if step is not None:
+        user.totp_last_step = step
+    store_backup_codes(user, codes)
+    # Όλες οι άλλες συνδέσεις (browsers ΚΑΙ πρόγραμμα Windows) πρέπει να ξαναμπούν με 2FA.
+    user.session_version = (user.session_version or 0) + 1
+    A.DeviceToken.query.filter_by(user_id=user.id).delete()
+    A.db.session.commit()
+    login_user(user, remember=bool(request.cookies.get(current_app.config['REMEMBER_COOKIE_NAME'])))
+    session['login_at'] = utcnow().timestamp()
+    record('2fa_enabled', user=user, detail={'method': method})
+    return jsonify({'status': 'enabled', 'backup_codes': codes, **two_factor_status(user)})
 
 
 @bp.get('/api/me/2fa')
@@ -956,10 +1066,12 @@ def get_2fa():
 @bp.post('/api/me/2fa/setup')
 @login_required
 def setup_2fa():
+    """Βήμα 1 (εφαρμογή authenticator): χρειάζεται τον κωδικό του λογαριασμού."""
     user = current_user._get_current_object()
     if user.totp_enabled:
         raise AuthError('Ο έλεγχος δύο βημάτων είναι ήδη ενεργός.', 409)
     throttle(f'2fasetup:{user.id}', 10, timedelta(hours=1))
+    reauthenticate(user, body())
     secret = new_totp_secret()
     user.totp_pending_enc = encrypt_secret(secret)
     A.db.session.commit()
@@ -972,22 +1084,68 @@ def setup_2fa():
 def enable_2fa():
     user = current_user._get_current_object()
     data = body()
-    if not user.totp_pending_enc:
+    if not user.totp_pending_enc or user.totp_enabled:
         raise AuthError('Ξεκίνα πρώτα τη ρύθμιση.', 400)
     throttle(f'2faenable:{user.id}', 10, timedelta(minutes=15))
-    secret = decrypt_secret(user.totp_pending_enc)
+    try:
+        secret = decrypt_secret(user.totp_pending_enc)
+    except Exception:
+        raise AuthError('Ξεκίνα ξανά τη ρύθμιση.', 400)
     step = totp_match(secret, text_field(data, 'code', 16))
     if step is None:
         raise AuthError('Λάθος κωδικός. Έλεγξε ότι η ώρα του κινητού είναι σωστή.', 400, code='bad_code')
-    codes = new_backup_codes()
     user.totp_secret_enc, user.totp_pending_enc = user.totp_pending_enc, None
-    user.totp_enabled, user.totp_last_step = True, step
-    store_backup_codes(user, codes)
-    user.session_version = (user.session_version or 0) + 1   # οι άλλες συσκευές ξανασυνδέονται με 2FA
-    A.db.session.commit()
-    login_user(user, remember=bool(request.cookies.get(current_app.config['REMEMBER_COOKIE_NAME'])))
-    record('2fa_enabled', user=user)
-    return jsonify({'status': 'enabled', 'backup_codes': codes, **two_factor_status(user)})
+    return _finish_enable(user, 'totp', step)
+
+
+@bp.post('/api/me/2fa/email/setup')
+@login_required
+def setup_email_2fa():
+    """Βήμα 1 (κωδικός στο email): χρειάζεται τον κωδικό του λογαριασμού και στέλνει κωδικό επιβεβαίωσης."""
+    user = current_user._get_current_object()
+    if user.totp_enabled:
+        raise AuthError('Ο έλεγχος δύο βημάτων είναι ήδη ενεργός.', 409)
+    if not user.email_verified:
+        raise AuthError('Επιβεβαίωσε πρώτα το email σου.', 400, code='email_unverified')
+    reauthenticate(user, body())
+    sent = issue_email_code(user, 'enable2fa', 'Ενεργοποίηση ελέγχου δύο βημάτων',
+                            'Ο κωδικός για να ενεργοποιήσεις τον έλεγχο δύο βημάτων με email:')
+    if not sent and not A.dev:
+        raise AuthError('Δεν ήταν δυνατή η αποστολή email. Χρησιμοποίησε εφαρμογή authenticator.', 503,
+                        code='email_unavailable')
+    return jsonify({'status': 'sent', 'email_hint': mask_email(user.email)})
+
+
+@bp.post('/api/me/2fa/email/enable')
+@login_required
+def enable_email_2fa():
+    user = current_user._get_current_object()
+    if user.totp_enabled:
+        raise AuthError('Ο έλεγχος δύο βημάτων είναι ήδη ενεργός.', 409)
+    throttle(f'2faenable:{user.id}', 10, timedelta(minutes=15))
+    if not check_email_code(user, text_field(body(), 'code', 16), 'enable2fa'):
+        raise AuthError('Λάθος ή ληγμένος κωδικός.', 400, code='bad_code')
+    user.totp_secret_enc = user.totp_pending_enc = None
+    return _finish_enable(user, 'email')
+
+
+@bp.post('/api/me/2fa/send-code')
+@login_required
+def send_manage_code():
+    """Για χρήστες με 2FA μέσω email: κωδικός για απενεργοποίηση / νέους εφεδρικούς κωδικούς."""
+    user = current_user._get_current_object()
+    if not user.totp_enabled or user.twofa_method != 'email':
+        raise AuthError('Δεν χρειάζεται.', 400)
+    sent = issue_email_code(user, 'login', 'Κωδικός ασφαλείας', 'Ο κωδικός για να αλλάξεις τις ρυθμίσεις ασφαλείας:')
+    return jsonify({'status': 'sent' if sent or A.dev else 'failed', 'email_hint': mask_email(user.email)})
+
+
+def _require_current_2fa(user, data, context):
+    code = text_field(data, 'code', 64)
+    if not check_second_factor(user, code, _method_for_code(user, code)):
+        A.db.session.commit()
+        record('2fa_failed', user=user, detail={'context': context})
+        raise AuthError('Λάθος κωδικός δύο βημάτων.', 403, code='bad_code')
 
 
 @bp.post('/api/me/2fa/disable')
@@ -997,14 +1155,12 @@ def disable_2fa():
     data = body()
     if not user.totp_enabled:
         return jsonify(two_factor_status(user))
-    _require_password_or_2fa(user, {**data, 'code': data.get('code')})
-    if user.has_password and not check_second_factor(user, text_field(data, 'code', 64),
-                                                     'backup' if len(_norm_backup(data.get('code'))) == 10 else 'totp'):
-        A.db.session.commit()
-        record('2fa_failed', user=user, detail={'context': 'disable'})
-        raise AuthError('Λάθος κωδικός δύο βημάτων.', 403, code='bad_code')
+    throttle(f'2fadisable:{user.id}', 10, timedelta(minutes=15))
+    if user.has_password:
+        reauthenticate(user, data)          # κωδικός λογαριασμού ...
+    _require_current_2fa(user, data, 'disable')   # ... ΚΑΙ κωδικός δύο βημάτων
     user.totp_enabled, user.totp_secret_enc, user.totp_pending_enc = False, None, None
-    user.backup_codes, user.totp_last_step = None, None
+    user.backup_codes, user.totp_last_step, user.twofa_method = None, None, 'totp'
     A.db.session.commit()
     record('2fa_disabled', user=user)
     return jsonify(two_factor_status(user))
@@ -1018,7 +1174,8 @@ def regenerate_backup_codes():
     if not user.totp_enabled:
         raise AuthError('Ενεργοποίησε πρώτα τον έλεγχο δύο βημάτων.', 400)
     throttle(f'2fabackup:{user.id}', 10, timedelta(minutes=15))
-    if not check_second_factor(user, text_field(data, 'code', 16), 'totp'):
+    code = text_field(data, 'code', 64)
+    if _method_for_code(user, code) == 'backup' or not check_second_factor(user, code, user.twofa_method or 'totp'):
         A.db.session.commit()
         record('2fa_failed', user=user, detail={'context': 'backup_codes'})
         raise AuthError('Λάθος κωδικός.', 403, code='bad_code')
@@ -1029,6 +1186,55 @@ def regenerate_backup_codes():
     return jsonify({'backup_codes': codes, **two_factor_status(user)})
 
 
+# ---------------------------------------------------------------------------
+# Επιβεβαίωση email
+# ---------------------------------------------------------------------------
+VERIFY_TTL = timedelta(hours=48)
+
+
+def send_verification(user):
+    token = secrets.token_urlsafe(32)
+    A.EmailOtp.query.filter_by(user_id=user.id, purpose='verify', used=False).update({'used': True})
+    A.db.session.add(A.EmailOtp(user_id=user.id, purpose='verify', code_hash=keyed_hash(f'verify:{token}'),
+                                created_at=utcnow(), expires_at=utcnow() + VERIFY_TTL))
+    A.db.session.commit()
+    link = f'{public_base()}/verify-email#token={token}'
+    html = _email_layout('Επιβεβαίωσε το email σου', (
+        '<p>Καλώς ήρθες στη LASCA! Πάτα το κουμπί για να επιβεβαιώσεις ότι αυτό το email είναι δικό σου.</p>'
+        f'<p><a href="{escape(link)}" style="display:inline-block;background:#663af3;color:#fff;'
+        'padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600">Επιβεβαίωση email</a></p>'
+        '<p>Ο σύνδεσμος ισχύει 48 ώρες.</p>'))
+    return send_email(user.email, 'Επιβεβαίωσε το email σου', html, dev_hint=link)
+
+
+@bp.post('/api/auth/verify-email')
+def verify_email():
+    throttle(f'verify:{client_ip()}', 20, timedelta(minutes=15))
+    token = text_field(body(), 'token', 200)
+    row = A.EmailOtp.query.filter_by(purpose='verify', used=False, code_hash=keyed_hash(f'verify:{token}')).first() \
+        if token else None
+    if row is None or row.expires_at < utcnow():
+        raise AuthError('Ο σύνδεσμος δεν ισχύει ή έληξε. Ζήτησε νέο από το Προφίλ.', 410, code='invalid_token')
+    row.used = True
+    user = A.db.session.get(A.User, row.user_id)
+    if user is not None:
+        user.email_verified = True
+    A.db.session.commit()
+    record('email_verified', user=user)
+    return jsonify({'status': 'verified'})
+
+
+@bp.post('/api/me/verify-email')
+@login_required
+def resend_verification():
+    user = current_user._get_current_object()
+    if user.email_verified:
+        return jsonify({'status': 'verified'})
+    throttle(f'verifyresend:{user.id}', 3, timedelta(hours=1), 'Στάλθηκαν ήδη αρκετά emails. Δοκίμασε σε λίγο.')
+    send_verification(user)
+    return jsonify({'status': 'sent'})
+
+
 EVENT_LABELS = {
     'login_success': 'Σύνδεση', 'login_failed': 'Αποτυχημένη σύνδεση', 'login_blocked': 'Μπλοκαρίστηκε σύνδεση',
     '2fa_failed': 'Λάθος κωδικός 2 βημάτων', '2fa_enabled': 'Ενεργοποίηση 2 βημάτων',
@@ -1036,6 +1242,7 @@ EVENT_LABELS = {
     'password_changed': 'Αλλαγή κωδικού', 'backup_codes_regenerated': 'Νέοι εφεδρικοί κωδικοί',
     'backup_code_used': 'Χρήση εφεδρικού κωδικού', 'signup': 'Δημιουργία λογαριασμού',
     'logout_all': 'Αποσύνδεση από όλες τις συσκευές', 'reset_requested': 'Αίτημα επαναφοράς κωδικού',
+    'email_verified': 'Επιβεβαίωση email', 'unverified_account_reclaimed': 'Ανάκτηση λογαριασμού μέσω Google',
 }
 
 
