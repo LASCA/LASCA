@@ -15,6 +15,8 @@
 """
 import io
 import json
+import os
+import re
 import secrets
 import shutil
 from datetime import datetime, timedelta
@@ -24,6 +26,8 @@ from types import SimpleNamespace
 from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required, login_user, logout_user
 
+from auth_security import clean_display_name, record as record_auth_event, validate_new_password
+
 bp = Blueprint('collab', __name__)
 C = SimpleNamespace()  # τα μοντέλα/βοηθητικά του main_4_app (γεμίζει στην init_collab)
 
@@ -31,7 +35,12 @@ ROLES = ('editor', 'viewer')
 ROLE_LABEL = {'owner': 'Ιδιοκτήτης', 'editor': 'Επεξεργαστής', 'viewer': 'Αναγνώστης'}
 PRESENCE_WINDOW = timedelta(seconds=40)
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
-MIN_PASSWORD = 8
+# Όρια χρήσης (quotas): προστατεύουν τον server από κατάχρηση και κόστος.
+MAX_PROJECTS_PER_USER = int(os.getenv('MAX_PROJECTS_PER_USER', '100'))
+MAX_MEMBERS_PER_PROJECT = int(os.getenv('MAX_MEMBERS_PER_PROJECT', '50'))
+MAX_ACTIVE_INVITES = int(os.getenv('MAX_ACTIVE_INVITES', '20'))
+PROJECT_NAME_MAX = 80
+_BAD_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f\x7f]')
 
 
 def init_collab(app, **refs):
@@ -103,13 +112,29 @@ def _touch_last_seen():
 
 def _relogin_current(user):
     """Μετά από αλλαγή session_version, ξανασυνδέει την τρέχουσα συσκευή."""
-    remember = bool(request.cookies.get('remember_token'))
+    from flask import current_app
+    remember = bool(request.cookies.get(current_app.config.get('REMEMBER_COOKIE_NAME', 'remember_token')))
     login_user(user, remember=remember)
 
 
-def _validate_password(password):
-    if len(password) < MIN_PASSWORD:
-        raise ApiError(f'Ο κωδικός πρέπει να έχει τουλάχιστον {MIN_PASSWORD} χαρακτήρες.')
+def clean_project_name(name):
+    """Όνομα project = όνομα φακέλου στον server: χωρίς / \\ : * ? " < > | και χαρακτήρες ελέγχου."""
+    if not isinstance(name, str):
+        raise ApiError('Μη έγκυρο όνομα project.')
+    name = ' '.join(name.split())
+    if not name:
+        raise ApiError('Το όνομα του project είναι υποχρεωτικό.')
+    if len(name) > PROJECT_NAME_MAX:
+        raise ApiError(f'Το όνομα του project πρέπει να έχει έως {PROJECT_NAME_MAX} χαρακτήρες.')
+    if _BAD_NAME_CHARS.search(name) or name.strip('. ') == '' or '..' in name or name.endswith('.'):
+        raise ApiError('Το όνομα του project δεν μπορεί να περιέχει τους χαρακτήρες / \\ : * ? " < > |')
+    return name
+
+
+def check_project_quota(user):
+    if C.Project.query.filter_by(owner_id=user.id).count() >= MAX_PROJECTS_PER_USER:
+        raise ApiError(f'Έφτασες το όριο των {MAX_PROJECTS_PER_USER} projects. Διέγραψε κάποιο παλιό.', 403,
+                       code='quota_projects')
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +280,7 @@ def save_state_checked(project, role, state, base_version=None, force=False):
 
 
 def unique_project_name(name):
-    base = ' '.join(str(name or '').split())[:120] or 'Νέο project'
+    base = ' '.join(str(name or '').split())[:PROJECT_NAME_MAX - 6] or 'Νέο project'
     candidate, k = base, 2
     while C.project_record_by_name(candidate) is not None:
         candidate = f'{base} ({k})'
@@ -329,7 +354,7 @@ def update_me():
     """Όνομα και/ή εικόνα προφίλ (multipart ή JSON)."""
     data = request.form if request.form else body()
     if 'display_name' in data:
-        name = ' '.join(str(data.get('display_name') or '').split())[:150]
+        name = clean_display_name(data.get('display_name'))
         if not name:
             raise ApiError('Το όνομα χρήστη δεν μπορεί να είναι κενό.')
         current_user.display_name = name
@@ -376,17 +401,22 @@ def get_avatar(user_id):
 @login_required
 def change_password():
     data = body()
-    new_password = str(data.get('new_password') or '')
-    _validate_password(new_password)
-    if current_user.has_password and not current_user.check_password(str(data.get('current_password') or '')):
-        raise ApiError('Ο τρέχων κωδικός δεν είναι σωστός.', 403)
+    new_password = str(data.get('new_password') or '')[:200]
     user = current_user._get_current_object()
+    if user.has_password and not user.check_password(str(data.get('current_password') or '')[:1024]):
+        record_auth_event('password_change_failed', user=user)
+        raise ApiError('Ο τρέχων κωδικός δεν είναι σωστός.', 403)
+    if user.has_password and user.check_password(new_password):
+        raise ApiError('Ο νέος κωδικός πρέπει να είναι διαφορετικός από τον τωρινό.')
+    validate_new_password(new_password, user.email, user.display_name)
     user.set_password(new_password)
     user.has_password = True
+    user.password_changed_at = utcnow()
     user.session_version = (user.session_version or 0) + 1   # αποσυνδέει τις άλλες συσκευές
     C.DeviceToken.query.filter_by(user_id=user.id).delete()
     C.db.session.commit()
     _relogin_current(user)
+    record_auth_event('password_changed', user=user)
     return jsonify(user.to_me_dict())
 
 
@@ -398,6 +428,7 @@ def logout_everywhere():
     C.DeviceToken.query.filter_by(user_id=user.id).delete()
     C.db.session.commit()
     _relogin_current(user)
+    record_auth_event('logout_all', user=user)
     return jsonify({'status': 'success'})
 
 
@@ -406,7 +437,8 @@ def logout_everywhere():
 def delete_account():
     data = body()
     user = current_user._get_current_object()
-    if user.has_password and not user.check_password(str(data.get('password') or '')):
+    if user.has_password and not user.check_password(str(data.get('password') or '')[:1024]):
+        record_auth_event('delete_account_failed', user=user)
         raise ApiError('Ο κωδικός δεν είναι σωστός.', 403)
     if str(data.get('confirm') or '').strip().upper() != 'ΔΙΑΓΡΑΦΗ':
         raise ApiError('Γράψε ΔΙΑΓΡΑΦΗ για επιβεβαίωση.')
@@ -425,7 +457,7 @@ def delete_account():
         else:
             delete_project_completely(project)
             deleted.append(project.name)
-    for model in (C.ProjectMember, C.ProjectPresence, C.DeviceToken):
+    for model in (C.ProjectMember, C.ProjectPresence, C.DeviceToken, C.PasswordReset, C.EmailOtp, C.AuthEvent):
         model.query.filter_by(user_id=user.id).delete()
     _remove_avatar(user)
     C.db.session.delete(user)
@@ -492,26 +524,6 @@ def lookup_users():
 # ---------------------------------------------------------------------------
 # Κλειδιά συσκευής (exe)
 # ---------------------------------------------------------------------------
-@bp.post('/api/auth/device-token')
-def create_device_token():
-    data = body()
-    email = C.normalize_email(data.get('email'))
-    password = str(data.get('password') or '')
-    if not email or not password:
-        raise ApiError('Το email και ο κωδικός είναι υποχρεωτικά.')
-    user = C.User.query.filter(C.db.func.lower(C.User.email) == email).first()
-    if user is None or not user.check_password(password):
-        raise ApiError('Λανθασμένο email ή κωδικός.', 401)
-    if not user.has_password:
-        raise ApiError('Ο λογαριασμός σου μπαίνει με Google. Όρισε πρώτα κωδικό από το Προφίλ στη σελίδα.', 403,
-                       code='no_password')
-    token = secrets.token_urlsafe(32)
-    name = str(data.get('device_name') or 'LASCA για Windows')[:120]
-    C.db.session.add(C.DeviceToken(user_id=user.id, token_hash=C.hash_device_token(token), name=name))
-    C.db.session.commit()
-    return jsonify({'token': token, 'user': user.to_me_dict()}), 201
-
-
 @bp.delete('/api/auth/device-token')
 def revoke_device_token():
     header = request.headers.get('Authorization', '')
@@ -536,12 +548,11 @@ def list_projects():
 @login_required
 def load_project():
     data = body()
-    name = ' '.join(str(data.get('project_name') or '').split())
-    if not name:
-        raise ApiError('Το όνομα του project είναι υποχρεωτικό.')
+    name = clean_project_name(data.get('project_name'))
     project = C.project_record_by_name(name)
     created = False
     if project is None:
+        check_project_quota(current_user)
         project = C.Project(name=name, owner_id=current_user.id, version=0)
         C.db.session.add(project)
         C.db.session.flush()
@@ -589,7 +600,8 @@ def delete_project(project_name):
 def create_project():
     """Νέο project (χρησιμοποιείται από το exe για «Ανέβασμα στο cloud»)."""
     data = body()
-    name = unique_project_name(data.get('name'))
+    check_project_quota(current_user)
+    name = unique_project_name(clean_project_name(data.get('name') or 'Νέο project'))
     project = C.Project(name=name, owner_id=current_user.id, version=0)
     C.db.session.add(project)
     C.db.session.flush()
@@ -703,6 +715,9 @@ def add_member(pid):
         raise ApiError('Ο χρήστης είναι ήδη ο ιδιοκτήτης του project.')
     if C.ProjectMember.query.filter_by(project_id=project.id, user_id=target.id).first():
         raise ApiError('Ο χρήστης έχει ήδη πρόσβαση στο project.', 409)
+    if C.ProjectMember.query.filter_by(project_id=project.id).count() >= MAX_MEMBERS_PER_PROJECT:
+        raise ApiError(f'Ένα project μπορεί να έχει έως {MAX_MEMBERS_PER_PROJECT} συνεργάτες.', 403,
+                       code='quota_members')
     C.db.session.add(C.ProjectMember(project_id=project.id, user_id=target.id, role=role,
                                      added_by_id=current_user.id, added_at=utcnow()))
     log_activity(project, 'member_added', {'user': user_public(target, include_email=False), 'role': role})
@@ -823,6 +838,11 @@ def create_invite(pid):
             return None
         return max(low, min(value, high)) if value > 0 else None
 
+    active = [r for r in C.ProjectInvite.query.filter_by(project_id=project.id, revoked=False).all()
+              if _invite_problem(r) is None]
+    if len(active) >= MAX_ACTIVE_INVITES:
+        raise ApiError(f'Υπάρχουν ήδη {MAX_ACTIVE_INVITES} ενεργοί σύνδεσμοι. Ακύρωσε κάποιον πρώτα.', 403,
+                       code='quota_invites')
     days = bounded(data.get('days'), 1, 90)
     max_uses = bounded(data.get('max_uses'), 1, 500)
     invite = C.ProjectInvite(token=secrets.token_urlsafe(18), project_id=project.id, role=role,

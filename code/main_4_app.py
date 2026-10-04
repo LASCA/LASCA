@@ -40,7 +40,7 @@ except ImportError:
 from datetime import datetime, timedelta
 import mimetypes
 from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
-from flask import Flask, Response, request, jsonify, send_file, send_from_directory
+from flask import Flask, Response, request, jsonify, send_file, send_from_directory, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -250,20 +250,35 @@ app = Flask(__name__, static_folder=str(STATIC_FOLDER), static_url_path='')
 # Πίσω από το nginx: παίρνουμε το σωστό https/domain από τις κεφαλίδες X-Forwarded-*
 from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'lasca-web-secret-key')
-app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('FEEDBACK_MAX_SIZE_MB', '5')) * 1024 * 1024
+IS_DEVELOPMENT = os.getenv('LASCA_ENV', '').strip().lower() == 'development'
+_secret_key = os.getenv('SECRET_KEY', '').strip()
+if len(_secret_key) < 32 or _secret_key in {'lasca-web-secret-key', 'change-me'}:
+    if not IS_DEVELOPMENT:
+        # Χωρίς δικό του μυστικό ο καθένας θα μπορούσε να πλαστογραφήσει cookies σύνδεσης.
+        raise RuntimeError('SECRET_KEY λείπει ή είναι πολύ μικρό (>= 32 χαρακτήρες). '
+                           'Φτιάξε ένα με: python3 -c "import secrets; print(secrets.token_hex(32))"')
+    _secret_key = _secret_key or 'dev-only-insecure-secret-key-do-not-use-in-production'
+app.config['SECRET_KEY'] = _secret_key
+# Μέγιστο μέγεθος αιτήματος (projects, Excel, εικόνες). Τα επιμέρους όρια (π.χ. εικόνα προφίλ) είναι μικρότερα.
+app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_REQUEST_MB', '8')) * 1024 * 1024
 
 # --- Cookies σύνδεσης ---
 # COOKIE_SECURE=1 στον server (HTTPS). Τοπικά (http://localhost) πρέπει να είναι 0.
 _cookie_secure = os.getenv('COOKIE_SECURE', '0').strip().lower() in {'1', 'true', 'yes'}
+# Το πρόθεμα __Host- εγγυάται ότι το cookie μπήκε από αυτό το domain μέσω HTTPS (μόνο με Secure).
+_cookie_prefix = '__Host-' if _cookie_secure else ''
 app.config.update(
+    SESSION_COOKIE_NAME=f'{_cookie_prefix}lasca_session',
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SAMESITE='Strict',
     SESSION_COOKIE_SECURE=_cookie_secure,
+    REMEMBER_COOKIE_NAME=f'{_cookie_prefix}lasca_remember',
     REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SAMESITE='Lax',
+    REMEMBER_COOKIE_SAMESITE='Strict',
     REMEMBER_COOKIE_SECURE=_cookie_secure,
-    REMEMBER_COOKIE_DURATION=timedelta(days=int(os.getenv('REMEMBER_ME_DAYS', '30'))),
+    REMEMBER_COOKIE_REFRESH_EACH_REQUEST=False,
+    REMEMBER_COOKIE_DURATION=timedelta(days=min(int(os.getenv('REMEMBER_ME_DAYS', '30')), 90)),
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
 )
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '').strip()
 
@@ -282,6 +297,62 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = None
+
+# ==========================================
+# Ασφάλεια: κεφαλίδες, έλεγχος προέλευσης (CSRF), όρια αιτημάτων — βλ. code/security.py
+# ==========================================
+from security import build_csp, init_api_throttle, init_origin_guard, init_security_headers, origin_of  # noqa: E402
+
+_analytics_origin = origin_of(os.getenv('ANALYTICS_ORIGIN', '').strip())
+APP_CSP = build_csp({
+    'script-src': ['https://accounts.google.com/gsi/client', 'https://challenges.cloudflare.com', _analytics_origin],
+    'style-src': ['https://accounts.google.com/gsi/style'],
+    'frame-src': ['https://accounts.google.com/gsi/', 'https://challenges.cloudflare.com'],
+    'connect-src': ['https://accounts.google.com/gsi/', _analytics_origin],
+    'img-src': ['https://*.tile.openstreetmap.org', 'https://*.googleusercontent.com'],
+}, upgrade_insecure=_cookie_secure)
+# same-origin-allow-popups: χρειάζεται το παράθυρο σύνδεσης του Google
+init_security_headers(app, csp=APP_CSP, hsts=_cookie_secure, coop='same-origin-allow-popups')
+
+
+def _allowed_origins():
+    allowed = {origin_of(request.host_url)}
+    for value in [os.getenv('PUBLIC_URL', '')] + os.getenv('ALLOWED_ORIGINS', '').split(','):
+        if origin_of(value.strip()):
+            allowed.add(origin_of(value.strip()))
+    if IS_DEVELOPMENT:
+        allowed |= {'http://localhost:5173', 'http://127.0.0.1:5173'}
+    return allowed
+
+
+init_origin_guard(app, _allowed_origins)
+
+_AUTH_PREFIXES = ('/api/login', '/api/register', '/api/auth/')
+_LIGHT_PREFIXES = ('/api/projects', '/api/me', '/api/users', '/api/invites', '/api/auth', '/api/login',
+                   '/api/register', '/api/logout', '/api/feedback')
+API_THROTTLE_RULES = [
+    # (όνομα, ταίριασμα, όριο, παράθυρο σε δευτ., ανά)
+    ('api', lambda p, m: True, 600, 60, 'ip'),
+    ('auth', lambda p, m: m == 'POST' and p.startswith(_AUTH_PREFIXES), 40, 900, 'ip'),
+    ('compute', lambda p, m: m == 'POST' and not p.startswith(_LIGHT_PREFIXES), 60, 60, 'user'),
+    ('feedback', lambda p, m: p == '/api/feedback', 5, 3600, 'user'),
+    ('profile', lambda p, m: p == '/api/me' and m in ('PUT', 'DELETE'), 20, 3600, 'user'),
+    ('password', lambda p, m: p == '/api/me/password', 10, 900, 'user'),
+    ('lookup', lambda p, m: p == '/api/users/lookup', 60, 600, 'user'),
+    ('invites', lambda p, m: m == 'POST' and '/invite' in p, 30, 3600, 'user'),
+    ('new_project', lambda p, m: m == 'POST' and p == '/api/projects', 30, 3600, 'user'),
+]
+
+
+def _throttle_user_key():
+    try:
+        return f'u{current_user.id}' if current_user.is_authenticated else None
+    except Exception:
+        return None
+
+
+init_api_throttle(app, API_THROTTLE_RULES, user_key=_throttle_user_key,
+                  enabled=os.getenv('API_THROTTLE', '1').strip() != '0')
 
 logger = logging.getLogger(__name__)
 logger.handlers.clear()
@@ -311,7 +382,7 @@ def _mask_secret(value: str | None) -> str:
     return f'{value[:4]}...{value[-4:]}'
 
 
-logger.info('Startup RESEND_API_KEY=%s NOTIFICATION_EMAIL=%s', _mask_secret(os.getenv('RESEND_API_KEY')), os.getenv('NOTIFICATION_EMAIL') or '<missing>')
+logger.info('Startup RESEND_API_KEY=%s NOTIFICATION_EMAIL=%s', 'set' if os.getenv('RESEND_API_KEY') else '<missing>', 'set' if os.getenv('NOTIFICATION_EMAIL') else '<missing>')
 FEEDBACK_TYPES = {'bug', 'feature', 'general'}
 ALLOWED_FEEDBACK_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 if IS_FROZEN:
@@ -355,6 +426,15 @@ class User(db.Model, UserMixin):
     # False για λογαριασμούς που φτιάχτηκαν με Google (δεν ξέρουν κωδικό).
     has_password = db.Column(db.Boolean, nullable=False, default=True)
     last_seen_at = db.Column(db.DateTime, nullable=True)
+    # Ασφάλεια λογαριασμού (βλ. auth_security.py)
+    totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    totp_secret_enc = db.Column(db.Text, nullable=True)      # κρυπτογραφημένο (Fernet)
+    totp_pending_enc = db.Column(db.Text, nullable=True)     # κατά τη ρύθμιση, πριν επιβεβαιωθεί
+    totp_last_step = db.Column(db.Integer, nullable=True)    # ένας κωδικός TOTP δεν ξαναπερνάει
+    backup_codes = db.Column(db.Text, nullable=True)         # JSON με hashes εφεδρικών κωδικών
+    terms_accepted_at = db.Column(db.DateTime, nullable=True)
+    age_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
 
     def get_id(self):
         return f"{self.id}:{self.session_version or 0}"
@@ -383,6 +463,7 @@ class User(db.Model, UserMixin):
     def to_me_dict(self):
         data = self.to_public_dict()
         data['has_password'] = bool(self.has_password)
+        data['two_factor_enabled'] = bool(self.totp_enabled)
         data['created_at'] = self.created_at.isoformat() + 'Z' if self.created_at else None
         return data
 
@@ -466,6 +547,54 @@ class DeviceToken(db.Model):
     last_used_at = db.Column(db.DateTime, nullable=True)
 
 
+class AuthEvent(db.Model):
+    """Γεγονότα ασφαλείας: συνδέσεις, αποτυχίες, 2FA, επαναφορές κωδικού (κρατιούνται 90 ημέρες)."""
+    __tablename__ = 'auth_events'
+    id = db.Column(db.Integer, primary_key=True)
+    event = db.Column(db.String(40), nullable=False, index=True)
+    user_id = db.Column(db.Integer, nullable=True, index=True)
+    email = db.Column(db.String(255), nullable=True, index=True)
+    ip = db.Column(db.String(64), nullable=True, index=True)
+    user_agent = db.Column(db.String(200), nullable=True)
+    detail = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class RateHit(db.Model):
+    """Μετρητής ορίων (κοινός για όλους τους workers του gunicorn)."""
+    __tablename__ = 'rate_hits'
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(120), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (db.Index('ix_rate_hits_key_time', 'key', 'created_at'),)
+
+
+class PasswordReset(db.Model):
+    __tablename__ = 'password_resets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    ip = db.Column(db.String(64), nullable=True)
+
+
+class EmailOtp(db.Model):
+    __tablename__ = 'email_otps'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    purpose = db.Column(db.String(20), nullable=False, default='login')
+    code_hash = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    used = db.Column(db.Boolean, nullable=False, default=False)
+
+
+DEVICE_TOKEN_IDLE_DAYS = int(os.getenv('DEVICE_TOKEN_IDLE_DAYS', '90'))
+
+
 def hash_device_token(token):
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
@@ -495,10 +624,17 @@ def load_user_from_device_token(req):
     token = header[7:].strip()
     if not token:
         return None
+    if len(token) > 200:
+        return None
     record = DeviceToken.query.filter_by(token_hash=hash_device_token(token)).first()
     if record is None:
         return None
     now = datetime.utcnow()
+    # Κλειδί που δεν χρησιμοποιήθηκε για DEVICE_TOKEN_IDLE_DAYS ημέρες λήγει.
+    if (now - (record.last_used_at or record.created_at or now)).days > DEVICE_TOKEN_IDLE_DAYS:
+        db.session.delete(record)
+        db.session.commit()
+        return None
     if record.last_used_at is None or (now - record.last_used_at).total_seconds() > 300:
         record.last_used_at = now
         db.session.commit()
@@ -511,6 +647,8 @@ def load_user_from_device_token(req):
 PUBLIC_API_PATHS = {
     '/api/login', '/api/register', '/api/logout', '/api/me',
     '/api/auth/config', '/api/auth/google', '/api/auth/device-token',
+    '/api/auth/2fa/verify', '/api/auth/2fa/email', '/api/auth/forgot', '/api/auth/reset',
+    '/api/auth/reset/check', '/api/auth/password-check',
 }
 # Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
 PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
@@ -526,7 +664,23 @@ def require_login_for_api():
     if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS \
             and not current_user.is_authenticated:
         return jsonify({"error": "Απαιτείται σύνδεση"}), 401
+    # Υπολογισμοί/εξαγωγές που αναφέρουν project (header, ?project=, form, JSON): έλεγχος πρόσβασης
+    # ΠΡΙΝ τρέξει ο κώδικας, ώστε κανείς να μη διαβάζει/γράφει αρχεία project άλλου χρήστη (IDOR).
+    if request.path.startswith('/api/') and not request.path.startswith(_PROJECT_API_PREFIXES):
+        project_name = get_active_project_name()
+        if project_name:
+            try:
+                get_request_project_dir(project_name)
+            except PermissionError:
+                return jsonify({"error": "Δεν έχετε πρόσβαση σε αυτό το project"}), 403
+            except ValueError:
+                return jsonify({"error": "Μη έγκυρο όνομα project"}), 400
     return None
+
+
+# Αυτά τα routes ελέγχουν μόνα τους τα δικαιώματα (collab.py / auth_security.py).
+_PROJECT_API_PREFIXES = ('/api/projects/list', '/api/projects/load', '/api/projects/save', '/api/me',
+                         '/api/users', '/api/invites', '/api/auth', '/api/login', '/api/register', '/api/logout')
 
 
 def _migrate_schema():
@@ -538,6 +692,14 @@ def _migrate_schema():
             ('session_version', 'INTEGER NOT NULL DEFAULT 0'),
             ('has_password', 'BOOLEAN NOT NULL DEFAULT 1'),
             ('last_seen_at', 'DATETIME'),
+            ('totp_enabled', 'BOOLEAN NOT NULL DEFAULT 0'),
+            ('totp_secret_enc', 'TEXT'),
+            ('totp_pending_enc', 'TEXT'),
+            ('totp_last_step', 'INTEGER'),
+            ('backup_codes', 'TEXT'),
+            ('terms_accepted_at', 'DATETIME'),
+            ('age_confirmed', 'BOOLEAN NOT NULL DEFAULT 0'),
+            ('password_changed_at', 'DATETIME'),
         ],
         'projects': [
             ('public_id', 'VARCHAR(32)'),
@@ -724,26 +886,114 @@ class UniversalNumberedCanvas(canvas.Canvas):
         
         self.restoreState()
 
+SPA_ROUTES = {'/', '/login', '/signup', '/app', '/profile', '/forgot-password', '/reset-password',
+              '/privacy', '/terms', '/cookies'}
+SPA_PREFIXES = ('/invite/',)
+PUBLIC_PAGES = [('/', 'weekly', '1.0'), ('/signup', 'monthly', '0.8'), ('/login', 'monthly', '0.6'),
+                ('/privacy', 'yearly', '0.3'), ('/terms', 'yearly', '0.3'), ('/cookies', 'yearly', '0.2')]
+
+
+def _site_base():
+    return (os.getenv('PUBLIC_URL', '').strip() or request.host_url).rstrip('/')
+
+
+def _spa_index(status=200):
+    index = Path(app.static_folder) / 'index.html'
+    if index.is_file():
+        resp = send_from_directory(app.static_folder, 'index.html')
+        resp.headers['Cache-Control'] = 'no-cache'
+    else:  # δεν έχει γίνει ακόμα «npm run build»
+        resp = Response('<!doctype html><title>LASCA</title><div id="root"></div>', mimetype='text/html')
+    resp.status_code = status
+    return resp
+
+
 @app.route('/')
 def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
+    return _spa_index()
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    body = ('User-agent: *\n'
+            'Allow: /$\nAllow: /signup\nAllow: /login\nAllow: /privacy\nAllow: /terms\nAllow: /cookies\n'
+            'Disallow: /app\nDisallow: /profile\nDisallow: /invite/\nDisallow: /reset-password\n'
+            'Disallow: /forgot-password\nDisallow: /api/\n\n'
+            f'Sitemap: {_site_base()}/sitemap.xml\n')
+    return Response(body, mimetype='text/plain', headers={'Cache-Control': 'public, max-age=86400'})
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    base = escape(_site_base())
+    urls = ''.join(f'<url><loc>{base}{path}</loc><changefreq>{freq}</changefreq><priority>{prio}</priority></url>'
+                   for path, freq, prio in PUBLIC_PAGES)
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>'
+           f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>')
+    return Response(xml, mimetype='application/xml', headers={'Cache-Control': 'public, max-age=86400'})
+
 
 @app.errorhandler(404)
 def not_found(e):
-    # Άγνωστο API route -> JSON 404. Οτιδήποτε άλλο (/, /login, /signup, /app, /profile)
-    # το χειρίζεται το React Router, οπότε επιστρέφουμε το index.html.
+    # Άγνωστο API route -> JSON 404. Γνωστές σελίδες (/login, /app, ...) τις χειρίζεται το React
+    # Router (200). Οτιδήποτε άλλο: η σελίδα 404 της εφαρμογής, με πραγματικό status 404.
     if request.path.startswith('/api/'):
         return jsonify({"error": "Δεν βρέθηκε"}), 404
-    return send_from_directory(app.static_folder, 'index.html')
+    path = request.path.rstrip('/') or '/'
+    return _spa_index(200 if (path in SPA_ROUTES or path.startswith(SPA_PREFIXES)) else 404)
 
 
 @app.errorhandler(RequestEntityTooLarge)
 def request_too_large(e):
-    return jsonify({"error": "Feedback upload exceeds the maximum size limit"}), 413
+    return jsonify({"error": "Το αρχείο ή τα δεδομένα είναι πολύ μεγάλα."}), 413
 
 
 def _feedback_error(message: str, status_code: int):
     return jsonify({'status': 'error', 'message': message}), status_code
+
+
+_PATH_RE = re.compile(r'(?:[A-Za-z]:\\|/(?:srv|home|root|usr|var|tmp|opt|Users)/)[^\s"\'<>]*')
+
+
+@app.after_request
+def _scrub_server_errors(resp):
+    """Σφάλματα 5xx: δεν δείχνουμε στον χρήστη διαδρομές αρχείων του server."""
+    if resp.status_code >= 500 and request.path.startswith('/api/') and resp.mimetype == 'application/json':
+        text = resp.get_data(as_text=True)
+        cleaned = _PATH_RE.sub('[…]', text)
+        if cleaned != text:
+            resp.set_data(cleaned)
+    return resp
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    logger.exception('Unhandled server error on %s %s', request.method, request.path)
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Σφάλμα του server. Δοκίμασε ξανά."}), 500
+    return _spa_index(500)
+
+
+FEEDBACK_MESSAGE_MAX = 5000
+FEEDBACK_IMAGE_MAX = 5 * 1024 * 1024
+
+
+def _sanitize_image(raw: bytes, max_side: int = 2400) -> bytes | None:
+    """Επιστρέφει την εικόνα ξανακωδικοποιημένη σε WEBP, ή None αν δεν είναι έγκυρη PNG/JPG/WEBP."""
+    try:
+        from PIL import Image
+        Image.MAX_IMAGE_PIXELS = 40_000_000  # προστασία από «decompression bombs»
+        img = Image.open(io.BytesIO(raw))
+        if img.format not in {'PNG', 'JPEG', 'WEBP'}:
+            return None
+        img.load()
+        img = img.convert('RGBA') if img.mode in ('P', 'LA', 'RGBA') else img.convert('RGB')
+        img.thumbnail((max_side, max_side))
+        out = io.BytesIO()
+        img.save(out, 'WEBP', quality=85, method=4)
+        return out.getvalue()
+    except Exception:
+        return None
 
 
 def _send_feedback_webhook(feedback: dict[str, str]) -> None:
@@ -837,7 +1087,8 @@ def _send_feedback_email(
 @login_required
 def submit_feedback():
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
         is_json_request = bool(data)
         feedback_type = str(data.get('type', 'general') if is_json_request else request.form.get('type', 'general')).strip().lower() or 'general'
         message = str(data.get('details', '') if is_json_request else request.form.get('message', '')).strip()
@@ -847,29 +1098,41 @@ def submit_feedback():
         if not message:
             return _feedback_error('Message is required', 400)
 
+        if len(message) > FEEDBACK_MESSAGE_MAX:
+            return _feedback_error(f'Το μήνυμα πρέπει να έχει έως {FEEDBACK_MESSAGE_MAX} χαρακτήρες', 400)
+
         screenshot_content = None
-        screenshot_filename = 'screenshot'
-        screenshot = request.files.get('screenshot')
+        screenshot_filename = 'screenshot.webp'
         screenshot_path = ''
+        raw_image = None
+        screenshot = request.files.get('screenshot')
         if is_json_request and data.get('screenshot'):
             screenshot_value = data['screenshot']
-            if isinstance(screenshot_value, str) and ',' in screenshot_value:
+            if not isinstance(screenshot_value, str) or len(screenshot_value) > FEEDBACK_IMAGE_MAX * 4 // 3 + 200:
+                return _feedback_error('Η εικόνα είναι πολύ μεγάλη', 400)
+            if ',' in screenshot_value:
                 screenshot_value = screenshot_value.split(',', 1)[1]
-            screenshot_content = base64.b64decode(screenshot_value, validate=True)
-            screenshot_filename = str(data.get('screenshot_filename', 'screenshot.png'))
+            try:
+                raw_image = base64.b64decode(screenshot_value, validate=True)
+            except (ValueError, TypeError):
+                return _feedback_error('Μη έγκυρη εικόνα', 400)
         elif screenshot and screenshot.filename:
-            safe_name = secure_filename(screenshot.filename)
-            extension = Path(safe_name).suffix.lower()
-            if not safe_name or extension not in ALLOWED_FEEDBACK_EXTENSIONS:
+            extension = Path(secure_filename(screenshot.filename)).suffix.lower()
+            if extension not in ALLOWED_FEEDBACK_EXTENSIONS:
                 return _feedback_error('Unsupported screenshot format', 400)
-
+            raw_image = screenshot.read(FEEDBACK_IMAGE_MAX + 1)
+        if raw_image is not None:
+            if len(raw_image) > FEEDBACK_IMAGE_MAX:
+                return _feedback_error('Η εικόνα είναι πολύ μεγάλη (έως 5MB)', 400)
+            # Ελέγχουμε ότι είναι πραγματικά εικόνα και την ξαναγράφουμε ως WEBP: φεύγουν μεταδεδομένα
+            # (π.χ. τοποθεσία) και οτιδήποτε κρυμμένο μέσα στο αρχείο.
+            screenshot_content = _sanitize_image(raw_image)
+            if screenshot_content is None:
+                return _feedback_error('Επιτρέπονται μόνο εικόνες PNG, JPG ή WEBP', 400)
             FEEDBACK_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-            unique_name = f'{Path(safe_name).stem}-{uuid.uuid4().hex}{extension}'
-            destination = FEEDBACK_UPLOAD_FOLDER / unique_name
-            screenshot.save(destination)
+            destination = FEEDBACK_UPLOAD_FOLDER / f'{uuid.uuid4().hex}.webp'
+            destination.write_bytes(screenshot_content)
             screenshot_path = str(destination)
-            with destination.open('rb') as screenshot_file:
-                screenshot_content = screenshot_file.read()
             screenshot_filename = destination.name
 
         user_email = current_user.email
@@ -890,7 +1153,7 @@ def submit_feedback():
     except Exception:
         logger.exception('Failed to process feedback submission')
         print('Feedback submission exception:\n' + traceback.format_exc(), file=sys.stderr, flush=True)
-        return _feedback_error('Unable to submit feedback. Check lasca_app.log for details.', 500)
+        return _feedback_error('Δεν ήταν δυνατή η αποστολή. Δοκίμασε ξανά αργότερα.', 500)
 
 def get_active_project_name():
     """ Ψάχνει το όνομα του ενεργού project σε όλα τα πιθανά σημεία του request """
@@ -957,93 +1220,10 @@ def normalize_400(angle):
     while angle >= 400.0: angle -= 400.0
     return angle
 
-@app.route('/api/register', methods=['POST'])
-def register_user():
-    data = request.get_json(silent=True) or {}
-    email = normalize_email(data.get('email'))
-    password = str(data.get('password') or '')
-    display_name = str(data.get('display_name') or '').strip()
-
-    if not email or not EMAIL_RE.fullmatch(email):
-        return jsonify({"error": "Το email δεν είναι έγκυρο"}), 400
-    if len(password) < 8:
-        return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες"}), 400
-    if User.query.filter(db.func.lower(User.email) == email).first():
-        return jsonify({"error": "Υπάρχει ήδη χρήστης με αυτό το email"}), 409
-
-    user = User(email=email, display_name=display_name or email.split('@', 1)[0])
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
-    login_user(user, remember=bool(data.get('remember')))
-    return jsonify({"status": "success", "user": user.to_me_dict()}), 201
-
-
-@app.route('/api/login', methods=['POST'])
-def login_user_route():
-    data = request.get_json(silent=True) or {}
-    email = normalize_email(data.get('email'))
-    password = str(data.get('password') or '')
-
-    if not email or not password:
-        return jsonify({"error": "Το email και ο κωδικός είναι υποχρεωτικά"}), 400
-
-    user = User.query.filter(db.func.lower(User.email) == email).first()
-    if user is None or not user.check_password(password):
-        return jsonify({"error": "Λανθασμένο email ή κωδικός"}), 401
-
-    login_user(user, remember=bool(data.get('remember')))
-    return jsonify({"status": "success", "user": user.to_me_dict()})
-
-
-@app.route('/api/auth/config', methods=['GET'])
-def auth_config():
-    """Δημόσιες ρυθμίσεις για το frontend (π.χ. αν είναι ενεργό το Google login)."""
-    return jsonify({"google_client_id": GOOGLE_CLIENT_ID or None})
-
-
-@app.route('/api/auth/google', methods=['POST'])
-def google_login_route():
-    """Σύνδεση/εγγραφή με Google. Το frontend στέλνει το ID token (credential) του Google."""
-    if not GOOGLE_CLIENT_ID:
-        return jsonify({"error": "Η σύνδεση με Google δεν είναι ενεργή σε αυτόν τον server"}), 503
-    data = request.get_json(silent=True) or {}
-    credential = str(data.get('credential') or '')
-    if not credential:
-        return jsonify({"error": "Λείπει το token του Google"}), 400
-    try:
-        from google.oauth2 import id_token as google_id_token
-        from google.auth.transport import requests as google_requests
-        info = google_id_token.verify_oauth2_token(credential, google_requests.Request(), GOOGLE_CLIENT_ID)
-    except ImportError:
-        logger.error('google-auth is not installed')
-        return jsonify({"error": "Η σύνδεση με Google δεν είναι διαθέσιμη"}), 503
-    except ValueError:
-        return jsonify({"error": "Μη έγκυρη σύνδεση Google. Δοκίμασε ξανά."}), 401
-
-    email = normalize_email(info.get('email'))
-    if not email or not info.get('email_verified'):
-        return jsonify({"error": "Ο λογαριασμός Google δεν έχει επιβεβαιωμένο email"}), 401
-
-    user = User.query.filter(db.func.lower(User.email) == email).first()
-    created = False
-    if user is None:
-        user = User(email=email, display_name=(info.get('name') or email.split('@', 1)[0])[:150])
-        # Τυχαίος κωδικός που δεν τον ξέρει κανείς: ο λογαριασμός μπαίνει μόνο μέσω Google.
-        user.set_password(uuid.uuid4().hex + uuid.uuid4().hex)
-        user.has_password = False
-        db.session.add(user)
-        db.session.commit()
-        created = True
-
-    login_user(user, remember=bool(data.get('remember', True)))
-    return jsonify({"status": "success", "created": created, "user": user.to_me_dict()}), (201 if created else 200)
-
-
 @app.route('/api/logout', methods=['POST'])
-@login_required
 def logout_user_route():
     logout_user()
+    session.clear()
     return jsonify({"status": "success", "message": "Αποσυνδεθήκατε επιτυχώς"})
 
 
@@ -1051,11 +1231,21 @@ def logout_user_route():
 # Λογαριασμοί, projects, κοινοποίηση και ζωντανή συνεργασία: code/collab.py
 # ==========================================
 from collab import init_collab  # noqa: E402
+from auth_security import init_auth  # noqa: E402
+
+init_auth(
+    app, db=db, User=User, AuthEvent=AuthEvent, RateHit=RateHit, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
+    DeviceToken=DeviceToken, hash_device_token=hash_device_token, normalize_email=normalize_email,
+    EMAIL_RE=EMAIL_RE, logger=logger, resend=resend, GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID,
+    PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(), is_development=IS_DEVELOPMENT,
+    MIN_AGE=int(os.getenv('MIN_SIGNUP_AGE', '15')),
+)
 
 init_collab(
     app, db=db, User=User, Project=Project, ProjectMember=ProjectMember, ProjectInvite=ProjectInvite,
     ProjectActivity=ProjectActivity, ProjectPresence=ProjectPresence, DeviceToken=DeviceToken,
     hash_device_token=hash_device_token, WORKSPACE_DIR=WORKSPACE_DIR, USER_AVATAR_DIR=USER_AVATAR_DIR,
+    AuthEvent=AuthEvent, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
     TopoProject=TopoProject, resolve_project_dir=resolve_project_dir, project_record_by_name=project_record_by_name,
     normalize_email=normalize_email, EMAIL_RE=EMAIL_RE, logger=logger,
     PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(),
