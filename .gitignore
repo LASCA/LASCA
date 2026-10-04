@@ -36,3 +36,8 @@ code/lasca_data/
 code/feedback_uploads/
 local_data/
 code/.env
+
+# Ρυθμίσεις build του frontend (τοπικές)
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

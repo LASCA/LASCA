@@ -337,6 +337,13 @@ codes = [burst.post('/api/register', json={}).status_code for _ in range(45)]
 ok(429 in codes, 'auth endpoints throttled per IP (in-memory layer)')
 limiter.reset()
 
+# ---------------------------------------------------------------- logout really logs out
+rc = client()
+rc.post('/api/login', json={'email': 'frank@lasca.test', 'password': PW, 'remember': True})
+ok(rc.get('/api/me').status_code == 200, 'login with remember-me')
+rc.post('/api/logout')
+ok(rc.get('/api/me').status_code == 401, 'logout clears the session AND the remember-me cookie')
+
 # ---------------------------------------------------------------- misc
 r = client().get('/totally-unknown-page')
 ok(r.status_code == 404 and b'<div id="root">' in r.data if r.status_code == 404 and r.data else r.status_code == 404,

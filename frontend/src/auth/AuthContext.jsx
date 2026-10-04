@@ -11,7 +11,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [googleClientId, setGoogleClientId] = useState(null);
+  const [config, setConfig] = useState({});
 
   const refresh = useCallback(async () => {
     try {
@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
     Promise.all([
       refresh(),
       axios.get(`${API_BASE_URL}/api/auth/config`)
-        .then(({ data }) => { if (alive) setGoogleClientId(data?.google_client_id || null); })
+        .then(({ data }) => { if (alive) setConfig(data || {}); })
         .catch(() => {}),
     ]).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -50,25 +50,47 @@ export function AuthProvider({ children }) {
     return () => axios.interceptors.response.eject(id);
   }, []);
 
-  const login = useCallback(async ({ email, password, remember }) => {
-    const { data } = await axios.post(`${API_BASE_URL}/api/login`, { email, password, remember });
+  // Επιστρέφει { user } ή { twoFactor: { methods, email_hint } } όταν χρειάζεται δεύτερο βήμα.
+  const finish = useCallback((data) => {
+    if (data?.requires_2fa) return { twoFactor: { methods: data.methods || ['totp'], emailHint: data.email_hint } };
+    setUser(data.user);
+    return { user: data.user };
+  }, []);
+
+  const login = useCallback(async ({ email, password, remember, captchaToken }) => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/login`, {
+      email, password, remember, captcha_token: captchaToken || undefined,
+    });
+    return finish(data);
+  }, [finish]);
+
+  const verifyTwoFactor = useCallback(async ({ code, method }) => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/auth/2fa/verify`, { code, method });
     setUser(data.user);
     return data.user;
   }, []);
 
-  const register = useCallback(async ({ email, password, displayName, remember }) => {
+  const sendTwoFactorEmail = useCallback(async () => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/auth/2fa/email`);
+    return data;
+  }, []);
+
+  const register = useCallback(async ({ email, password, displayName, remember, acceptTerms, ageConfirmed, captchaToken, website }) => {
     const { data } = await axios.post(`${API_BASE_URL}/api/register`, {
       email, password, display_name: displayName, remember,
+      accept_terms: acceptTerms, age_confirmed: ageConfirmed,
+      captcha_token: captchaToken || undefined, website: website || undefined,
     });
     setUser(data.user);
     return data.user;
   }, []);
 
-  const loginWithGoogle = useCallback(async (credential, remember = true) => {
-    const { data } = await axios.post(`${API_BASE_URL}/api/auth/google`, { credential, remember });
-    setUser(data.user);
-    return data.user;
-  }, []);
+  const loginWithGoogle = useCallback(async (credential, { remember = true, acceptTerms, ageConfirmed } = {}) => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/auth/google`, {
+      credential, remember, accept_terms: acceptTerms || undefined, age_confirmed: ageConfirmed || undefined,
+    });
+    return finish(data);
+  }, [finish]);
 
   const logout = useCallback(async () => {
     try {
@@ -81,8 +103,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(() => ({
-    user, setUser, loading, refresh, login, register, loginWithGoogle, logout, googleClientId,
-  }), [user, loading, refresh, login, register, loginWithGoogle, logout, googleClientId]);
+    user, setUser, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout,
+    config, googleClientId: config.google_client_id || null, captchaSiteKey: config.captcha_site_key || null,
+    passwordMin: config.password_min || 12, minAge: config.min_age || 15,
+  }), [user, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -96,5 +120,13 @@ export function useAuth() {
 // Μήνυμα λάθους από απάντηση του backend ({ error: "..." }) ή γενικό.
 export function apiErrorMessage(error, fallback = 'Κάτι πήγε στραβά. Δοκίμασε ξανά.') {
   if (!error?.response) return 'Δεν υπάρχει σύνδεση με τον server.';
+  if (error.response.status === 429 && !error.response.data?.error) return 'Πάρα πολλές προσπάθειες. Δοκίμασε ξανά σε λίγο.';
   return error.response.data?.error || error.response.data?.message || fallback;
+}
+
+// Κωδικός λάθους (π.χ. captcha_required, account_locked) και δευτερόλεπτα αναμονής από το backend.
+export function apiErrorInfo(error) {
+  const data = error?.response?.data || {};
+  const retry = Number(data.retry_after || error?.response?.headers?.['retry-after'] || 0);
+  return { code: data.code || null, retryAfter: Number.isFinite(retry) ? retry : 0, data };
 }

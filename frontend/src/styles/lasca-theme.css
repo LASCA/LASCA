@@ -1,0 +1,325 @@
+/*
+ * LASCA design system — «γυάλινος καθεδρικός τα μεσάνυχτα» (βλ. DESIGN.md / AuthKit style reference),
+ * προσαρμοσμένος στη LASCA: κάνναβος συντεταγμένων στο φόντο, ελληνικές γραμματοσειρές.
+ * Το ίδιο αρχείο χρησιμοποιείται στη σελίδα (web-pages) και στο πρόγραμμα των Windows (cloud).
+ *
+ * Χρώματα κειμένου (από φωτεινό σε σβηστό): ice → frost → mist → fog. Ένα μόνο χρώμα δράσης: violet.
+ * Γραμματοσειρές (όλες τοπικά, χωρίς Google Fonts): Inter (κείμενο), Manrope (τίτλοι),
+ * JetBrains Mono (ετικέτες). Όλες έχουν ελληνικούς χαρακτήρες.
+ */
+
+@theme {
+  --color-canvas: #05060f;
+  --color-steel: #2f343e;
+  --color-fog: #9da7ba;
+  --color-mist: #c7d3ea;
+  --color-frost: #d1e4fa;
+  --color-ice: #d8ecf8;
+  --color-violet: #663af3;
+  --color-violet-hover: #7650f5;
+  --color-blueprint: #b6d9fc;
+  --color-ember: #e46d4c;
+  --color-signal: #027dea;
+  --color-teal: #269684;
+  --color-gridline: #3f4959;
+  --color-glass-edge: rgb(186 215 247 / 0.12);
+  --color-glass-fill: rgb(186 214 247 / 0.03);
+  --color-glass-wash: rgb(186 214 247 / 0.06);
+  --color-input-fill: rgb(199 211 234 / 0.06);
+  --color-luminous: rgb(199 211 234 / 0.12);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --radius-card: 16px;
+  --radius-field: 6px;
+  --radius-pill: 999px;
+
+  --shadow-hairline: inset 0 0 0 1px rgb(186 215 247 / 0.12);
+  --shadow-hairline-strong: inset 0 0 0 1px rgb(186 215 247 / 0.24);
+  --shadow-glass: inset 0 1px 1px rgb(199 211 234 / 0.12), inset 0 24px 48px rgb(199 211 234 / 0.05),
+    0 24px 32px rgb(6 6 14 / 0.7);
+  --shadow-modal: inset 0 1px 1px rgb(216 236 248 / 0.2), inset 0 24px 48px rgb(168 216 245 / 0.06),
+    0 16px 32px rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(186 215 247 / 0.1);
+  --shadow-halo: 0 0 6px rgb(186 207 247 / 0.32), 0 0 12px rgb(238 186 247 / 0.24);
+
+  /* Κίνηση (αρχές Emil Kowalski): γρήγορη, με «ease-out», ποτέ πάνω από ~300ms σε UI */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --animate-rise: rise 280ms var(--ease-out-strong) both;
+  --animate-pop: pop 180ms var(--ease-out-strong) both;
+  --animate-fade: fade 200ms ease-out both;
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    color-scheme: dark;
+  }
+  ::selection { background: rgb(102 58 243 / 0.45); color: #fff; }
+  :focus-visible { outline: 2px solid rgb(182 217 252 / 0.7); outline-offset: 2px; }
+}
+
+@layer components {
+  /* --- Φόντο: κάνναβος «blueprint» + προβολέας στην κορυφή --- */
+  .l-grid-bg {
+    background-image:
+      linear-gradient(to right, rgb(186 215 247 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(186 215 247 / 0.06) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 40%, transparent 100%);
+  }
+  .l-spotlight {
+    background: conic-gradient(from 180deg at 50% -5%, transparent 45%, rgb(124 145 182 / 0.22) 48.5%,
+      rgb(124 145 182 / 0.42) 50%, rgb(124 145 182 / 0.22) 51.5%, transparent 55%);
+    filter: blur(18px);
+    mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+  }
+  .l-glow {
+    background: radial-gradient(closest-side, rgb(102 58 243 / 0.22), transparent);
+  }
+
+  /* --- Τυπογραφία --- */
+  .l-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-feature-settings: 'tnum' on;
+    color: var(--color-mist);
+  }
+  .l-eyebrow-lines {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  .l-eyebrow-lines::before,
+  .l-eyebrow-lines::after {
+    content: '';
+    height: 1px;
+    width: min(96px, 18vw);
+    background: linear-gradient(to right, transparent, rgb(186 215 247 / 0.18), transparent);
+  }
+  .l-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    background: linear-gradient(180deg, #d8ecf8 0%, #98c0ef 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .l-heading {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--color-ice);
+  }
+
+  /* --- Επιφάνειες --- */
+  .l-card {
+    border-radius: var(--radius-card);
+    background: var(--color-glass-fill);
+    box-shadow: var(--shadow-glass), var(--shadow-hairline);
+  }
+  .l-modal {
+    border-radius: var(--radius-card);
+    background: rgb(8 10 22 / 0.97);
+    box-shadow: var(--shadow-modal);
+  }
+  .l-panel {
+    border-radius: var(--radius-card);
+    background: rgb(11 14 28 / 0.88);
+    box-shadow: var(--shadow-hairline);
+    backdrop-filter: blur(14px);
+  }
+  .l-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-field);
+    background: var(--color-luminous);
+    color: var(--color-frost);
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: inset 0 1px 1px rgb(216 236 248 / 0.12);
+  }
+  .l-icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--color-glass-wash);
+    color: var(--color-frost);
+    box-shadow: var(--shadow-hairline);
+  }
+
+  /* --- Κουμπιά: όλα «χάπι» --- */
+  .l-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    user-select: none;
+    transition: background-color 160ms ease-out, box-shadow 160ms ease-out, transform 120ms var(--ease-out-strong),
+      opacity 160ms ease-out, color 160ms ease-out;
+  }
+  .l-btn:active:not(:disabled) { transform: scale(0.97); }
+  .l-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .l-btn-lg { height: 48px; padding: 0 26px; font-size: 15px; }
+  .l-btn-sm { height: 34px; padding: 0 14px; font-size: 13px; }
+  .l-btn-primary {
+    background: var(--color-violet);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 8px 24px -8px rgb(102 58 243 / 0.7);
+  }
+  .l-btn-primary:hover:not(:disabled) { background: var(--color-violet-hover); }
+  .l-btn-ghost {
+    background: var(--color-glass-wash);
+    color: #fff;
+    box-shadow: var(--shadow-hairline);
+  }
+  .l-btn-ghost:hover:not(:disabled) { background: rgb(186 214 247 / 0.12); }
+  .l-btn-outline {
+    background: transparent;
+    color: var(--color-frost);
+    box-shadow: var(--shadow-hairline);
+  }
+  .l-btn-outline:hover:not(:disabled) { background: var(--color-glass-wash); color: #fff; }
+  .l-btn-danger {
+    background: rgb(228 109 76 / 0.12);
+    color: #ffb8a3;
+    box-shadow: inset 0 0 0 1px rgb(228 109 76 / 0.35);
+  }
+  .l-btn-danger:hover:not(:disabled) { background: rgb(228 109 76 / 0.2); }
+  .l-link {
+    color: var(--color-frost);
+    text-decoration: underline;
+    text-decoration-color: rgb(209 228 250 / 0.35);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 160ms ease-out, color 160ms ease-out;
+  }
+  .l-link:hover { color: #fff; text-decoration-color: currentColor; }
+
+  /* --- Πεδία φόρμας --- */
+  .l-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-mist);
+  }
+  .l-input {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--radius-field);
+    background: var(--color-input-fill);
+    color: #fff;
+    padding: 0 12px;
+    font-size: 15px;
+    box-shadow: var(--shadow-hairline);
+    outline: none;
+    transition: box-shadow 160ms ease-out, background-color 160ms ease-out;
+  }
+  .l-input::placeholder { color: rgb(199 211 234 / 0.5); }
+  .l-input:hover { box-shadow: var(--shadow-hairline-strong); }
+  .l-input:focus { box-shadow: inset 0 0 0 1px rgb(182 217 252 / 0.55), 0 0 0 3px rgb(102 58 243 / 0.25); }
+  .l-input[aria-invalid='true'] { box-shadow: inset 0 0 0 1px rgb(228 109 76 / 0.7); }
+  .l-input-code {
+    font-family: var(--font-mono);
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-size: 22px;
+    height: 56px;
+  }
+  .l-checkbox {
+    appearance: none;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border-radius: 5px;
+    background: var(--color-input-fill);
+    box-shadow: var(--shadow-hairline-strong);
+    display: inline-grid;
+    place-content: center;
+    transition: background-color 120ms ease-out;
+  }
+  .l-checkbox::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    background: #fff;
+    transform: scale(0);
+    transition: transform 120ms var(--ease-out-strong);
+  }
+  .l-checkbox:checked { background: var(--color-violet); box-shadow: none; }
+  .l-checkbox:checked::after { transform: scale(1); }
+
+  .l-alert {
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .l-alert-error { background: rgb(228 109 76 / 0.1); color: #ffcfc2; box-shadow: inset 0 0 0 1px rgb(228 109 76 / 0.3); }
+  .l-alert-info { background: rgb(2 125 234 / 0.1); color: #cfe6ff; box-shadow: inset 0 0 0 1px rgb(2 125 234 / 0.3); }
+  .l-alert-ok { background: rgb(38 150 132 / 0.12); color: #c3f1e8; box-shadow: inset 0 0 0 1px rgb(38 150 132 / 0.35); }
+
+  .l-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fog);
+  }
+  .l-divider::before,
+  .l-divider::after { content: ''; height: 1px; flex: 1; background: rgb(186 215 247 / 0.12); }
+
+  /* Κάρτα που «ανασηκώνεται» στο hover (μόνο με ποντίκι — όχι σε αφή) */
+  .l-lift { transition: transform 220ms var(--ease-out-strong), box-shadow 220ms ease-out, background-color 220ms ease-out; }
+  @media (hover: hover) and (pointer: fine) {
+    .l-lift:hover {
+      transform: translateY(-2px);
+      background: rgb(186 214 247 / 0.05);
+      box-shadow: var(--shadow-glass), var(--shadow-hairline-strong);
+    }
+  }
+}
+
+/* Όσοι έχουν ζητήσει λιγότερη κίνηση από το λειτουργικό τους */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

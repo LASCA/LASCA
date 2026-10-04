@@ -106,7 +106,7 @@ const About = ({ isOpen, onClose }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-900/40">
           <div className="flex items-center gap-3.5">
             <div className="p-1.5 bg-slate-800/40 rounded-xl border border-slate-700/50 shadow-sm">
-              <img src="/LASCA-logo-red-blue-1024.png" alt="LASCA Logo" className="w-7 h-7 object-contain drop-shadow-sm" />
+              <img src="/LASCA-logo-128.webp" alt="LASCA Logo" className="w-7 h-7 object-contain drop-shadow-sm" />
             </div>
             <h3 className="text-lg font-bold text-slate-100 tracking-wider">LASCA</h3>
           </div>

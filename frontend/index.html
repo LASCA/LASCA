@@ -2,12 +2,36 @@
 <html lang="el">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon-64.png" />
-    <meta name="theme-color" content="#020617" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LASCA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>LASCA — Τοπογραφικοί υπολογισμοί online</title>
+    <meta name="description" content="Δωρεάν εφαρμογή τοπογραφικών υπολογισμών για φοιτητές Αγρονόμων Τοπογράφων Μηχανικών: όδευση, χωροστάθμηση, ταχυμετρία, χάραξη, συνόρθωση, με αναφορές PDF, DXF, Excel και κοινά projects." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#05060f" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Προεπισκόπηση όταν μοιράζεται ο σύνδεσμος (Facebook, Messenger, Viber, LinkedIn, X, Discord) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LASCA" />
+    <meta property="og:locale" content="el_GR" />
+    <meta property="og:title" content="LASCA — Τοπογραφικοί υπολογισμοί online" />
+    <meta property="og:description" content="Όδευση, χωροστάθμηση, ταχυμετρία, χάραξη και συνόρθωση από τον browser σου, με αναφορές PDF/DXF και κοινά projects." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="LASCA: όλοι οι τοπογραφικοί υπολογισμοί σε μια εφαρμογή" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LASCA — Τοπογραφικοί υπολογισμοί online" />
+    <meta name="twitter:description" content="Όδευση, χωροστάθμηση, ταχυμετρία, χάραξη και συνόρθωση από τον browser σου." />
+    <meta name="twitter:image" content="/og-image.png" />
   </head>
-  <body style="background:#020617">
+  <body style="background:#05060f;color:#d1e4fa">
+    <noscript><p style="font-family:sans-serif;padding:24px">Η LASCA χρειάζεται JavaScript για να λειτουργήσει.</p></noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

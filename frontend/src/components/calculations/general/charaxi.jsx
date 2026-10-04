@@ -643,7 +643,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
               <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
                 <img
                   src={stakeoutData.plot}
-                  alt="Fullscreen Plot"
+                  alt="Διάγραμμα χάραξης (πλήρης οθόνη)"
                   className="max-w-[95vw] max-h-[95vh] object-contain p-4 rounded-lg pointer-events-none"
                 />
               </TransformComponent>

@@ -1222,8 +1222,10 @@ def normalize_400(angle):
 
 @app.route('/api/logout', methods=['POST'])
 def logout_user_route():
-    logout_user()
+    # Πρώτα καθαρίζουμε τη συνεδρία και ΜΕΤΑ logout_user(): αυτό αφήνει την εντολή να σβηστεί
+    # και το cookie «Να με θυμάσαι» (αλλιώς ο χρήστης θα έμενε συνδεδεμένος).
     session.clear()
+    logout_user()
     return jsonify({"status": "success", "message": "Αποσυνδεθήκατε επιτυχώς"})
 
 

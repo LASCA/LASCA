@@ -1,10 +1,11 @@
 @import "tailwindcss";
+@import "./styles/lasca-theme.css";
 
 /* Το Dark Theme που ζήτησες */
 @layer base {
   html, body, #root {
-    background-color: #020617; /* slate-950 */
-    color: #e2e8f0;            /* slate-200 */
+    background-color: #05060f; /* midnight canvas (lasca-theme.css) */
+    color: #d1e4fa;            /* frost */
     height: 100%;
     margin: 0;
     padding: 0;

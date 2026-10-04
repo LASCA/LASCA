@@ -16,12 +16,14 @@
  *   speed     loop speed multiplier (5.4s / speed per loop)      default 0.7
  *   showName  render the LASCA wordmark                         default true
  *   name      wordmark text                                     default 'LASCA'
- *   loadFont  inject the Archivo webfont from Google Fonts      default true
+ *   loadFont  (δεν χρησιμοποιείται πια: η Archivo είναι τοπικά)   default true
  *             (set false if you already self-host Archivo)
  *
  * To use as a real ES module, replace the last line with:
  *   export default LascaIntro;
  */
+import '@fontsource/archivo/600.css';
+import '@fontsource/archivo/700.css';
 import React from 'react';
 const LASCA_INTRO_PATH =
   'M353 115.7L488 193.2Q498 199 498 210.6L498 598Q498 613 511.2 605.8L602.1 556.4Q612 551 621.7 556.6L756 634.2Q766 640 766 651.5L766 708.4Q766 720 756 725.8L438 909.2Q428 915 418 909.2L282 830.8Q272 825 272 813.4L272 162.5Q272 151 282 145.2L333 115.8Q343 110 353 115.7Z';
@@ -130,13 +132,7 @@ function LascaIntro(props) {
       el.textContent = LASCA_INTRO_CSS + lascaLetterKeyframes(12);
       document.head.appendChild(el);
     }
-    if (loadFont && !document.getElementById('lasca-intro-font')) {
-      const link = document.createElement('link');
-      link.id = 'lasca-intro-font';
-      link.rel = 'stylesheet';
-      link.href = 'https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap';
-      document.head.appendChild(link);
-    }
+    // Η γραμματοσειρά Archivo φορτώνεται τοπικά (@fontsource) — όχι από τους servers της Google.
   }, [loadFont]);
 
   const gradId = 'ig' + uid;

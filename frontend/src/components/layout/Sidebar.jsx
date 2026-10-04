@@ -95,7 +95,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         {/* Header Sidebar */}
         <div className={`h-[72px] flex items-center ${isOpen ? 'px-4 gap-2.5' : 'px-0 justify-center'} border-b border-slate-800/80 overflow-hidden shrink-0`}>
           <img 
-            src="/LASCA-logo-red-blue-1024.png" 
+            src="/LASCA-logo-128.webp" 
             alt="LASCA Logo" 
             className="w-13 h-13 shrink-0 object-contain transition-transform duration-300 hover:scale-105"
           />

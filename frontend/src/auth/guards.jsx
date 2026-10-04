@@ -6,9 +6,9 @@ import LascaLoader from '../components/animations/LascaLoader';
 
 export function FullScreenLoader({ label = 'ΦΟΡΤΩΣΗ...' }) {
   return (
-    <div className="h-full w-full bg-slate-950 flex flex-col items-center justify-center">
+    <div className="h-full w-full bg-canvas flex flex-col items-center justify-center">
       <LascaLoader variant="cycle" size={140} glow breathe />
-      <p className="mt-6 text-slate-400 font-mono text-xs tracking-[0.3em] animate-pulse">{label}</p>
+      <p className="mt-6 text-fog font-mono text-xs tracking-[0.3em] animate-pulse" role="status">{label}</p>
     </div>
   );
 }

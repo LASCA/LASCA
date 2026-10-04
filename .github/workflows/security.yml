@@ -1,0 +1,41 @@
+# Έλεγχοι ασφαλείας σε κάθε push / pull request και κάθε Δευτέρα:
+#   * gitleaks: ψάχνει κλειδιά/κωδικούς σε ΟΛΟ το ιστορικό του git
+#   * pip-audit / npm audit: γνωστά κενά ασφαλείας στις βιβλιοθήκες
+#   * οι δοκιμές «επίθεσης» της εφαρμογής (code/tests/test_security.py) και των κοινών projects
+name: security
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+permissions:
+  contents: read
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r deploy/requirements-web.txt pip-audit
+      - run: pip-audit -r deploy/requirements-web.txt
+      - run: python code/tests/test_security.py
+      - run: python code/tests/test_collab.py
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm install --no-audit --no-fund
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
