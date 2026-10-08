@@ -23,9 +23,9 @@ The system is structured around a project-centric workflow:
 
 ## Key Features
 
-### <img src="code/assets/icons/metriseis_stathmou.svg" width="26" height="26" align="center"> Μετρήσεις Σταθμού
+### <img src="code/assets/icons/metriseis_stathmou.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Μετρήσεις Σταθμού
 
-#### <img src="code/assets/icons/goniometriseis.svg" width="22" height="22" align="center"> Angular Measurements (Γωνιομετρήσεις)
+#### <img src="code/assets/icons/goniometriseis.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Angular Measurements (Γωνιομετρήσεις)
 
 Process station observations to derive horizontal and zenith angles. The measurement workflow organizes readings by station, target, period, and instrument face.
 
@@ -37,7 +37,7 @@ Process station observations to derive horizontal and zenith angles. The measure
   <img src="code/assets/gif_demo/gwniometriseis.gif" alt="Angular Measurements Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/synorthosi_stathmou.svg" width="22" height="22" align="center"> Network Adjustment (Συνόρθωση Σταθμού)
+#### <img src="code/assets/icons/synorthosi_stathmou.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Network Adjustment (Συνόρθωση Σταθμού)
 
 Support vertical control workflows with geometric leveling and station-observation adjustment. LASCA provides a table-based calculation flow and network visualization for reviewing observations and results.
 
@@ -49,7 +49,7 @@ Support vertical control workflows with geometric leveling and station-observati
   <img src="code/assets/gif_demo/synorthosi_stathmoy.gif" alt="Station Adjustment Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/trigonometriki_ypsometria.svg" width="22" height="22" align="center"> Trigonometric Leveling (Τριγωνομετρική Υψομετρία)
+#### <img src="code/assets/icons/trigonometriki_ypsometria.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Trigonometric Leveling (Τριγωνομετρική Υψομετρία)
 
 Compute height differences from slope-distance and zenith-angle observations, with instrument and target heights included in the calculation. Results are presented station-by-station for review.
 
@@ -60,7 +60,7 @@ Compute height differences from slope-distance and zenith-angle observations, wi
   <img src="code/assets/gif_demo/trig_leveling.gif" alt="Trigonometric Leveling Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-### <img src="code/assets/icons/chorostathmisi.svg" width="26" align="center"> Leveling / Χωροστάθμη
+### <img src="code/assets/icons/chorostathmisi.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Leveling / Χωροστάθμη
 
 Perform geometric leveling calculations, line reductions, and height difference determinations:
 
@@ -72,21 +72,21 @@ Perform geometric leveling calculations, line reductions, and height difference 
   <img src="code/assets/gif_demo/leveling.gif" alt="Leveling Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-### <img src="code/assets/icons/basic_calc.svg" width="26" height="26" align="center"> Basic Calculations - Βασικοί Τοπογραφικοί Υπολογισμοί
+### <img src="code/assets/icons/basic_calc.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Basic Calculations - Βασικοί Τοπογραφικοί Υπολογισμοί
 
-#### <img src="code/assets/icons/convert.svg" width="22" align="center"> Μετατροπές Γωνιών
+#### <img src="code/assets/icons/convert.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Μετατροπές Γωνιών
 
 <p align="center">
   <img src="code/assets/gif_demo/metatropes.gif" alt="Angle Conversions Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/themeliodi.svg" width="22" align="center"> Θεμελιώδη Προβλήματα Τοπογραφίας
+#### <img src="code/assets/icons/themeliodi.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Θεμελιώδη Προβλήματα Τοπογραφίας
 
 <p align="center">
   <img src="code/assets/gif_demo/them.gif" alt="Fundamental Geodetic Problems Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/allilotomies.svg" width="22" align="center"> Resection & Intersection (Οπισθοτομία & Εμπροσθοτομία)
+#### <img src="code/assets/icons/allilotomies.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Resection & Intersection (Οπισθοτομία & Εμπροσθοτομία)
 
 Determine unknown point coordinates from known control points and measured directions or distances. LASCA includes several solution methods for common resection and forward-intersection problems.
 
@@ -98,13 +98,13 @@ Determine unknown point coordinates from known control points and measured direc
   <img src="code/assets/gif_demo/tomes.gif" alt="Intersections and Resections Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/scale_factor.svg" width="22" align="center"> Συντελεστής Κλίμακας
+#### <img src="code/assets/icons/scale_factor.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Συντελεστής Κλίμακας
 
 <p align="center">
   <img src="code/assets/gif_demo/klimaka.gif" alt="Scale Factor Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-### <img src="code/assets/icons/traverse.svg" width="26" height="26" align="center"> Traverse / Όδευση
+### <img src="code/assets/icons/traverse.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Traverse / Όδευση
 
 LASCA supports complete traverse workflows for station observations, horizontal network computation, and vertical control. The module combines field measurements, coordinate propagation, and reporting in one structured environment.
 
@@ -112,7 +112,7 @@ LASCA supports complete traverse workflows for station observations, horizontal 
   <img src="code/assets/gif_demo/traverse.gif" alt="Traverse / Όδευση Demo" width="100%" style="border-radius: 8px;">
 </p> -->
 
-#### <img src="code/assets/icons/planimetry.svg" width="22" height="22" align="center"> Οριζοντιογραφία (Planimetry / Horizontal Network)
+#### <img src="code/assets/icons/planimetry.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Οριζοντιογραφία (Planimetry / Horizontal Network)
 
 Compute the horizontal geometry of a traverse network from observed directions and distances, then review the resulting coordinate system and network closure.
 
@@ -120,7 +120,7 @@ Compute the horizontal geometry of a traverse network from observed directions a
   <img src="code/assets/gif_demo/traverse.gif" alt="Οριζοντιογραφία Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-#### <img src="code/assets/icons/chorostathmisi.svg" width="22" height="22" align="center"> Traverse Leveling / Υψομετρία Όδευσης
+#### <img src="code/assets/icons/chorostathmisi.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Traverse Leveling / Υψομετρία Όδευσης
 
 Perform trigonometric heighting along traverse lines, calculate vertical misclosures, and distribute height corrections:
 
@@ -132,7 +132,7 @@ Perform trigonometric heighting along traverse lines, calculate vertical misclos
   <img src="code/assets/gif_demo/traverse_trig_leveling.gif" alt="Traverse Leveling Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-### <img src="code/assets/icons/mapping.svg" width="26" height="26" align="center"> Mapping - Αποτύπωση
+### <img src="code/assets/icons/mapping.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Mapping - Αποτύπωση
 
 Turn station observations into mapped detail points for topographic survey work. The module combines measured data, coordinate computation, and a station sketch for spatial review.
 
@@ -144,7 +144,7 @@ Turn station observations into mapped detail points for topographic survey work.
   <img src="code/assets/gif_demo/apotiposi.gif" alt="Topographic Surveying and Detail Mapping Demo" width="100%" style="border-radius: 8px;">
 </p>
 
-### <img src="code/assets/icons/stakeout.svg" width="26" height="26" align="center"> Stakeout - Χάραξη
+### <img src="code/assets/icons/stakeout.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Stakeout - Χάραξη
 
 Prepare known design points for field setting out from a selected station and orientation point. LASCA presents the point coordinates and an interactive sketch to support the layout workflow.
 
