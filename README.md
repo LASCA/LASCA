@@ -23,18 +23,138 @@ The system is structured around a project-centric workflow:
 
 ## Key Features
 
-- Project dashboard with project creation, loading, deletion, and summary information.
-- Multi-module geodetic workflow covering goniometry, traverse, traverse height, leveling, trig-leveling, tachymetry, and stakeout.
-- Angular and linear observation processing with closure and tolerance calculations.
-- Coordinate and height propagation for traverse and leveling networks.
-- Geodetic utilities for angle, unit, azimuth, intersection, resection, and scale-factor tasks.
-- Interactive visuals using Recharts and Leaflet for coordinate plotting and map-based inspection.
-- PDF report generation for computations and survey summaries.
-- DXF export support for traverse and tachymetry data.
-- Excel import support and template generation for structured field data.
-- Persistent JSON-based project storage with separate user workspace directories.
-- Desktop packaging for Windows through PyWebView, PyInstaller, and Inno Setup.
-- User feedback submission with attachments and notification handling.
+### <img src="code/assets/icons/metriseis_stathmou.svg" width="26" height="26" align="center"> Μετρήσεις Σταθμού
+
+#### <img src="code/assets/icons/goniometriseis.svg" width="22" height="22" align="center"> Angular Measurements (Γωνιομετρήσεις)
+
+Process station observations to derive horizontal and zenith angles. The measurement workflow organizes readings by station, target, period, and instrument face.
+
+- Review horizontal and zenith observations in structured tables.
+- Run angle calculations and export a PDF report.
+- Work with project measurement data loaded into LASCA.
+
+<p align="center">
+  <img src="code/assets/gif_demo/gwniometriseis.gif" alt="Angular Measurements Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/synorthosi_stathmou.svg" width="22" height="22" align="center"> Network Adjustment (Συνόρθωση Σταθμού)
+
+Support vertical control workflows with geometric leveling and station-observation adjustment. LASCA provides a table-based calculation flow and network visualization for reviewing observations and results.
+
+- Calculate geometric leveling runs, including forward and return runs.
+- Adjust station observations and inspect network quality in the interactive preview.
+- Export supported adjustment results as a PDF report.
+
+<p align="center">
+  <img src="code/assets/gif_demo/synorthosi_stathmoy.gif" alt="Station Adjustment Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/trigonometriki_ypsometria.svg" width="22" height="22" align="center"> Trigonometric Leveling (Τριγωνομετρική Υψομετρία)
+
+Compute height differences from slope-distance and zenith-angle observations, with instrument and target heights included in the calculation. Results are presented station-by-station for review.
+
+- Enter or review distances, zenith angles, and station/target heights.
+- Calculate height results and generate a PDF report.
+
+<p align="center">
+  <img src="code/assets/gif_demo/trig_leveling.gif" alt="Trigonometric Leveling Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+### <img src="code/assets/icons/chorostathmisi.svg" width="26" align="center"> Leveling / Χωροστάθμη
+
+Perform geometric leveling calculations, line reductions, and height difference determinations:
+
+- **Geometric Leveling:** Calculate point elevations and line closures from backsight and foresight rod readings.
+- **Error Distribution:** Compute and distribute misclosure errors across leveling loops.
+- **Data Export:** Generate detailed leveling reduction sheets and summaries.
+
+<p align="center">
+  <img src="code/assets/gif_demo/leveling.gif" alt="Leveling Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+### <img src="code/assets/icons/basic_calc.svg" width="26" height="26" align="center"> Basic Calculations - Βασικοί Τοπογραφικοί Υπολογισμοί
+
+#### <img src="code/assets/icons/convert.svg" width="22" align="center"> Μετατροπές Γωνιών
+
+<p align="center">
+  <img src="code/assets/gif_demo/metatropes.gif" alt="Angle Conversions Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/themeliodi.svg" width="22" align="center"> Θεμελιώδη Προβλήματα Τοπογραφίας
+
+<p align="center">
+  <img src="code/assets/gif_demo/them.gif" alt="Fundamental Geodetic Problems Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/allilotomies.svg" width="22" align="center"> Resection & Intersection (Οπισθοτομία & Εμπροσθοτομία)
+
+Determine unknown point coordinates from known control points and measured directions or distances. LASCA includes several solution methods for common resection and forward-intersection problems.
+
+- Calculate resection solutions, including Collins and Tienstra methods.
+- Solve forward intersections and review the resulting point geometry.
+- Use intersection diagrams and generate supported calculation reports.
+
+<p align="center">
+  <img src="code/assets/gif_demo/tomes.gif" alt="Intersections and Resections Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/scale_factor.svg" width="22" align="center"> Συντελεστής Κλίμακας
+
+<p align="center">
+  <img src="code/assets/gif_demo/klimaka.gif" alt="Scale Factor Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+### <img src="code/assets/icons/traverse.svg" width="26" height="26" align="center"> Traverse / Όδευση
+
+LASCA supports complete traverse workflows for station observations, horizontal network computation, and vertical control. The module combines field measurements, coordinate propagation, and reporting in one structured environment.
+
+<!-- <p align="center">
+  <img src="code/assets/gif_demo/traverse.gif" alt="Traverse / Όδευση Demo" width="100%" style="border-radius: 8px;">
+</p> -->
+
+#### <img src="code/assets/icons/planimetry.svg" width="22" height="22" align="center"> Οριζοντιογραφία (Planimetry / Horizontal Network)
+
+Compute the horizontal geometry of a traverse network from observed directions and distances, then review the resulting coordinate system and network closure.
+
+<p align="center">
+  <img src="code/assets/gif_demo/traverse.gif" alt="Οριζοντιογραφία Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+#### <img src="code/assets/icons/chorostathmisi.svg" width="22" height="22" align="center"> Traverse Leveling / Υψομετρία Όδευσης
+
+Perform trigonometric heighting along traverse lines, calculate vertical misclosures, and distribute height corrections:
+
+- **Trigonometric Leveling:** Compute relative height differences $(\Delta H)$ using zenith angles and slope distances.
+- **Vertical Closure:** Calculate vertical misclosure errors ($w_h$) across traverse legs.
+- **Elevation Adjustment:** Automatically distribute height corrections based on distance or leg counts to determine final point elevations.
+
+<p align="center">
+  <img src="code/assets/gif_demo/traverse_trig_leveling.gif" alt="Traverse Leveling Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+### <img src="code/assets/icons/mapping.svg" width="26" height="26" align="center"> Mapping - Αποτύπωση
+
+Turn station observations into mapped detail points for topographic survey work. The module combines measured data, coordinate computation, and a station sketch for spatial review.
+
+- Process horizontal and vertical angles with slope distances.
+- Calculate detail-point coordinates and apply supported scale-factor options.
+- Inspect the station sketch and mapping visualization.
+
+<p align="center">
+  <img src="code/assets/gif_demo/apotiposi.gif" alt="Topographic Surveying and Detail Mapping Demo" width="100%" style="border-radius: 8px;">
+</p>
+
+### <img src="code/assets/icons/stakeout.svg" width="26" height="26" align="center"> Stakeout - Χάραξη
+
+Prepare known design points for field setting out from a selected station and orientation point. LASCA presents the point coordinates and an interactive sketch to support the layout workflow.
+
+- Set the station and backsight coordinates.
+- Enter stakeout point coordinates and run the calculation.
+- Review the stakeout sketch and generate a PDF report.
+
+<p align="center">
+  <img src="code/assets/gif_demo/charaxi.gif" alt="Stakeout Demo" width="100%" style="border-radius: 8px;">
+</p>
 
 ## Tech Stack
 
@@ -86,47 +206,13 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-> The repository may include a local `Lasca.venv` directory for development, but a clean `.venv` is recommended for a standard setup.
-
-### 4) Set up environment variables
-
-The application loads environment variables from a `.env` file when present.
-
-Supported variables include:
-
-```env
-VITE_API_BASE_URL=http://127.0.0.1:5000
-RESEND_API_KEY=your_key_here
-NOTIFICATION_EMAIL=admin@example.com
-FEEDBACK_UPLOAD_FOLDER=./feedback_uploads
-```
-
-For normal local development, `VITE_API_BASE_URL` is usually only needed when the frontend and backend run on different ports.
-
-### 5) Run the backend
+### 4) Launch LASCA
 
 ```powershell
-python code\main_4_app.py
+python main_for_app.py
 ```
 
-This starts the Flask API and opens the desktop window via PyWebView.
-
-### 6) Run the frontend in development mode
-
-Open a second terminal and run:
-
-```powershell
-cd frontend
-npm run dev
-```
-
-If the frontend is served separately from the backend, set the environment variable before running Vite:
-
-```powershell
-$env:VITE_API_BASE_URL = "http://127.0.0.1:<backend-port>"
-cd frontend
-npm run dev
-```
+This single entry point initializes the local server and starts the application in one process, so you do not need to run the backend and frontend in separate terminals.
 
 ## Production and Build
 
@@ -224,9 +310,3 @@ LASCA was developed by students and contributors in the Surveying and Geomatics 
 | Alexandros Karachles | [GitHub](https://github.com/Neversplit2) |
 | Ilias Saoulias | [GitHub](https://github.com/iliasaou) |
 | Savvas Tsigou | [GitHub](https://github.com/Savvas-Tsigou) |
-
-## Notes
-
-- Project data is stored in user-specific directories under the local Windows home profile, not inside the source tree.
-- Sample files under `Topo_Workspace` are development and demo data and should not be treated as production output.
-- The application is primarily focused on surveying and geodetic workflows, with report and export generation tailored to that domain.
