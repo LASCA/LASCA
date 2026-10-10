@@ -37,7 +37,7 @@ SEED_PASSWORD = 'lasca123'
 # Το .test είναι δεσμευμένο domain: κανένα από αυτά τα email δεν είναι πραγματικό.
 SEED_USERS = [
     {'email': 'savvas@lasca.test', 'name': 'Savvas 1914'},
-    {'email': 'ilias@lasca.test', 'name': 'Ilias Saoulias'},
+    {'email': 'ilias@lasca.test', 'name': 'Παππούς Ηλίας'},
     {'email': 'alex@lasca.test', 'name': 'Alex Karachles'},
 ]
 
