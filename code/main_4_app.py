@@ -327,6 +327,10 @@ def _allowed_origins():
 
 init_origin_guard(app, _allowed_origins)
 
+# Δοκιμαστική περίοδος: με TEAM_GATE_PASSWORD στο .env όλη η σελίδα ζητάει πρώτα τον κωδικό της ομάδας.
+from team_gate import init_team_gate  # noqa: E402
+TEAM_GATE_ON = init_team_gate(app, _allowed_origins, lambda: PUBLIC_API_PATHS)
+
 _AUTH_PREFIXES = ('/api/login', '/api/register', '/api/auth/')
 _LIGHT_PREFIXES = ('/api/projects', '/api/me', '/api/users', '/api/invites', '/api/auth', '/api/login',
                    '/api/register', '/api/logout', '/api/feedback', '/api/desktop-link')

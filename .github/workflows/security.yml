@@ -30,6 +30,7 @@ jobs:
       - run: python code/tests/test_security.py
       - run: python code/tests/test_collab.py
       - run: python code/tests/test_history.py
+      - run: python code/tests/test_team_gate.py
   frontend:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
