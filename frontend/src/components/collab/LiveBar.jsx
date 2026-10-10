@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, ArrowUpRight, ChevronDown, Clock, CloudOff, Eye, Loader2, Monitor } from 'lucide-react';
 import CollabAvatar from './CollabAvatar';
 import { TOOL_LABEL, describeActivity, describeChange, sectionCounts, timeAgo } from './collabApi';
@@ -83,16 +84,35 @@ export function LiveBar({
   const [open, setOpen] = useState(false);
   const [seenAtOpen, setSeenAtOpen] = useState(0);
   const ref = useRef(null);
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState(null);
   const others = presence.filter((p) => !p.self);
   const selfId = currentUserId ?? presence.find((p) => p.self)?.id;
 
   useEffect(() => {
     if (!open) return undefined;
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = (e) => {
+      if (ref.current?.contains(e.target) || panelRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', esc);
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+
+  // Το παράθυρο ζωγραφίζεται στο <body> (portal), πάνω από όλα: αλλιώς οι πίνακες των εργαλείων
+  // (sticky headers με δικό τους z-index) περνούσαν από πάνω του.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [open]);
 
   // Όσο είναι ανοιχτό, ό,τι νέο έρχεται διαβάζεται αμέσως.
@@ -148,9 +168,9 @@ export function LiveBar({
             </span>
           )}
         </button>
-        {open && (
-          <div role="dialog" aria-label="Ιστορικό αλλαγών"
-            className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700/60 bg-slate-950/95 shadow-2xl backdrop-blur-sm z-[80] origin-top-right animate-pop">
+        {open && pos && createPortal(
+          <div role="dialog" aria-label="Ιστορικό αλλαγών" ref={panelRef} style={{ top: pos.top, right: pos.right }}
+            className="fixed w-[360px] max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700/60 bg-slate-950/95 shadow-2xl backdrop-blur-sm z-[130] origin-top-right animate-pop">
             <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-slate-950/95 px-3 py-2 border-b border-slate-800">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Ιστορικό αλλαγών</p>
               {newCount > 0 && <span className="rounded-full bg-[#663af3]/25 px-2 py-0.5 text-[10px] font-bold text-[#cbbcff]">{newCount} {newCount === 1 ? 'νέα' : 'νέες'}</span>}
@@ -161,7 +181,8 @@ export function LiveBar({
               <ActivityItem key={a.id} a={a} isNew={isNew(a)} asset={asset} defaultOpen={isNew(a) && i < 3}
                 onOpenTool={onOpenTool ? (tool) => { setOpen(false); onOpenTool(tool); } : undefined} />
             ))}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </div>
