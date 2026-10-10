@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './topbar';
-import { ChevronDown, LogOut, Share2, User } from 'lucide-react';
+import { ChevronDown, LogOut, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const UserMenu = ({ currentProject, onOpenShareProject }) => {
+// Η κοινοποίηση project έγινε κουμπί δίπλα στο «Επιλογή Project» (App.jsx).
+const UserMenu = () => {
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -49,13 +50,6 @@ const UserMenu = ({ currentProject, onOpenShareProject }) => {
   const handleProfileClick = () => {
     setMenuOpen(false);
     navigate('/profile');
-  };
-
-  const handleShareClick = () => {
-    setMenuOpen(false);
-    if (onOpenShareProject) {
-      onOpenShareProject();
-    }
   };
 
   const handleLogout = async () => {
@@ -103,16 +97,6 @@ const UserMenu = ({ currentProject, onOpenShareProject }) => {
           >
             <User size={15} className="text-slate-300" />
             Προφίλ
-          </button>
-          <button
-            type="button"
-            onClick={handleShareClick}
-            disabled={!currentProject}
-            title={!currentProject ? 'Επίλεξε πρώτα project' : ''}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-200 hover:bg-slate-800/80 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Share2 size={15} className="text-slate-300" />
-            Κοινοποίηση Project
           </button>
           <div className="border-t border-slate-800/80" />
           <button

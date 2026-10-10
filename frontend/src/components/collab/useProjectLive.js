@@ -1,28 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { mergeActivity } from './collabApi';
 
 /**
  * Ζωντανή συνεργασία: κάθε λίγα δευτερόλεπτα λέει στον server «είμαι εδώ, σε αυτό το εργαλείο»
- * και παίρνει πίσω: ποιος άλλος είναι online, το ιστορικό, και τα δεδομένα αν τα άλλαξε κάποιος άλλος.
+ * και παίρνει πίσω: ποιος άλλος είναι online, το ιστορικό, πόσες αλλαγές δεν έχω δει ακόμα,
+ * και τα δεδομένα αν τα άλλαξε κάποιος άλλος.
  *
  *  sync(body)        → Promise με την απάντηση του /sync (web: server, exe: τοπικός server)
+ *  markSeen(lastId)  → «τα είδα» (μηδενίζει τον μετρητή νέων αλλαγών, σε όλες τις συσκευές)
  *  getVersion()      → η τελευταία έκδοση που ξέρουμε (την κρατάει το App μαζί με την αποθήκευση)
  *  onRemoteState(state, project) → κάποιος άλλος άλλαξε τα δεδομένα
  *  onProject(project)            → νέα στοιχεία project (π.χ. άλλαξε ο ρόλος μου)
  *  onLostAccess()                → δεν έχω πια πρόσβαση (με αφαίρεσαν / διαγράφηκε)
  */
 export default function useProjectLive({
-  enabled, sync, tool, client = 'web', getVersion, onRemoteState, onProject, onLostAccess, onStatus,
+  enabled, sync, markSeen, tool, client = 'web', getVersion, onRemoteState, onProject, onLostAccess, onStatus,
   interval = 4000,
 }) {
   const [presence, setPresence] = useState([]);
   const [activity, setActivity] = useState([]);
   const [online, setOnline] = useState(true);
+  const [unread, setUnread] = useState(0);
+  const [lastSeen, setLastSeen] = useState(0);
   const lastActivityRef = useRef(0);
   const cbRef = useRef({});
-  cbRef.current = { sync, getVersion, onRemoteState, onProject, onLostAccess, onStatus, tool, client };
+  cbRef.current = { sync, markSeen, getVersion, onRemoteState, onProject, onLostAccess, onStatus, tool, client };
 
   useEffect(() => {
-    setPresence([]); setActivity([]); lastActivityRef.current = 0;
+    setPresence([]); setActivity([]); setUnread(0); setLastSeen(0); lastActivityRef.current = 0;
     if (!enabled) return undefined;
     let stopped = false;
     let timer = null;
@@ -43,11 +48,10 @@ export default function useProjectLive({
         if (res?.project) cb.onProject?.(res.project);
         if (Array.isArray(res?.presence)) setPresence(res.presence);
         if (Array.isArray(res?.activity) && res.activity.length) {
-          setActivity((prev) => {
-            const seen = new Set(prev.map((a) => a.id));
-            return [...res.activity.filter((a) => !seen.has(a.id)), ...prev].slice(0, 60);
-          });
+          setActivity((prev) => mergeActivity(res.activity, prev));
         }
+        if (typeof res?.unread === 'number') setUnread(res.unread);
+        if (typeof res?.last_seen === 'number') setLastSeen((v) => Math.max(v, res.last_seen));
         if (typeof res?.last_activity === 'number') lastActivityRef.current = res.last_activity;
         if (res?.state) cb.onRemoteState?.(res.state, res.project);
       } catch (error) {
@@ -68,5 +72,14 @@ export default function useProjectLive({
     return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [enabled, interval]);
 
-  return { presence, activity, online };
+  // Ο χρήστης άνοιξε το ιστορικό: ό,τι υπάρχει ως τώρα μετράει ως «διαβασμένο».
+  const markAllSeen = useCallback(() => {
+    const last = lastActivityRef.current;
+    if (!last) return;
+    setUnread(0);
+    setLastSeen((v) => Math.max(v, last));
+    Promise.resolve(cbRef.current.markSeen?.(last)).catch(() => {});
+  }, []);
+
+  return { presence, activity, online, unread, lastSeen, markAllSeen };
 }

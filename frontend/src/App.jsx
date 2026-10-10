@@ -21,9 +21,12 @@ import LascaIntro from './components/animations/LascaIntro';
 import UserMenu from './components/layout/UserMenu';
 import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './components/layout/topbar';
 import ShareDialog from './components/collab/ShareDialog';
+import ShareButton from './components/collab/ShareButton';
 import { LiveBar, ConflictBanner } from './components/collab/LiveBar';
 import useProjectLive from './components/collab/useProjectLive';
 import { createCollabApi } from './components/collab/collabApi';
+
+const MEMBERSHIP_ACTIONS = new Set(['member_added', 'member_removed', 'role_changed', 'left', 'joined_via_link', 'ownership_transferred']);
 
 function App() {
   // Ο συνδεδεμένος χρήστης έρχεται από το AuthProvider (main.jsx).
@@ -47,6 +50,7 @@ function App() {
   });
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isShareProjectOpen, setIsShareProjectOpen] = useState(false);
+  const [shareMembers, setShareMembers] = useState([]);   // ποιοι άλλοι έχουν πρόσβαση στο ανοιχτό project
   const [globalSettings, setGlobalSettings] = useState({});
 
   // --- ΚΟΙΝΑ PROJECTS / ΖΩΝΤΑΝΗ ΣΥΝΕΡΓΑΣΙΑ ---
@@ -322,11 +326,25 @@ function App() {
     trigHeightData
   ]);
 
+  // Μέλη του ανοιχτού project για το κουμπί «Κοινοποίηση».
+  const [membersVersion, setMembersVersion] = useState(0);
+  useEffect(() => {
+    setShareMembers([]);
+    const pid = projectMeta?.public_id;
+    if (!pid) return undefined;
+    let cancelled = false;
+    collabApi.members(pid)
+      .then((d) => { if (!cancelled) setShareMembers((d.members || []).filter((m) => m.id !== currentUser?.id)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [projectMeta?.public_id, collabApi, currentUser?.id, membersVersion]);
+
   // --- 1Β. ΖΩΝΤΑΝΗ ΣΥΝΕΡΓΑΣΙΑ (ποιος είναι online, αλλαγές άλλων, ιστορικό) ---
   const lastRemoteToastRef = useRef(0);
   const live = useProjectLive({
     enabled: Boolean(currentProject && projectMeta?.public_id && isDataLoaded),
     sync: (body) => collabApi.sync(projectMeta.public_id, body),
+    markSeen: (lastId) => collabApi.markSeen(projectMeta.public_id, lastId),
     tool: activeTab,
     client: 'web',
     getVersion: () => versionRef.current,
@@ -350,6 +368,10 @@ function App() {
       closeProject();
     },
   });
+
+  // Κάποιος μπήκε/βγήκε από το project (φαίνεται στο ιστορικό): ανανέωση του κουμπιού «Κοινοποίηση».
+  const membershipEvents = live.activity.filter((a) => MEMBERSHIP_ACTIONS.has(a.action)).length;
+  useEffect(() => { if (membershipEvents) setMembersVersion((v) => v + 1); }, [membershipEvents]);
 
   const buildProjectState = () => ({
     project_name: currentProject,
@@ -519,6 +541,7 @@ function App() {
         projectName={currentProject}
         currentUserId={currentUser?.id}
         onRoleChanged={(role) => role && setProjectMeta((prev) => (prev && prev.role !== role ? { ...prev, role } : prev))}
+        onMembersChanged={(list) => setShareMembers(list.filter((m) => m.id !== currentUser?.id))}
         onLeft={closeProject}
       />
       <ConflictBanner conflict={conflict} onLoadTheirs={loadTheirChanges} onKeepMine={keepMyChanges} busy={resolvingConflict} />
@@ -534,7 +557,9 @@ function App() {
             <div className="flex items-center gap-2 sm:gap-3 flex-nowrap min-w-0">
               {currentProject && projectMeta && (
                 <LiveBar presence={live.presence} activity={live.activity} online={live.online}
-                  readOnly={isReadOnly} asset={collabApi.asset} itemClass={TOPBAR_ITEM} />
+                  readOnly={isReadOnly} asset={collabApi.asset} itemClass={TOPBAR_ITEM}
+                  unread={live.unread} lastSeen={live.lastSeen} onOpenHistory={live.markAllSeen}
+                  onOpenTool={setActiveTab} currentUserId={currentUser?.id} />
               )}
               {currentProject && (
                 <div className="hidden lg:block min-w-0">
@@ -557,7 +582,10 @@ function App() {
                 <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
                 <span className="hidden md:inline">{currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}</span>
               </button>
-              <UserMenu currentProject={currentProject} onOpenShareProject={() => setIsShareProjectOpen(true)} />
+              <ShareButton itemClass={TOPBAR_ITEM} asset={collabApi.asset} members={shareMembers}
+                disabled={!projectMeta?.public_id} onClick={() => setIsShareProjectOpen(true)}
+                hint={!projectMeta?.public_id ? 'Άνοιξε πρώτα ένα project για να το κοινοποιήσεις' : undefined} />
+              <UserMenu />
             </div>
           );
           return activeTab === 'dashboard' ? (

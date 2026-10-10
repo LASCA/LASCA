@@ -26,7 +26,7 @@ function RoleBadge({ role }) {
  * Κοινοποίηση project: μέλη με ρόλους, προσθήκη με email, σύνδεσμοι πρόσκλησης,
  * μεταβίβαση ιδιοκτησίας, αποχώρηση. Ίδιο component στη σελίδα και στο exe (api = createCollabApi(prefix)).
  */
-export default function ShareDialog({ isOpen, onClose, api, projectId, projectName, currentUserId, onLeft, onRoleChanged }) {
+export default function ShareDialog({ isOpen, onClose, api, projectId, projectName, currentUserId, onLeft, onRoleChanged, onMembersChanged }) {
   const [members, setMembers] = useState([]);
   const [myRole, setMyRole] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +44,12 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
   // ξαναφόρτωνε τα μέλη → ατελείωτος κύκλος (το παράθυρο «αναβόσβηνε»).
   const onRoleChangedRef = useRef(onRoleChanged);
   onRoleChangedRef.current = onRoleChanged;
+  const onMembersChangedRef = useRef(onMembersChanged);
+  onMembersChangedRef.current = onMembersChanged;
+  // Το κουμπί «Κοινοποίηση» της μπάρας δείχνει ποιοι έχουν πρόσβαση: το ενημερώνουμε σε κάθε αλλαγή.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { if (isOpen && loaded) onMembersChangedRef.current?.(members); }, [members, isOpen, loaded]);
+  useEffect(() => { if (!isOpen) setLoaded(false); }, [isOpen]);
 
   const isOwner = myRole === 'owner';
 
@@ -53,6 +59,7 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
     try {
       const data = await api.members(projectId);
       setMembers(data.members || []);
+      setLoaded(true);
       setMyRole(data.project?.role || null);
       onRoleChangedRef.current?.(data.project?.role || null);
       if (data.project?.role === 'owner') {

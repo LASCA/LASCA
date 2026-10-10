@@ -329,7 +329,7 @@ init_origin_guard(app, _allowed_origins)
 
 _AUTH_PREFIXES = ('/api/login', '/api/register', '/api/auth/')
 _LIGHT_PREFIXES = ('/api/projects', '/api/me', '/api/users', '/api/invites', '/api/auth', '/api/login',
-                   '/api/register', '/api/logout', '/api/feedback')
+                   '/api/register', '/api/logout', '/api/feedback', '/api/desktop-link')
 API_THROTTLE_RULES = [
     # (όνομα, ταίριασμα, όριο, παράθυρο σε δευτ., ανά)
     ('api', lambda p, m: True, 600, 60, 'ip'),
@@ -341,6 +341,8 @@ API_THROTTLE_RULES = [
     ('lookup', lambda p, m: p == '/api/users/lookup', 60, 600, 'user'),
     ('invites', lambda p, m: m == 'POST' and '/invite' in p, 30, 3600, 'user'),
     ('new_project', lambda p, m: m == 'POST' and p == '/api/projects', 30, 3600, 'user'),
+    # Το exe ρωτάει κάθε 2″ αν εγκρίθηκε η σύνδεση (έως 10′): χωριστό, άνετο όριο ανά IP.
+    ('desktop_poll', lambda p, m: p == '/api/desktop-link/poll', 240, 60, 'ip'),
 ]
 
 
@@ -483,6 +485,9 @@ class Project(db.Model):
     version = db.Column(db.Integer, nullable=False, default=0)
     updated_at = db.Column(db.DateTime, nullable=True)
     updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    # Αναγνωριστικό ανεβάσματος από το exe: αν το ίδιο ανέβασμα ξαναγίνει (π.χ. μετά από timeout),
+    # επιστρέφεται το ίδιο project αντί για διπλό.
+    client_ref = db.Column(db.String(40), nullable=True, index=True)
     owner = db.relationship('User', foreign_keys=[owner_id], backref=db.backref('owned_projects', lazy=True))
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])
 
@@ -525,6 +530,37 @@ class ProjectActivity(db.Model):
     action = db.Column(db.String(40), nullable=False)
     detail = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    # Μόνο στην τελευταία «συνεδρία αλλαγών»: τα δεδομένα πριν ξεκινήσει (για το λεπτομερές ιστορικό).
+    snapshot = db.Column(db.Text, nullable=True)
+
+
+class ProjectRead(db.Model):
+    """Μέχρι ποια εγγραφή του ιστορικού έχει δει κάθε χρήστης (για τις ειδοποιήσεις «νέες αλλαγές»)."""
+    __tablename__ = 'project_reads'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    last_seen_id = db.Column(db.Integer, nullable=False, default=0)
+    __table_args__ = (db.UniqueConstraint('project_id', 'user_id', name='uq_read_project_user'),)
+
+
+class DesktopLogin(db.Model):
+    """Σύνδεση του exe μέσω browser (Google, κωδικός, 2FA): αίτημα που εγκρίνει ο χρήστης στη σελίδα.
+
+    Το exe κρατάει ένα μυστικό και στέλνει εδώ μόνο το hash του (challenge). Ο σύνδεσμος που ανοίγει
+    στον browser (request_id) δεν αρκεί για να πάρει κανείς το κλειδί: χρειάζεται και το μυστικό."""
+    __tablename__ = 'desktop_logins'
+    id = db.Column(db.Integer, primary_key=True)
+    request_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    challenge = db.Column(db.String(64), nullable=False)
+    user_code = db.Column(db.String(9), nullable=False)
+    device_name = db.Column(db.String(120), nullable=True)
+    ip = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    user_id = db.Column(db.Integer, nullable=True, index=True)       # ποιος ενέκρινε
+    approved_at = db.Column(db.DateTime, nullable=True)
+    denied = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class ProjectPresence(db.Model):
@@ -653,6 +689,7 @@ PUBLIC_API_PATHS = {
     '/api/auth/config', '/api/auth/google', '/api/auth/device-token',
     '/api/auth/2fa/verify', '/api/auth/2fa/email', '/api/auth/forgot', '/api/auth/reset',
     '/api/auth/reset/check', '/api/auth/password-check', '/api/auth/verify-email',
+    '/api/auth/desktop/start', '/api/desktop-link/poll',
 }
 # Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
 PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
@@ -712,10 +749,14 @@ def _migrate_schema():
             ('version', 'INTEGER NOT NULL DEFAULT 0'),
             ('updated_at', 'DATETIME'),
             ('updated_by_id', 'INTEGER'),
+            ('client_ref', 'VARCHAR(40)'),
         ],
         'project_members': [
             ('added_at', 'DATETIME'),
             ('added_by_id', 'INTEGER'),
+        ],
+        'project_activity': [
+            ('snapshot', 'TEXT'),
         ],
     }
     with db.engine.begin() as conn:
@@ -894,7 +935,7 @@ class UniversalNumberedCanvas(canvas.Canvas):
 
 SPA_ROUTES = {'/', '/login', '/signup', '/app', '/profile', '/forgot-password', '/reset-password',
               '/verify-email', '/privacy', '/terms', '/cookies'}
-SPA_PREFIXES = ('/invite/',)
+SPA_PREFIXES = ('/invite/', '/desktop-login/')
 PUBLIC_PAGES = [('/', 'weekly', '1.0'), ('/signup', 'monthly', '0.8'), ('/login', 'monthly', '0.6'),
                 ('/privacy', 'yearly', '0.3'), ('/terms', 'yearly', '0.3'), ('/cookies', 'yearly', '0.2')]
 
@@ -923,7 +964,7 @@ def serve_index():
 def robots_txt():
     body = ('User-agent: *\n'
             'Allow: /$\nAllow: /signup\nAllow: /login\nAllow: /privacy\nAllow: /terms\nAllow: /cookies\n'
-            'Disallow: /app\nDisallow: /profile\nDisallow: /invite/\nDisallow: /reset-password\n'
+            'Disallow: /app\nDisallow: /profile\nDisallow: /invite/\nDisallow: /desktop-login/\nDisallow: /reset-password\n'
             'Disallow: /forgot-password\nDisallow: /verify-email\nDisallow: /api/\n\n'
             f'Sitemap: {_site_base()}/sitemap.xml\n')
     return Response(body, mimetype='text/plain', headers={'Cache-Control': 'public, max-age=86400'})
@@ -1244,6 +1285,7 @@ from auth_security import init_auth  # noqa: E402
 init_auth(
     app, db=db, User=User, AuthEvent=AuthEvent, RateHit=RateHit, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
     DeviceToken=DeviceToken, hash_device_token=hash_device_token, normalize_email=normalize_email,
+    DesktopLogin=DesktopLogin,
     EMAIL_RE=EMAIL_RE, logger=logger, resend=resend, GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID,
     PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(), is_development=IS_DEVELOPMENT,
     MIN_AGE=int(os.getenv('MIN_SIGNUP_AGE', '15')),
@@ -1252,6 +1294,7 @@ init_auth(
 init_collab(
     app, db=db, User=User, Project=Project, ProjectMember=ProjectMember, ProjectInvite=ProjectInvite,
     ProjectActivity=ProjectActivity, ProjectPresence=ProjectPresence, DeviceToken=DeviceToken,
+    ProjectRead=ProjectRead, DesktopLogin=DesktopLogin,
     hash_device_token=hash_device_token, WORKSPACE_DIR=WORKSPACE_DIR, USER_AVATAR_DIR=USER_AVATAR_DIR,
     AuthEvent=AuthEvent, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
     TopoProject=TopoProject, resolve_project_dir=resolve_project_dir, project_record_by_name=project_record_by_name,

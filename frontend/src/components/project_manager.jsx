@@ -6,15 +6,14 @@ import {
   FolderOpen, 
   User, 
   Layers, 
-  ChevronRight, 
   Loader2,
   X,
   Settings,
   Briefcase,
   MapPin,
-  Trash2,
   AlertTriangle
 } from 'lucide-react';
+import ProjectListItem from './collab/ProjectListItem';
 
 const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   const [activeTab, setActiveTab] = useState('create');
@@ -42,8 +41,17 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     setIsLoadingList(true);
     setError('');
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/projects/list`);
-      setExistingProjects(response.data || []);
+      // Στη σελίδα όλα τα projects είναι ήδη στο cloud: δείχνουμε ρόλο, μέλη και νέες αλλαγές.
+      const { data } = await axios.get(`${API_BASE_URL}/api/me/projects`);
+      const toItem = (p) => ({
+        key: p.public_id, name: p.name, status: 'synced', role: p.role, members: p.members || [],
+        members_count: p.members_count, unread: p.unread, updated_at: p.updated_at || p.created_at,
+        active: p.name === currentProject,
+        // Το ανοιχτό project δεν διαγράφεται από εδώ (η αυτόματη αποθήκευση θα το χρειαζόταν).
+        canDelete: p.role === 'owner' && p.name !== currentProject,
+      });
+      setExistingProjects([...(data.owned || []), ...(data.shared || [])].map(toItem)
+        .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))));
     } catch (err) {
       console.error("Σφάλμα φόρτωσης λίστας projects:", err);
       setError("Αποτυχία ανάκτησης των υπαρχόντων projects.");
@@ -101,10 +109,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     }
   };
 
-  const handleDeleteClick = (e, projectName) => {
-    e.stopPropagation();
-    setProjectToDelete(projectName);
-  };
+  const handleDeleteClick = (item) => setProjectToDelete(item);
 
   const executeDelete = async () => {
     if (!projectToDelete) return;
@@ -112,7 +117,7 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     setIsSubmitting(true);
     setError('');
     try {
-      await axios.delete(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectToDelete)}`);
+      await axios.delete(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectToDelete.name)}`);
       setProjectToDelete(null);
       await fetchExistingProjects();
     } catch (err) {
@@ -144,7 +149,8 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
               </h3>
               
               <p className="text-[11px] text-slate-400 mb-5 leading-relaxed">
-                Είστε σίγουροι ότι θέλετε να διαγράψετε το <span className="font-mono font-semibold text-slate-200 bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 rounded-md">{projectToDelete}</span>;
+                Είστε σίγουροι ότι θέλετε να διαγράψετε το <span className="font-mono font-semibold text-slate-200 bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 rounded-md">{projectToDelete.name}</span>;
+                {projectToDelete.members_count > 1 && <span className="block mt-1.5 text-amber-300/90">Θα χαθεί και για τους {projectToDelete.members_count - 1} συνεργάτες.</span>}
               </p>
 
               <div className="flex items-center gap-2.5 w-full">
@@ -303,52 +309,19 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
           {activeTab === 'open' && (
             <div className="flex flex-col gap-2">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase mb-1 flex items-center gap-1">
-                <Layers size={10} /> Διαθεσιμοι Φακελοι Εργασιασ
+                <Layers size={10} /> Τα projects σου
               </label>
 
               {isLoadingList ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-500">
                   <Loader2 size={24} className="animate-spin text-amber-500" />
-                  <span className="text-xs tracking-wide">Ανάγνωση σκληρού δίσκου...</span>
+                  <span className="text-xs tracking-wide">Φόρτωση projects...</span>
                 </div>
               ) : existingProjects.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
-                  {existingProjects.map((projName) => (
-                    <div
-                      key={projName}
-                      role="button"
-                      tabIndex={isSubmitting ? -1 : 0}
-                      onClick={() => !isSubmitting && handleOpenProject(projName)}
-                      onKeyDown={(e) => {
-                        if ((e.key === 'Enter' || e.key === ' ') && !isSubmitting) {
-                          e.preventDefault();
-                          handleOpenProject(projName);
-                        }
-                      }}
-                      className={`group w-full bg-slate-950/30 hover:bg-amber-500/[0.03] border border-slate-800/80 hover:border-amber-500/30 p-3.5 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-mono font-bold text-slate-300 group-hover:text-amber-400 transition-colors">
-                          {projName}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-medium">
-                          Κλικ για άμεση επαναφορά
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          aria-label={`Διαγραφή του project ${projName}`}
-                          title="Διαγραφή project"
-                          onClick={(e) => handleDeleteClick(e, projName)}
-                          disabled={isSubmitting}
-                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                        <ChevronRight size={16} className="text-slate-600 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
-                      </div>
-                    </div>
+                  {existingProjects.map((item) => (
+                    <ProjectListItem key={item.key} item={item} busy={isSubmitting}
+                      onOpen={() => handleOpenProject(item.name)} onDelete={handleDeleteClick} />
                   ))}
                 </div>
               ) : (

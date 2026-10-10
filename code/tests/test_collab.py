@@ -43,14 +43,14 @@ r=I.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Cam
 
 # --- versions + conflict ---
 st=S.post('/api/projects/load',json={'project_name':'Χωροστάθμηση Campus'}).json; v0=st['_meta']['version']
-r=S.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':1}]},'base_version':v0}); ok(r.status_code==200 and r.json['version']==v0+1,'savvas saves -> version+1')
-r=S.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':1}]},'base_version':v0+1}); ok(r.json['changed'] is False,'identical save does not bump version')
-r=A.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':9}]},'base_version':v0}); ok(r.status_code==409 and r.json['current']['updated_by']['display_name'],'stale save from other user -> 409 conflict')
-r=A.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':9}]},'base_version':v0,'force':True}); ok(r.status_code==200,'force save wins')
+r=S.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':1,'x':'100'}]},'base_version':v0}); ok(r.status_code==200 and r.json['version']==v0+1,'savvas saves -> version+1')
+r=S.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':1,'x':'100'}]},'base_version':v0+1}); ok(r.json['changed'] is False,'identical save does not bump version')
+r=A.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':9,'x':'200'}]},'base_version':v0}); ok(r.status_code==409 and r.json['current']['updated_by']['display_name'],'stale save from other user -> 409 conflict')
+r=A.post('/api/projects/save',json={'project_name':'Χωροστάθμηση Campus','state':{**st,'traverse_data':[{'id':9,'x':'200'}]},'base_version':v0,'force':True}); ok(r.status_code==200,'force save wins')
 
 # --- sync: presence, remote state, activity ---
 r=S.post(f'/api/projects/{pid}/sync',json={'since_version':v0+1,'tool':'traverse'}); j=r.json
-ok('state' in j and j['state']['traverse_data']==[{'id':9}],'sync returns other user change')
+ok('state' in j and j['state']['traverse_data']==[{'id':9,'x':'200'}],'sync returns other user change')
 ok(any(p['self'] for p in j['presence']),'presence includes me')
 r=A.post(f'/api/projects/{pid}/sync',json={'since_version':j['project']['version'],'tool':'dashboard'}); j2=r.json
 ok('state' not in j2,'no state when nothing new from others'); ok(len(j2['presence'])==2,'two users online')

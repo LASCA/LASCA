@@ -17,6 +17,7 @@ const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
 const Invite = lazy(() => import('./pages/Invite.jsx'))
+const DesktopLogin = lazy(() => import('./pages/DesktopLogin.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 const ForgotPassword = lazy(() => import('./pages/PasswordReset.jsx').then((m) => ({ default: m.ForgotPassword })))
 const ResetPassword = lazy(() => import('./pages/PasswordReset.jsx').then((m) => ({ default: m.ResetPassword })))
@@ -49,6 +50,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="/app" element={<RequireAuth><App /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/invite/:token" element={<Invite />} />
+              <Route path="/desktop-login/:rid" element={<RequireAuth><DesktopLogin /></RequireAuth>} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/cookies" element={<Cookies />} />

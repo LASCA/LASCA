@@ -29,6 +29,7 @@ jobs:
       - run: pip-audit -r deploy/requirements-web.txt
       - run: python code/tests/test_security.py
       - run: python code/tests/test_collab.py
+      - run: python code/tests/test_history.py
   frontend:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }

@@ -154,4 +154,5 @@ bash /srv/lasca/deploy/update.sh
 - **Ποτέ** `LASCA_ENV=development` στον server.
 - Μην τρέχεις ποτέ `dev_tools.py` στον server (έτσι κι αλλιώς αρνείται).
 - Το `TOTP_ENCRYPTION_KEY` δεν αλλάζει ποτέ μετά την πρώτη μέρα.
-- Το exe: πριν το build, στο `code/cloud_client.py` (γραμμή `DEFAULT_SERVER_URL`) άλλαξε το `https://lasca.example.com` στο domain σου.
+- Το exe συνδέεται ήδη στο `https://lasca.gr` (`code/cloud_client.py`, γραμμή `DEFAULT_SERVER_URL`). Άλλαξέ το μόνο αν αλλάξει το domain.
+- Η «Σύνδεση με Google» του exe ανοίγει τη σελίδα `/desktop-login/...` του server: το `PUBLIC_URL` στο `.env` πρέπει να είναι το πραγματικό domain.

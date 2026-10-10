@@ -826,6 +826,7 @@ def google_login_route():
         user.session_version = (user.session_version or 0) + 1
         user.email_verified = True
         A.DeviceToken.query.filter_by(user_id=user.id).delete()
+        A.DesktopLogin.query.filter_by(user_id=user.id).delete()
         A.db.session.commit()
         record('unverified_account_reclaimed', user=user)
     # Οι λάθος κωδικοί δεν μπλοκάρουν τη σύνδεση με Google (το Google είναι ήδη ισχυρή ταυτοποίηση).
@@ -942,6 +943,7 @@ def reset_password():
     user.password_changed_at = utcnow()
     user.session_version = (user.session_version or 0) + 1          # αποσύνδεση από παντού
     A.DeviceToken.query.filter_by(user_id=user.id).delete()
+    A.DesktopLogin.query.filter_by(user_id=user.id).delete()
     row.used_at = utcnow()
     A.db.session.commit()
     record('password_reset', user=user)
@@ -991,13 +993,139 @@ def create_device_token():
             A.db.session.commit()
             record('2fa_failed', user=user, detail={'method': method, 'client': 'desktop'})
             raise AuthError('Λάθος κωδικός δύο βημάτων.', 401, code='bad_code', requires_2fa=True)
+    token = issue_device_token(user, text_field(data, 'device_name', 200), via='desktop')
+    return jsonify({'token': token, 'user': user.to_me_dict()}), 201
+
+
+def issue_device_token(user, device_name, via):
     token = secrets.token_urlsafe(32)
-    name = clean_display_name(text_field(data, 'device_name', 200) or 'LASCA για Windows')[:120]
+    name = clean_display_name(device_name or 'LASCA για Windows')[:120] or 'LASCA για Windows'
     A.db.session.add(A.DeviceToken(user_id=user.id, token_hash=A.hash_device_token(token), name=name,
                                    created_at=utcnow(), last_used_at=utcnow()))
     A.db.session.commit()
-    record('login_success', user=user, detail={'via': 'desktop'})
-    return jsonify({'token': token, 'user': user.to_me_dict()}), 201
+    record('login_success', user=user, detail={'via': via})
+    return token
+
+
+# ---------------------------------------------------------------------------
+# Σύνδεση του exe μέσω browser (για λογαριασμούς Google, και για όποιον το προτιμά)
+#
+#   1. Το exe φτιάχνει ένα μυστικό και στέλνει μόνο το SHA-256 του (challenge) → παίρνει request_id
+#      και έναν σύντομο κωδικό (π.χ. K7QM-4DPA) που δείχνει στην οθόνη του.
+#   2. Ανοίγει τον browser στο /desktop-login/<request_id>. Ο χρήστης συνδέεται κανονικά στη σελίδα
+#      (Google, κωδικός, 2FA) και, αφού δει ότι ο κωδικός είναι ίδιος με του exe, πατάει «Έγκριση».
+#   3. Το exe ρωτάει κάθε 2 δευτ. με request_id + μυστικό. Μετά την έγκριση παίρνει κλειδί συσκευής.
+#      Όποιος δει μόνο τον σύνδεσμο (request_id) δεν μπορεί να πάρει το κλειδί.
+# ---------------------------------------------------------------------------
+DESKTOP_LOGIN_TTL = timedelta(minutes=10)
+_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+_HEX64 = re.compile(r'[0-9a-f]{64}')
+
+
+def _sha256(value):
+    return hashlib.sha256(str(value).encode('utf-8')).hexdigest()
+
+
+def _desktop_request(request_id):
+    request_id = str(request_id or '')[:100]
+    row = A.DesktopLogin.query.filter_by(request_hash=_sha256(request_id)).first() if request_id else None
+    if row is None:
+        raise AuthError('Το αίτημα σύνδεσης δεν βρέθηκε. Ξεκίνα ξανά από το πρόγραμμα.', 404, code='invalid_request')
+    return row
+
+
+def _desktop_status(row):
+    if row.denied:
+        return 'denied'
+    if row.expires_at < utcnow():
+        return 'expired'          # και τα εγκεκριμένα που δεν παραλήφθηκαν εγκαίρως
+    if row.approved_at:
+        return 'approved'
+    return 'pending'
+
+
+@bp.post('/api/auth/desktop/start')
+def desktop_login_start():
+    data = body()
+    challenge = text_field(data, 'challenge', 64).lower()
+    if not _HEX64.fullmatch(challenge):
+        raise AuthError('Μη έγκυρο αίτημα.')
+    throttle(f'desktop-start:{client_ip()}', 30, timedelta(minutes=15))
+    now = utcnow()
+    A.DesktopLogin.query.filter(A.DesktopLogin.expires_at < now - timedelta(days=1)).delete()
+    request_id = secrets.token_urlsafe(24)
+    raw = ''.join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
+    row = A.DesktopLogin(request_hash=_sha256(request_id), challenge=challenge, user_code=f'{raw[:4]}-{raw[4:]}',
+                         device_name=clean_display_name(text_field(data, 'device_name', 200))[:120] or None,
+                         ip=client_ip(), created_at=now, expires_at=now + DESKTOP_LOGIN_TTL)
+    A.db.session.add(row)
+    A.db.session.commit()
+    return jsonify({'request_id': request_id, 'user_code': row.user_code,
+                    'url': f'{public_base()}/desktop-login/{request_id}',
+                    'expires_in': int(DESKTOP_LOGIN_TTL.total_seconds()), 'interval': 2}), 201
+
+
+@bp.get('/api/auth/desktop/<request_id>')
+@login_required
+def desktop_login_info(request_id):
+    row = _desktop_request(request_id)
+    return jsonify({'user_code': row.user_code, 'device_name': row.device_name or 'LASCA για Windows',
+                    'created_at': row.created_at.isoformat() + 'Z', 'status': _desktop_status(row),
+                    'same_network': row.ip == client_ip()})
+
+
+@bp.post('/api/auth/desktop/<request_id>/approve')
+@login_required
+def desktop_login_approve(request_id):
+    row = _desktop_request(request_id)
+    status = _desktop_status(row)
+    if status == 'expired':
+        raise AuthError('Το αίτημα έληξε. Ξεκίνα ξανά από το πρόγραμμα.', 410, code='expired')
+    if status != 'pending':
+        if row.user_id == current_user.id and status == 'approved':
+            return jsonify({'status': 'approved'})
+        raise AuthError('Το αίτημα έχει ήδη απαντηθεί.', 409, code='answered')
+    row.user_id = current_user.id
+    row.approved_at = utcnow()
+    A.db.session.commit()
+    record('desktop_login_approved', user=current_user._get_current_object(),
+           detail={'device': row.device_name or 'LASCA για Windows'})
+    return jsonify({'status': 'approved'})
+
+
+@bp.post('/api/auth/desktop/<request_id>/deny')
+@login_required
+def desktop_login_deny(request_id):
+    row = _desktop_request(request_id)
+    if _desktop_status(row) == 'pending':
+        row.denied = True
+        A.db.session.commit()
+        record('desktop_login_denied', user=current_user._get_current_object())
+    return jsonify({'status': _desktop_status(row)})
+
+
+@bp.post('/api/desktop-link/poll')
+def desktop_login_poll():
+    """Το exe ρωτάει αν εγκρίθηκε. Χρειάζεται το μυστικό (όχι μόνο το request_id του συνδέσμου)."""
+    data = body()
+    row = _desktop_request(text_field(data, 'request_id', 100))
+    if not hmac.compare_digest(_sha256(text_field(data, 'secret', 200)), row.challenge):
+        raise AuthError('Μη έγκυρο αίτημα.', 403, code='invalid_request')
+    status = _desktop_status(row)
+    if status == 'pending':
+        return jsonify({'status': 'pending'})
+    if status in ('denied', 'expired'):
+        A.db.session.delete(row)
+        A.db.session.commit()
+        msg = 'Η σύνδεση απορρίφθηκε στον browser.' if status == 'denied' else 'Το αίτημα έληξε. Δοκίμασε ξανά.'
+        raise AuthError(msg, 410, code=status)
+    user, device_name = A.db.session.get(A.User, row.user_id), row.device_name
+    A.db.session.delete(row)            # μία χρήση
+    A.db.session.commit()
+    if user is None:
+        raise AuthError('Ο λογαριασμός δεν υπάρχει.', 410, code='expired')
+    token = issue_device_token(user, device_name, via='desktop_browser')
+    return jsonify({'status': 'approved', 'token': token, 'user': user.to_me_dict()})
 
 
 # ---------------------------------------------------------------------------
@@ -1050,6 +1178,7 @@ def _finish_enable(user, method, step=None):
     # Όλες οι άλλες συνδέσεις (browsers ΚΑΙ πρόγραμμα Windows) πρέπει να ξαναμπούν με 2FA.
     user.session_version = (user.session_version or 0) + 1
     A.DeviceToken.query.filter_by(user_id=user.id).delete()
+    A.DesktopLogin.query.filter_by(user_id=user.id).delete()
     A.db.session.commit()
     login_user(user, remember=bool(request.cookies.get(current_app.config['REMEMBER_COOKIE_NAME'])))
     session['login_at'] = utcnow().timestamp()
@@ -1243,6 +1372,8 @@ EVENT_LABELS = {
     'backup_code_used': 'Χρήση εφεδρικού κωδικού', 'signup': 'Δημιουργία λογαριασμού',
     'logout_all': 'Αποσύνδεση από όλες τις συσκευές', 'reset_requested': 'Αίτημα επαναφοράς κωδικού',
     'email_verified': 'Επιβεβαίωση email', 'unverified_account_reclaimed': 'Ανάκτηση λογαριασμού μέσω Google',
+    'desktop_login_approved': 'Έγκριση του προγράμματος των Windows',
+    'desktop_login_denied': 'Απόρριψη σύνδεσης προγράμματος',
 }
 
 

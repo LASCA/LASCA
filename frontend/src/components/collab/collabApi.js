@@ -32,6 +32,7 @@ export function createCollabApi(prefix = '/api') {
     createInvite: (pid, body) => data(axios.post(u(`/projects/${enc(pid)}/invites`), body)),
     revokeInvite: (pid, iid) => data(axios.delete(u(`/projects/${enc(pid)}/invites/${iid}`))),
     activity: (pid) => data(axios.get(u(`/projects/${enc(pid)}/activity`))),
+    markSeen: (pid, lastId) => data(axios.post(u(`/projects/${enc(pid)}/activity/seen`), { last_id: lastId })),
     lookup: (q) => data(axios.get(u('/users/lookup'), { params: { q } })),
     sync: (pid, body) => data(axios.post(u(`/projects/${enc(pid)}/sync`), body)),
   };
@@ -61,7 +62,7 @@ export function describeActivity(a) {
   const role = ROLE_LABEL[a.detail?.role] || '';
   switch (a.action) {
     case 'created': return `${who} δημιούργησε το project`;
-    case 'saved': return `${who} άλλαξε δεδομένα`;
+    case 'saved': return a.detail?.summary ? `${who} άλλαξε: ${a.detail.summary}` : `${who} άλλαξε δεδομένα`;
     case 'member_added': return `${who} πρόσθεσε ${target} ως ${role.toLowerCase()}`;
     case 'role_changed': return `${who} έκανε ${target} ${role.toLowerCase()}`;
     case 'member_removed': return `${who} αφαίρεσε ${target}`;
@@ -74,4 +75,32 @@ export function describeActivity(a) {
     case 'joined_via_link': return `${who} μπήκε με σύνδεσμο πρόσκλησης`;
     default: return `${who}: ${a.action}`;
   }
+}
+
+/** Μία γραμμή για μια συγκεκριμένη αλλαγή του ιστορικού, π.χ. «Σ3 · X: 1000.00 → 1000.50». */
+export function describeChange(c) {
+  if (c.kind === 'added') return { sign: '+', text: c.row || 'νέα γραμμή' };
+  if (c.kind === 'removed') return { sign: '−', text: c.row || 'γραμμή' };
+  const fields = (c.fields || []).map((f) => (f.from == null && f.to == null ? f.field : `${f.field}: ${f.from} → ${f.to}`));
+  const more = c.more_fields ? ` (+${c.more_fields})` : '';
+  return { sign: '~', text: [c.row, fields.join(', ')].filter(Boolean).join(' · ') + more };
+}
+
+/** Μετρητές ενότητας, π.χ. «+2 · −1 · 3 αλλαγές». */
+export function sectionCounts(s) {
+  const parts = [];
+  if (s.added) parts.push(`+${s.added} ${s.added === 1 ? 'νέα γραμμή' : 'νέες γραμμές'}`);
+  if (s.removed) parts.push(`−${s.removed} ${s.removed === 1 ? 'διαγραφή' : 'διαγραφές'}`);
+  if (s.modified) parts.push(`${s.modified} ${s.modified === 1 ? 'αλλαγή' : 'αλλαγές'}`);
+  if (!parts.length && s.recalculated) parts.push('νέα αποτελέσματα');
+  return parts.join(' · ');
+}
+
+/** Νέες εγγραφές ιστορικού + παλιές, χωρίς διπλές. Οι συνεχόμενες αποθηκεύσεις του ίδιου χρήστη
+ * έρχονται ως νέα εγγραφή της ίδιας «συνεδρίας» (detail.session): κρατάμε μόνο την πιο πρόσφατη. */
+export function mergeActivity(incoming, previous, limit = 60) {
+  const sessions = new Set(incoming.map((a) => a.detail?.session).filter(Boolean));
+  const ids = new Set(incoming.map((a) => a.id));
+  const kept = previous.filter((a) => !ids.has(a.id) && !(a.detail?.session && sessions.has(a.detail.session)));
+  return [...incoming, ...kept].sort((x, y) => y.id - x.id).slice(0, limit);
 }

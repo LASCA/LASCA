@@ -24,9 +24,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from flask import Blueprint, jsonify, request, send_file
+from sqlalchemy.exc import IntegrityError
 from flask_login import current_user, login_required, login_user, logout_user
 
 from auth_security import clean_display_name, reauthenticate, record as record_auth_event, validate_new_password
+from history_diff import RESULT_SECTIONS, SECTIONS, diff_states, summarize
 
 bp = Blueprint('collab', __name__)
 C = SimpleNamespace()  # τα μοντέλα/βοηθητικά του main_4_app (γεμίζει στην init_collab)
@@ -34,6 +36,9 @@ C = SimpleNamespace()  # τα μοντέλα/βοηθητικά του main_4_ap
 ROLES = ('editor', 'viewer')
 ROLE_LABEL = {'owner': 'Ιδιοκτήτης', 'editor': 'Επεξεργαστής', 'viewer': 'Αναγνώστης'}
 PRESENCE_WINDOW = timedelta(seconds=40)
+# Συνεχόμενες αποθηκεύσεις του ίδιου χρήστη μέσα σε αυτό το διάστημα γίνονται μία εγγραφή στο ιστορικό.
+SAVE_SESSION = timedelta(minutes=10)
+UNREAD_CAP = 99
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
 # Όρια χρήσης (quotas): προστατεύουν τον server από κατάχρηση και κόστος.
 MAX_PROJECTS_PER_USER = int(os.getenv('MAX_PROJECTS_PER_USER', '100'))
@@ -216,6 +221,85 @@ def log_activity(project, action, detail=None, coalesce_minutes=0, user_id=None)
     C.db.session.add(Activity(project_id=project.id, user_id=uid, action=action, detail=detail_text, created_at=now))
 
 
+def _snapshot(state):
+    keys = tuple(SECTIONS) + tuple(RESULT_SECTIONS)
+    return json.dumps({k: (state or {}).get(k) for k in keys}, ensure_ascii=False, default=str)
+
+
+def log_saved(project, before, after, client=None):
+    """Εγγραφή «άλλαξε δεδομένα» με λεπτομέρειες (τι ακριβώς άλλαξε).
+
+    Η εφαρμογή αποθηκεύει σε κάθε πληκτρολόγηση, οπότε οι συνεχόμενες αποθηκεύσεις του ίδιου χρήστη
+    ενώνονται σε μία «συνεδρία»: κρατάμε τα δεδομένα πριν ξεκινήσει (snapshot) και κάθε φορά
+    ξαναϋπολογίζουμε τη διαφορά από εκεί. Η εγγραφή παίρνει νέο id σε κάθε ενημέρωση, ώστε οι
+    συνεργάτες να ειδοποιούνται ξανά· το detail.session δείχνει ότι αντικαθιστά την προηγούμενη."""
+    Activity = C.ProjectActivity
+    uid = current_user.id
+    now = utcnow()
+    last = Activity.query.filter_by(project_id=project.id).order_by(Activity.id.desc()).first()
+    session_id, base = None, before
+    if last is not None and last.action == 'saved' and last.user_id == uid and last.snapshot \
+            and now - last.created_at < SAVE_SESSION:
+        try:
+            base = json.loads(last.snapshot)
+            session_id = (json.loads(last.detail or '{}') or {}).get('session') or last.id
+        except ValueError:
+            base, last = before, None
+    else:
+        last = None
+    sections = diff_states(base, after)
+    if last is not None:
+        C.db.session.delete(last)
+    if not sections:
+        return   # π.χ. ο χρήστης έσβησε ό,τι είχε μόλις γράψει
+    if last is None:
+        # Μόνο η τελευταία συνεδρία χρειάζεται snapshot· τα παλιά σβήνονται για να μη μεγαλώνει η βάση.
+        Activity.query.filter(Activity.project_id == project.id, Activity.snapshot.isnot(None)) \
+            .update({'snapshot': None}, synchronize_session=False)
+        snapshot = _snapshot(before)
+    else:
+        snapshot = last.snapshot
+    row = Activity(project_id=project.id, user_id=uid, action='saved', created_at=now, snapshot=snapshot)
+    C.db.session.add(row)
+    C.db.session.flush()
+    row.detail = json.dumps({'session': session_id or row.id, 'summary': summarize(sections), 'sections': sections,
+                             'client': client or None}, ensure_ascii=False)
+
+
+def _read_row(project, user_id):
+    """Μέχρι ποια εγγραφή του ιστορικού έχει δει ο χρήστης. Νέο μέλος: ξεκινάει από «τώρα»."""
+    Read, Activity = C.ProjectRead, C.ProjectActivity
+    row = Read.query.filter_by(project_id=project.id, user_id=user_id).first()
+    if row is None:
+        last = Activity.query.filter_by(project_id=project.id).order_by(Activity.id.desc()).first()
+        try:
+            with C.db.session.begin_nested():
+                row = Read(project_id=project.id, user_id=user_id, last_seen_id=last.id if last else 0)
+                C.db.session.add(row)
+        except IntegrityError:   # δύο αιτήματα ταυτόχρονα (π.χ. συγχρονισμός + λίστα projects)
+            row = Read.query.filter_by(project_id=project.id, user_id=user_id).first()
+    return row
+
+
+def unread_count(project, user_id, read_row=None):
+    Activity = C.ProjectActivity
+    read_row = read_row or _read_row(project, user_id)
+    q = Activity.query.filter(Activity.project_id == project.id, Activity.id > (read_row.last_seen_id or 0),
+                              C.db.or_(Activity.user_id.is_(None), Activity.user_id != user_id))
+    return min(q.count(), UNREAD_CAP)
+
+
+def members_preview(project, limit=5):
+    """Ιδιοκτήτης + μέλη (λίγα, για τη λίστα projects) με εικόνα και ρόλο."""
+    out = []
+    if project.owner is not None:
+        out.append({**user_public(project.owner, include_email=False), 'role': 'owner'})
+    for m in C.ProjectMember.query.filter_by(project_id=project.id).order_by(C.ProjectMember.id).limit(limit).all():
+        if m.user is not None and m.user_id != project.owner_id:
+            out.append({**user_public(m.user, include_email=False), 'role': m.role})
+    return out[:limit]
+
+
 def activity_payload(rows):
     users = {u.id: u for u in C.User.query.filter(C.User.id.in_({r.user_id for r in rows if r.user_id})).all()} if rows else {}
     out = []
@@ -244,7 +328,7 @@ def members_of(project):
     return out
 
 
-def save_state_checked(project, role, state, base_version=None, force=False):
+def save_state_checked(project, role, state, base_version=None, force=False, client=None):
     """Αποθήκευση με έλεγχο έκδοσης. Αν κάποιος ΑΛΛΟΣ αποθήκευσε στο μεταξύ → 409."""
     if role == 'viewer':
         raise ApiError('Έχεις δικαίωμα μόνο ανάγνωσης σε αυτό το project.', 403, code='read_only')
@@ -275,7 +359,11 @@ def save_state_checked(project, role, state, base_version=None, force=False):
     project.version = current_version + 1
     project.updated_at = utcnow()
     project.updated_by_id = current_user.id
-    log_activity(project, 'saved', coalesce_minutes=15)
+    try:
+        with C.db.session.begin_nested():
+            log_saved(project, existing, state, client)
+    except Exception:   # το ιστορικό δεν πρέπει ποτέ να χαλάσει την αποθήκευση
+        C.logger.exception('Could not record history for project %s', project.id)
     C.db.session.commit()
     return project.version, True
 
@@ -297,7 +385,7 @@ def delete_project_completely(project):
             shutil.rmtree(project_dir)
     except (ValueError, OSError) as exc:
         C.logger.warning('Could not remove project folder %s: %s', project_dir, exc)
-    for model in (C.ProjectMember, C.ProjectInvite, C.ProjectActivity, C.ProjectPresence):
+    for model in (C.ProjectMember, C.ProjectInvite, C.ProjectActivity, C.ProjectPresence, C.ProjectRead):
         model.query.filter_by(project_id=project.id).delete()
     C.db.session.delete(project)
 
@@ -418,6 +506,7 @@ def change_password():
     user.password_changed_at = utcnow()
     user.session_version = (user.session_version or 0) + 1   # αποσυνδέει τις άλλες συσκευές
     C.DeviceToken.query.filter_by(user_id=user.id).delete()
+    C.DesktopLogin.query.filter_by(user_id=user.id).delete()
     C.db.session.commit()
     _relogin_current(user)
     record_auth_event('password_changed', user=user)
@@ -430,6 +519,7 @@ def logout_everywhere():
     user = current_user._get_current_object()
     user.session_version = (user.session_version or 0) + 1
     C.DeviceToken.query.filter_by(user_id=user.id).delete()
+    C.DesktopLogin.query.filter_by(user_id=user.id).delete()
     C.db.session.commit()
     _relogin_current(user)
     record_auth_event('logout_all', user=user)
@@ -463,7 +553,8 @@ def delete_account():
         else:
             delete_project_completely(project)
             deleted.append(project.name)
-    for model in (C.ProjectMember, C.ProjectPresence, C.DeviceToken, C.PasswordReset, C.EmailOtp, C.AuthEvent):
+    for model in (C.ProjectMember, C.ProjectPresence, C.ProjectRead, C.DeviceToken, C.PasswordReset, C.EmailOtp,
+                  C.AuthEvent, C.DesktopLogin):
         model.query.filter_by(user_id=user.id).delete()
     _remove_avatar(user)
     C.db.session.delete(user)
@@ -480,6 +571,8 @@ def my_projects():
         return {**project_meta(project, role),
                 'owner_name': (project.owner.display_name or project.owner.email.split('@', 1)[0]) if project.owner else None,
                 'members_count': C.ProjectMember.query.filter_by(project_id=project.id).count() + 1,
+                'members': members_preview(project),
+                'unread': unread_count(project, current_user.id),
                 'created_at': iso(project.created_at)}
 
     owned = C.Project.query.filter_by(owner_id=current_user.id).all()
@@ -498,6 +591,7 @@ def my_projects():
         collaborators.add(p.owner_id)
         collaborators |= {m.user_id for m in C.ProjectMember.query.filter_by(project_id=p.id).all()}
     collaborators.discard(current_user.id)
+    C.db.session.commit()   # νέες εγγραφές «διαβάστηκε έως» (ProjectRead)
     return jsonify({'owned': owned_out, 'shared': shared_out,
                     'stats': {'owned': len(owned_out), 'shared': len(shared_out), 'collaborators': len(collaborators)}})
 
@@ -585,7 +679,8 @@ def save_project():
     state = data.get('state')
     if isinstance(state, dict):
         state = {k: v for k, v in state.items() if k != '_meta'}
-    version, changed = save_state_checked(project, role, state, data.get('base_version'), bool(data.get('force')))
+    version, changed = save_state_checked(project, role, state, data.get('base_version'), bool(data.get('force')),
+                                          client='web')
     return jsonify({'status': 'success', 'version': version, 'changed': changed})
 
 
@@ -606,17 +701,33 @@ def delete_project(project_name):
 def create_project():
     """Νέο project (χρησιμοποιείται από το exe για «Ανέβασμα στο cloud»)."""
     data = body()
+    client_ref = str(data.get('client_ref') or '')[:40] or None
+    if client_ref:
+        existing = C.Project.query.filter_by(owner_id=current_user.id, client_ref=client_ref).first()
+        if existing is not None:
+            return jsonify({'project': project_meta(existing, 'owner'), 'existing': True}), 200
     check_project_quota(current_user)
     name = unique_project_name(clean_project_name(data.get('name') or 'Νέο project'))
-    project = C.Project(name=name, owner_id=current_user.id, version=0)
+    project = C.Project(name=name, owner_id=current_user.id, version=0, client_ref=client_ref)
     C.db.session.add(project)
     C.db.session.flush()
     log_activity(project, 'created', {'name': name, 'client': str(data.get('client') or 'web')[:20]})
     C.db.session.commit()
     read_state(project)
     if isinstance(data.get('state'), dict):
-        save_state_checked(project, 'owner', data['state'])
+        save_state_checked(project, 'owner', data['state'], client=str(data.get('client') or 'web')[:20])
     return jsonify({'project': project_meta(project, 'owner')}), 201
+
+
+@bp.post('/api/projects/<pid>/delete')
+@login_required
+def delete_project_by_id(pid):
+    """Διαγραφή με public_id (το exe: το όνομα στο cloud μπορεί να διαφέρει από τον τοπικό φάκελο)."""
+    project, _ = get_project(pid, need='owner')
+    name = project.name
+    delete_project_completely(project)
+    C.db.session.commit()
+    return jsonify({'status': 'success', 'message': f"Το project '{name}' διαγράφηκε."})
 
 
 @bp.get('/api/projects/<pid>/state')
@@ -632,7 +743,7 @@ def put_state(pid):
     project, role = get_project(pid)
     data = body()
     version, changed = save_state_checked(project, role, data.get('state'), data.get('base_version'),
-                                          bool(data.get('force')))
+                                          bool(data.get('force')), client=str(data.get('client') or 'desktop')[:20])
     return jsonify({'version': version, 'changed': changed, 'project': project_meta(project, role)})
 
 
@@ -677,8 +788,11 @@ def sync_project(pid):
         .order_by(Activity.id.desc()).limit(30).all()
     last_activity = Activity.query.filter_by(project_id=project.id).order_by(Activity.id.desc()).first()
 
+    read_row = _read_row(project, current_user.id)
     out = {'project': project_meta(project, role), 'presence': online,
-           'activity': activity_payload(acts), 'last_activity': last_activity.id if last_activity else 0}
+           'activity': activity_payload(acts), 'last_activity': last_activity.id if last_activity else 0,
+           'unread': unread_count(project, current_user.id, read_row), 'last_seen': read_row.last_seen_id or 0}
+    C.db.session.commit()
     # Η σελίδα αγνοεί τις δικές της αποθηκεύσεις (τις έχει ήδη). Το exe ζητάει include_own,
     # ώστε να πάρει και αλλαγές που έκανε ο ίδιος χρήστης από τη σελίδα ή άλλον υπολογιστή.
     include_own = bool(data.get('include_own'))
@@ -694,6 +808,23 @@ def get_activity(pid):
     Activity = C.ProjectActivity
     rows = Activity.query.filter_by(project_id=project.id).order_by(Activity.id.desc()).limit(60).all()
     return jsonify({'activity': activity_payload(rows)})
+
+
+@bp.post('/api/projects/<pid>/activity/seen')
+@login_required
+def mark_activity_seen(pid):
+    """Ο χρήστης άνοιξε το ιστορικό: οι αλλαγές μέχρι το last_id δεν μετράνε πια ως νέες."""
+    project, _ = get_project(pid)
+    Activity = C.ProjectActivity
+    try:
+        last_id = int(body().get('last_id') or 0)
+    except (TypeError, ValueError):
+        last_id = 0
+    newest = Activity.query.filter_by(project_id=project.id).order_by(Activity.id.desc()).first()
+    row = _read_row(project, current_user.id)
+    row.last_seen_id = max(row.last_seen_id or 0, min(last_id, newest.id if newest else 0))
+    C.db.session.commit()
+    return jsonify({'unread': unread_count(project, current_user.id, row), 'last_seen': row.last_seen_id})
 
 
 # --- Μέλη -------------------------------------------------------------------
