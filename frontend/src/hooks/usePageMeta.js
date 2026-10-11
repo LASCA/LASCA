@@ -18,7 +18,9 @@ function setMeta(selector, attr, value, create) {
 export default function usePageMeta({ title, description = SITE.description, noindex = false, path } = {}) {
   useEffect(() => {
     const full = title ? `${title} · ${SITE.name}` : `${SITE.name} — Τοπογραφικοί υπολογισμοί online`;
-    document.title = full;
+    // Η καρτέλα του browser γράφει πάντα σκέτο «LASCA». Ο πλήρης τίτλος μένει για την προεπισκόπηση
+    // συνδέσμων (Open Graph / Twitter), όταν κάποιος μοιράζεται μια σελίδα.
+    document.title = SITE.name;
     setMeta('meta[name="description"]', 'content', description);
     setMeta('meta[property="og:title"]', 'content', full);
     setMeta('meta[property="og:description"]', 'content', description);

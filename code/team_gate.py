@@ -40,7 +40,7 @@ def _too_many(ip):
 
 PAGE = """<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>LASCA · Δοκιμαστική έκδοση</title>
+<title>LASCA</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:#05060f;color:#d1e4fa;
