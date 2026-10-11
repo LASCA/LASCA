@@ -426,11 +426,20 @@ function App() {
 
       const rect = target.getBoundingClientRect();
       tooltipEl.textContent = text;
-      
-      const x = rect.left + (rect.width / 2);
+
+      const tooltipWidth = tooltipEl.offsetWidth;
+      const centeredX = rect.left + (rect.width / 2);
+      const alignRight = centeredX + (tooltipWidth / 2) > window.innerWidth - 8;
+      const x = alignRight ? Math.min(rect.right, window.innerWidth - 8) : centeredX;
       const y = rect.bottom + 8;
 
+      tooltipEl.classList.toggle('align-right', alignRight);
       tooltipEl.style.left = `${x}px`;
+      if (alignRight) {
+        tooltipEl.style.setProperty('--tooltip-arrow-left', `${tooltipWidth - (rect.right - rect.left) / 2}px`);
+      } else {
+        tooltipEl.style.removeProperty('--tooltip-arrow-left');
+      }
       tooltipEl.style.top = `${y}px`;
       tooltipEl.style.opacity = '1';
       tooltipEl.style.visibility = 'visible';

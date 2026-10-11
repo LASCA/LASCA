@@ -686,16 +686,19 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 9))
     
-    # Χρώμα ίδιο με το bg-[#030712] του React Tailwind
-    fig.patch.set_facecolor('#030712')
-    ax.set_facecolor('#030712')
+    BG_COLOR = '#0b0f19'
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+    for spine in ax.spines.values():
+        spine.set_color('#A0AEC0')
+    ax.tick_params(axis='both', colors='#A0AEC0')
     
     # Plain style για να μην έχουμε εκθέτες (scientific notation) στους άξονες
     ax.ticklabel_format(useOffset=False, style='plain', axis='both')
 
     # 1. Σχεδίαση Σημείων Λεπτομερείας (Σταυρός + Κύκλος)
-    ax.scatter(df['X'], df['Y'], marker='+', s=40, color='#C0C0C0', linewidths=1.2, zorder=5)
-    ax.scatter(df['X'], df['Y'], marker='o', s=80, facecolors='none', edgecolors='#C0C0C0', linewidths=1.2, zorder=6)
+    ax.scatter(df['X'], df['Y'], marker='+', s=40, color='#A0AEC0', linewidths=1.2, zorder=5)
+    ax.scatter(df['X'], df['Y'], marker='o', s=80, facecolors='none', edgecolors='#A0AEC0', linewidths=1.2, zorder=6)
 
     # 2. Σχεδίαση όλων των Στάσεων και Προσανατολισμών (Όλα σε Cyan #00FFFF)
     unique_stations = df['Στάση'].unique()
@@ -707,8 +710,8 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
             st_y = st_lookup[st_name]['y']
             
             # Σχεδίαση κυανού τριγώνου κύριας στάσης
-            ax.scatter(st_x, st_y, marker='^', s=200, facecolors='none', edgecolors='#00FFFF', linewidths=2, zorder=10)
-            ax.text(st_x, st_y, f"  {st_name}", color='#00FFFF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
+            ax.scatter(st_x, st_y, marker='^', s=200, facecolors='none', edgecolors='#00E5FF', linewidths=2, zorder=10)
+            ax.text(st_x, st_y, f"  {st_name}", color='#00E5FF', fontsize=12, fontweight='bold', va='bottom', zorder=11)
 
             # Εύρεση των προσανατολισμών που ανήκουν σε αυτή τη στάση
             station_df = df[df['Στάση'] == st_name]
@@ -722,8 +725,8 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
                         
                         # Σχεδίαση του Σημείου Προσανατολισμού με Cyan (χωρίς τη γραμμή σύνδεσης)
                         if bs_name not in unique_stations and bs_name not in drawn_orientations:
-                            ax.scatter(bs_x, bs_y, marker='^', s=160, facecolors='none', edgecolors='#00FFFF', linewidths=1.8, zorder=9)
-                            ax.text(bs_x, bs_y, f"  {bs_name}", color='#00FFFF', fontsize=11, fontweight='bold', va='top', zorder=11)
+                            ax.scatter(bs_x, bs_y, marker='^', s=160, facecolors='none', edgecolors='#00E5FF', linewidths=1.8, zorder=9)
+                            ax.text(bs_x, bs_y, f"  {bs_name}", color='#00E5FF', fontsize=11, fontweight='bold', va='top', zorder=11)
                             drawn_orientations.add(bs_name)
 
     # 3. Δυναμικά Labels Σημείων χωρίς δεκαδικά
@@ -736,7 +739,7 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
             point_id = str(row['Σημείο'])
             
         # Αρχικό μικρό offset 0.3μ για να μην πέφτει πάνω στο κέντρο
-        texts.append(ax.text(row['X'] + 0.3, row['Y'] + 0.3, point_id, color="#FFFEFE", fontsize=9, fontweight='bold'))
+        texts.append(ax.text(row['X'] + 0.3, row['Y'] + 0.3, point_id, color='#FFFFFF', fontsize=9, fontweight='bold'))
 
     # Εφαρμογή adjust_text για την αυτόματη αποφυγή επικαλύψεων στα labels
     if 'HAS_ADJUST_TEXT' in globals() and HAS_ADJUST_TEXT and texts:
@@ -752,35 +755,43 @@ def plot_tachymetry_base64(calculated_points: list, st_lookup: dict) -> str:
 
     # 4. Αισθητική & Άξονες
     title_suffix = unique_stations[0] if len(unique_stations) == 1 else "ΔΙΚΤΥΟ"
-    ax.set_title(f"ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ - {title_suffix}", loc='left', fontsize=14, fontweight='bold', pad=20)
-    ax.set_xlabel("X (m)", fontweight='bold', color='#888888')
-    ax.set_ylabel("Y (m)", fontweight='bold', color='#888888')
+    ax.set_title(f"ΤΟΠΟΓΡΑΦΙΚΟ ΣΚΑΡΙΦΗΜΑ - {title_suffix}", loc='left', fontsize=14, fontweight='bold', color='#FFFFFF', pad=20)
+    ax.set_xlabel("X (m)", fontweight='bold', color='#A0AEC0')
+    ax.set_ylabel("Y (m)", fontweight='bold', color='#A0AEC0')
     ax.set_aspect('equal', adjustable='datalim')
-    ax.grid(True, linestyle=':', alpha=0.15)
+    ax.grid(True, linestyle=':', color='#A0AEC0', alpha=0.25)
     
     ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
 
     # 5. Δημιουργία Προσαρμοσμένου Υπομνήματος (σε βέλτιστη θέση - loc='best')
-    detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none', 
-                          markeredgecolor='#C0C0C0', markersize=8, markeredgewidth=1.2)
-    cross_proxy = Line2D([], [], color='#C0C0C0', marker='+', linestyle='None', 
+    detail_proxy = Line2D([], [], color='none', marker='o', markerfacecolor='none',
+                          markeredgecolor='#A0AEC0', markersize=8, markeredgewidth=1.2)
+    cross_proxy = Line2D([], [], color='#A0AEC0', marker='+', linestyle='None',
                           markersize=6, markeredgewidth=1.2)
     station_proxy = Line2D([], [], color='none', marker='^', markerfacecolor='none',
-                           markeredgecolor='#00FFFF', markersize=12, markeredgewidth=2)
+                           markeredgecolor='#00E5FF', markersize=12, markeredgewidth=2)
     
     handles = [(detail_proxy, cross_proxy), station_proxy]
     labels = ['Σημεία Λεπτομερείας', 'Στάσεις & Σημεία Εξάρτησης']
 
-    legend = ax.legend(handles, labels, loc='best', frameon=True, facecolor='#0b1120', edgecolor='#1e293b')
+    legend = ax.legend(handles, labels, loc='best', frameon=True, facecolor=BG_COLOR, edgecolor='#A0AEC0')
     for text in legend.get_texts(): 
-        text.set_color("white")
+        text.set_color('#FFFFFF')
 
     plt.tight_layout()
     
     # 6. Μετατροπή του γραφήματος σε Base64 string
     img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight', transparent=True, dpi=120)
+    fig.savefig(
+        img,
+        format='png',
+        facecolor='#0b0f19',
+        edgecolor='none',
+        transparent=False,
+        bbox_inches='tight',
+        dpi=200,
+    )
     
     img.seek(0)
     plot_url = base64.b64encode(img.getvalue()).decode('utf8')

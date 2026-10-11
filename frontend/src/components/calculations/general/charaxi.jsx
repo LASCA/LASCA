@@ -4,6 +4,7 @@ import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cp
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import InputField from '../../InputField';
+import { saveImageFile } from '../../../utils/save_blob_file';
 
 const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const { station, backsight, points, mij } = stakeoutData;
@@ -211,15 +212,16 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
     }));
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!stakeoutData.plot) return;
-    const link = document.createElement('a');
-    link.href = stakeoutData.plot;
-    link.download = `Skarifima_Charaxis_${station.name || 'Station'}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Το σκαρίφημα κατέβηκε επιτυχώς!");
+    try {
+      const saved = await saveImageFile(stakeoutData.plot, `Skarifima_Charaxis_${station.name || 'Station'}.png`);
+      if (!saved) return;
+      toast.success("Το σκαρίφημα κατέβηκε επιτυχώς!");
+    } catch (error) {
+      console.error('Σφάλμα λήψης σκαριφήματος:', error);
+      toast.error('Αποτυχία λήψης σκαριφήματος.');
+    }
   };
 
   const noSpinnersClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";

@@ -7,6 +7,7 @@ import {
   Play, Cpu, CheckCircle, Maximize2, Download, X, Image as ImageIcon, ChevronDown, FileText, Layers
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { saveImageFile } from '../../../utils/save_blob_file';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ value, onChange, options, disabled, icon: Icon }) => {
@@ -412,10 +413,8 @@ const Tachymetry = ({
     if (!plotImage) return;
 
     try {
-      const response = await fetch(plotImage);
-      const blob = await response.blob();
       const defaultFileName = `tachymetry_plot_${activeStation}_${activeOrientation}.png`;
-      await saveBlobFile(blob, defaultFileName, 'PNG Image', ['.png']);
+      await saveImageFile(plotImage, defaultFileName);
     } catch (error) {
       console.error('Σφάλμα κατά την εξαγωγή γραφήματος:', error);
       toast.error('Αποτυχία αποθήκευσης γραφήματος.');

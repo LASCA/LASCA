@@ -113,12 +113,16 @@
   transition: opacity 0.2s ease, visibility 0.2s;
 }
 
+.global-custom-tooltip.align-right {
+  transform: translateX(-100%);
+}
+
 /* Το τριγωνάκι (βελάκι) του tooltip */
 .global-custom-tooltip::before {
   content: '';
   position: absolute;
   bottom: 100%; /* Τοποθετείται πάνω από το κουτί */
-  left: 50%;
+  left: var(--tooltip-arrow-left, 50%);
   transform: translateX(-50%);
   border-width: 5px;
   border-style: solid;

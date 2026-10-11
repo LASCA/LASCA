@@ -9,6 +9,7 @@ import {
   Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText,
   Layers, Globe
 } from 'lucide-react';
+import { saveImageFile } from '../../../utils/save_blob_file';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ label, value, onChange, options }) => {
@@ -270,16 +271,14 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!plotImage) return;
-    const imageData = plotImage.startsWith('data:') ? plotImage : `data:image/png;base64,${plotImage}`;
-    fetch(imageData)
-      .then(res => res.blob())
-      .then(blob => saveBlobFile(blob, 'traverse_plot.png'))
-      .catch(err => {
-        console.error('Σφάλμα λήψης εικόνας:', err);
-        alert('Αποτυχία λήψης γραφήματος.');
-      });
+    try {
+      await saveImageFile(plotImage, 'traverse_plot.png');
+    } catch (error) {
+      console.error('Σφάλμα λήψης εικόνας:', error);
+      alert('Αποτυχία λήψης γραφήματος.');
+    }
   };
 
   const handleDownloadDXF = async () => {

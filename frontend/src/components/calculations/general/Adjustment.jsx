@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
+import { saveImageFile } from '../../../utils/save_blob_file';
 
 const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics, projectInfo }) => {
   
@@ -219,15 +220,14 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!plotImage) return;
-    fetch(`data:image/png;base64,${plotImage}`)
-      .then(res => res.blob())
-      .then(blob => saveBlobFile(blob, 'Network_Preview_Plot.png'))
-      .catch(err => {
-        console.error('Σφάλμα λήψης γραφήματος:', err);
-        alert('Αποτυχία λήψης γραφήματος.');
-      });
+    try {
+      await saveImageFile(plotImage, 'Network_Preview_Plot.png');
+    } catch (err) {
+      console.error('Σφάλμα λήψης γραφήματος:', err);
+      alert('Αποτυχία λήψης γραφήματος.');
+    }
   };
 
   const handleBackToEdit = () => {
