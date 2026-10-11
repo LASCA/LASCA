@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, Camera, Copy, Download, FolderOpen, KeyRound, Loader2, LogOut, MonitorSmartphone, ShieldAlert,
-  ShieldCheck, Trash2, Users,
+  ArrowLeft, ArrowUpRight, Camera, Check, Copy, Download, FolderOpen, KeyRound, Loader2, LockKeyhole, LogOut, Mail, MonitorSmartphone, Pencil,
+  ShieldCheck, Trash2, Users, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiErrorMessage, useAuth } from '../auth/AuthContext';
 import LascaLogo from '../components/brand/LascaLogo';
 import PasswordStrength from '../components/ui/PasswordStrength';
 import usePageMeta from '../hooks/usePageMeta';
+import './Profile.css';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ROLE_LABEL = { owner: 'Ιδιοκτήτης', editor: 'Επεξεργαστής', viewer: 'Αναγνώστης' };
@@ -63,6 +65,7 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [projects, setProjects] = useState({ owned: [], shared: [], stats: null });
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -112,6 +115,7 @@ export default function Profile() {
       setDisplayName(data.display_name);
       setAvatarFile(null);
       setAvatarPreview(null);
+      setIsEditing(false);
       toast.success('Το προφίλ αποθηκεύτηκε');
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Αποτυχία αποθήκευσης'));
@@ -142,76 +146,137 @@ export default function Profile() {
     navigate('/', { replace: true });
   };
 
+  const cancelEdit = () => {
+    setDisplayName(user?.display_name || '');
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setIsEditing(false);
+  };
+
   const list = tab === 'owned' ? projects.owned : projects.shared;
 
   return (
-    <div className="relative h-full overflow-y-auto bg-canvas text-frost">
-      <div aria-hidden="true" className="l-grid-bg pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
+    <div className="profile-page relative h-full overflow-y-auto bg-canvas text-frost">
+      <div aria-hidden="true" className="l-grid-bg profile-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
       <header className="sticky top-0 z-20 bg-canvas/80 backdrop-blur-xl shadow-[inset_0_-1px_0_rgb(186_215_247/0.1)]">
-        <div className="mx-auto flex h-16 max-w-[1100px] items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link to="/app" className="l-btn l-btn-outline l-btn-sm">
-              <ArrowLeft size={15} aria-hidden="true" /> <span className="hidden sm:inline">Πίσω στην εφαρμογή</span><span className="sm:hidden">Πίσω</span>
+        <div className="profile-nav mx-auto flex h-[72px] max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+            <Link to="/app" className="profile-back-link profile-icon-tooltip" aria-label="Πίσω στην εφαρμογή"
+              data-tooltip="Πίσω στην εφαρμογή">
+              <ArrowLeft size={17} aria-hidden="true" />
             </Link>
-            <span className="hidden sm:inline-flex"><LascaLogo height={26} textClass="text-lg" /></span>
+            <span className="profile-nav-divider hidden h-7 w-px sm:block" aria-hidden="true" />
+            <span className="inline-flex"><LascaLogo height={27} textClass="text-lg" /></span>
           </div>
-          <button onClick={handleLogout} className="l-btn l-btn-sm text-[#ffb8a3] hover:bg-[rgb(228_109_76/0.1)]">
+          <button onClick={handleLogout} className="l-btn l-btn-sm profile-logout">
             <LogOut size={15} aria-hidden="true" /> Αποσύνδεση
           </button>
         </div>
       </header>
 
-      <div className="relative mx-auto max-w-[1100px] px-4 pt-6 sm:px-6"><VerifyEmailBanner user={user} /></div>
-      <main id="main" className="relative mx-auto grid max-w-[1100px] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[340px_1fr]">
-        <div className="h-fit space-y-6">
-          <form onSubmit={save} className="l-card h-fit p-6">
-            <div className="flex flex-col items-center text-center">
-              <button type="button" onClick={() => fileInput.current?.click()}
-                className="group relative rounded-full" aria-label="Αλλαγή εικόνας προφίλ">
-                <Avatar url={avatarPreview || user?.avatar_url} name={displayName || user?.display_name} size={104} />
-                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-canvas/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <Camera size={22} className="text-white" aria-hidden="true" />
-                </span>
-              </button>
-              <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                onChange={(e) => { pickAvatar(e.target.files?.[0]); e.target.value = ''; }} aria-label="Επιλογή εικόνας προφίλ" />
-              <p className="mt-3 text-[12.5px] text-fog">PNG, JPG ή WEBP, έως 5MB · κόβεται τετράγωνη</p>
-              {user?.avatar_url && !avatarPreview && (
-                <button type="button" onClick={removeAvatar} className="mt-1 text-[12.5px] text-fog hover:text-[#ffb8a3]">Αφαίρεση εικόνας</button>
-              )}
+      <main id="main" className="profile-layout relative mx-auto grid max-w-[1440px] gap-8 px-4 py-8 sm:px-6 lg:gap-10 lg:px-10 lg:py-10">
+        <aside className="profile-settings profile-id-card h-fit" aria-labelledby="settings-title">
+          <div className="profile-id-form">
+            <div className="profile-id-topbar">
+              <div className="profile-id-title">
+                <span className="profile-id-indicator" aria-hidden="true" />
+                <h2 id="settings-title">ΤΑΥΤΟΤΗΤΑ ΧΡΗΣΤΗ</h2>
+              </div>
+              <div className="profile-id-header-actions">
+                <button type="button" onClick={() => setIsEditing(true)} disabled={isEditing}
+                  className="profile-edit-toggle profile-icon-tooltip" aria-label="Επεξεργασία προφίλ"
+                  data-tooltip="Επεξεργασία προφίλ">
+                  <Pencil size={15} aria-hidden="true" />
+                </button>
+                <DangerZone user={user} onDeleted={() => { setUser(null); navigate('/', { replace: true }); }} />
+                {isEditing && (
+                  <button type="button" onClick={cancelEdit}
+                    className="profile-edit-toggle profile-icon-tooltip" aria-label="Κλείσιμο επεξεργασίας"
+                    data-tooltip="Κλείσιμο επεξεργασίας">
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="mt-6 space-y-1.5">
-              <label htmlFor="display_name" className="l-label">Όνομα χρήστη</label>
-              <input id="display_name" value={displayName} maxLength={60} onChange={(e) => setDisplayName(e.target.value)} className="l-input" />
+
+            <div className="profile-id-content">
+              <div className="profile-id-avatar-column">
+                <button type="button" onClick={() => fileInput.current?.click()}
+                  className="profile-avatar-button profile-id-avatar group relative rounded-full"
+                  aria-label="Αλλαγή εικόνας προφίλ">
+                  <Avatar url={avatarPreview || user?.avatar_url} name={displayName || user?.display_name} size={86} />
+                  <span className="profile-avatar-overlay absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <Camera size={19} aria-hidden="true" />
+                  </span>
+                </button>
+                <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                  onChange={(e) => { pickAvatar(e.target.files?.[0]); e.target.value = ''; }} aria-label="Επιλογή εικόνας προφίλ" />
+                <span className="profile-id-avatar-hint">LASCA ID</span>
+                {user?.avatar_url && !avatarPreview && (
+                  <button type="button" onClick={removeAvatar} className="profile-remove-avatar">Αφαίρεση εικόνας</button>
+                )}
+              </div>
+
+              <div className="profile-id-fields">
+                <form onSubmit={save} className="profile-id-edit-form">
+                  <div className="profile-id-field">
+                    <span className="profile-id-label">Όνομα χρήστη</span>
+                    {isEditing ? (
+                      <input id="display_name" value={displayName} maxLength={60} onChange={(e) => setDisplayName(e.target.value)}
+                        className="l-input profile-id-input" autoFocus />
+                    ) : (
+                      <p className="profile-id-value">{user?.display_name || '—'}</p>
+                    )}
+                  </div>
+                  <div className="profile-id-field">
+                    <span className="profile-id-label">Email</span>
+                    <div className="profile-id-email-row">
+                      <p className="profile-id-value profile-id-email">
+                        <LockKeyhole size={13} aria-hidden="true" /><span className="profile-id-email-text">{user?.email || '—'}</span>
+                      </p>
+                      <EmailVerificationStatus user={user} />
+                    </div>
+                  </div>
+                  {isEditing && (
+                    <div className="profile-id-actions">
+                      <button type="submit" disabled={!dirty || saving} className="l-btn l-btn-primary l-btn-sm">
+                        {saving && <Loader2 size={15} className="animate-spin" />} Αποθήκευση αλλαγών
+                      </button>
+                    </div>
+                  )}
+                </form>
+                <div className="profile-id-field profile-id-password">
+                  <span className="profile-id-label">Κωδικός</span>
+                  <p className="profile-id-value profile-password-mask" aria-label="Ο κωδικός είναι κρυμμένος">••••••••</p>
+                  <div className="profile-password-action" hidden={!isEditing}>
+                    <PasswordCard user={user} setUser={setUser} />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="mt-4 space-y-1">
-              <p className="l-label">Email</p>
-              <p className="truncate text-[14px] text-mist" title={user?.email}>{user?.email}</p>
+
+            <div className="profile-id-security">
+              <TwoFactorCard user={user} setUser={setUser} />
+              <SecurityLog />
             </div>
-            <button type="submit" disabled={!dirty || saving} className="l-btn l-btn-primary mt-6 w-full">
-              {saving && <Loader2 size={16} className="animate-spin" />} Αποθήκευση αλλαγών
-            </button>
-          </form>
-          <TwoFactorCard user={user} setUser={setUser} />
-          <PasswordCard user={user} setUser={setUser} />
-          <SecurityLog />
-          <DangerZone user={user} onDeleted={() => { setUser(null); navigate('/', { replace: true }); }} />
-        </div>
+          </div>
+        </aside>
 
         <section className="min-w-0" aria-labelledby="projects-title">
-          <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="profile-projects-heading flex flex-col justify-between gap-4 pb-6 sm:flex-row sm:items-center">
             <div>
-              <h1 id="projects-title" className="l-display text-[32px] leading-tight">Τα projects μου</h1>
-              <p className="mt-1 text-[14px] text-mist">
-                {projects.owned.length} δικά σου · {projects.shared.length} κοινοποιημένα σε εσένα
-                {projects.stats ? ` · ${projects.stats.collaborators} συνεργάτες` : ''}
-              </p>
+              <p className="profile-workspace-label mb-2"><span aria-hidden="true">•</span> ΧΩΡΟΣ ΕΡΓΑΣΙΑΣ</p>
+              <h1 id="projects-title" className="l-display text-2xl font-bold leading-tight tracking-tight text-white">Τα projects μου</h1>
             </div>
-            <div role="tablist" aria-label="Projects" className="inline-flex rounded-full bg-glass-wash p-1 text-[13px] font-medium shadow-[var(--shadow-hairline)]">
-              {[['owned', 'Δικά μου'], ['shared', 'Κοινά']].map(([key, label]) => (
+            <div role="tablist" aria-label="Projects" className="profile-project-tabs inline-flex p-1 text-[13px] font-medium">
+              {[
+                ['owned', 'Δικά μου', projects.owned.length],
+                ['shared', 'Κοινά', projects.shared.length],
+              ].map(([key, label, count]) => (
                 <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-                  className={`h-8 rounded-full px-4 transition-colors ${tab === key ? 'bg-[rgb(186_214_247/0.14)] text-white' : 'text-mist hover:text-white'}`}>
-                  {label}
+                  className={`profile-project-tab h-9 rounded-xl px-5 transition-colors ${tab === key ? 'profile-tab-active text-white' : 'text-mist hover:text-white'}`}>
+                  <span>{label}</span>
+                  <span className={`profile-project-tab-count ${tab === key ? 'is-active' : ''}`}>{count}</span>
                 </button>
               ))}
             </div>
@@ -223,30 +288,36 @@ export default function Profile() {
                 <Loader2 size={16} className="animate-spin" /> Φόρτωση...
               </div>
             ) : list.length === 0 ? (
-              <div className="rounded-[16px] py-16 text-center shadow-[inset_0_0_0_1px_rgb(186_215_247/0.12)] [border:1px_dashed_rgb(186_215_247/0.16)]">
-                <FolderOpen size={28} className="mx-auto text-fog" aria-hidden="true" />
-                <p className="mt-3 text-[14px] text-mist">
+              <div className="profile-empty rounded-[16px] py-16 text-center">
+                <FolderOpen size={27} strokeWidth={1.5} className="profile-empty-icon mx-auto" aria-hidden="true" />
+                <p className="profile-empty-label mt-3">
                   {tab === 'owned' ? 'Δεν έχεις δημιουργήσει ακόμα project.' : 'Κανείς δεν έχει κοινοποιήσει project σε εσένα.'}
                 </p>
-                {tab === 'owned' && <Link to="/app" className="l-btn l-btn-primary mt-5">Δημιούργησε το πρώτο σου project</Link>}
               </div>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="profile-project-grid grid grid-cols-1 gap-4 md:grid-cols-2">
                 {list.map((p) => (
-                  <li key={p.public_id || p.name}>
-                    <button type="button" onClick={() => openProject(p.name)} className="l-card l-lift w-full p-5 text-left">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="truncate font-semibold text-ice">{p.name}</p>
+                  <li key={p.public_id || p.name} className="profile-project-item">
+                    <button type="button" onClick={() => openProject(p.name)} className="profile-project-card l-card l-lift w-full p-5 text-left">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="profile-project-icon" aria-hidden="true"><FolderOpen size={18} /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-ice">{p.name}</p>
+                          <p className="mt-2 text-[12.5px] text-fog">
+                            {tab === 'shared' && p.owner_name ? `Από ${p.owner_name} · ` : ''}
+                            Τελευταία αλλαγή {formatDate(p.updated_at || p.created_at)}
+                            {p.updated_by?.display_name && p.updated_by.id !== user?.id ? ` από ${p.updated_by.display_name}` : ''}
+                          </p>
+                        </div>
+                        <span className="profile-project-open" aria-hidden="true"><ArrowUpRight size={14} /></span>
+                      </div>
+                      <div className="profile-project-meta flex shrink-0 gap-1.5">
+                        <span className={`profile-project-status ${tab === 'shared' ? 'is-shared' : ''}`} aria-label={tab === 'shared' ? 'Κοινό project' : 'Δικό σου project'} />
                         <div className="flex shrink-0 gap-1.5">
                           {tab === 'shared' && <span className="l-badge">{ROLE_LABEL[p.role] || p.role}</span>}
                           {p.members_count > 1 && <span className="l-badge"><Users size={11} aria-hidden="true" /> {p.members_count}</span>}
                         </div>
                       </div>
-                      <p className="mt-2 text-[12.5px] text-fog">
-                        {tab === 'shared' && p.owner_name ? `Από ${p.owner_name} · ` : ''}
-                        Τελευταία αλλαγή {formatDate(p.updated_at || p.created_at)}
-                        {p.updated_by?.display_name && p.updated_by.id !== user?.id ? ` από ${p.updated_by.display_name}` : ''}
-                      </p>
                     </button>
                   </li>
                 ))}
@@ -350,7 +421,14 @@ function TwoFactorCard({ user, setUser }) {
   );
 
   return (
-    <Card title="Έλεγχος δύο βημάτων" icon={ShieldCheck}>
+    <details className="profile-2fa-details">
+      <summary className="profile-2fa-summary">
+        <span><ShieldCheck size={15} aria-hidden="true" /> Έλεγχος δύο βημάτων</span>
+        <span className={`profile-2fa-status ${status?.enabled ? 'is-enabled' : ''}`}>
+          {status === null ? '...' : status.enabled ? 'Ενεργός' : 'Ανενεργό'}
+        </span>
+      </summary>
+      <div className="profile-2fa-content">
       {codes ? (
         <div className="mt-4 space-y-4 animate-rise">
           <p className="l-alert l-alert-info">Αποθήκευσε αυτούς τους κωδικούς κάπου ασφαλές. Αν χάσεις το κινητό ή την πρόσβαση στο email σου, θα μπεις μόνο με αυτούς. <strong>Δεν θα τους ξαναδείς.</strong></p>
@@ -442,22 +520,32 @@ function TwoFactorCard({ user, setUser }) {
           </div>
         </form>
       )}
-    </Card>
+      </div>
+    </details>
   );
 }
 
-// --- Επιβεβαίωση email ---
-function VerifyEmailBanner({ user }) {
+// --- Κατάσταση επιβεβαίωσης email ---
+function EmailVerificationStatus({ user }) {
   const [sent, setSent] = useState(false);
-  if (!user || user.email_verified) return null;
+  if (!user) return null;
   const resend = async () => {
     try { await axios.post(`${API_BASE_URL}/api/me/verify-email`); setSent(true); } catch (err) { toast.error(apiErrorMessage(err)); }
   };
+  if (user.email_verified) {
+    return (
+      <span className="profile-email-verified" role="status">
+        <Check size={12} aria-hidden="true" /> Επιβεβαιωμένο
+      </span>
+    );
+  }
   return (
-    <div role="status" className="l-alert l-alert-info flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <span>Επιβεβαίωσε το email σου ({user.email}) για να προστατέψεις τον λογαριασμό σου.</span>
-      <button type="button" onClick={resend} disabled={sent} className="l-btn l-btn-ghost l-btn-sm shrink-0">{sent ? 'Στάλθηκε' : 'Αποστολή συνδέσμου'}</button>
-    </div>
+    <button type="button" onClick={resend} disabled={sent}
+      className={`profile-email-resend profile-icon-tooltip ${sent ? 'is-sent' : ''}`}
+      aria-label={sent ? 'Στάλθηκε!' : 'Αποστολή συνδέσμου επιβεβαίωσης email'}
+      data-tooltip={sent ? 'Στάλθηκε!' : 'Αποστολή συνδέσμου επιβεβαίωσης email'}>
+      {sent ? <Check size={14} aria-hidden="true" /> : <Mail size={14} aria-hidden="true" />}
+    </button>
   );
 }
 
@@ -514,8 +602,8 @@ function PasswordCard({ user, setUser }) {
           </div>
         </form>
       )}
-      <button type="button" onClick={logoutEverywhere} className="l-btn l-btn-sm mt-3 w-full text-mist hover:bg-glass-wash hover:text-white">
-        <MonitorSmartphone size={15} aria-hidden="true" /> Αποσύνδεση από όλες τις άλλες συσκευές
+      <button type="button" onClick={logoutEverywhere} className="l-btn l-btn-sm profile-logout-everywhere mt-3 w-full text-mist hover:bg-glass-wash hover:text-white">
+        <MonitorSmartphone size={15} aria-hidden="true" /><span>Αποσύνδεση από όλες τις άλλες συσκευές</span>
       </button>
     </Card>
   );
@@ -561,7 +649,6 @@ function SecurityLog() {
 function DangerZone({ user, onDeleted }) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
-  const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const hasPassword = user?.has_password !== false;
 
@@ -569,7 +656,7 @@ function DangerZone({ user, onDeleted }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data } = await axios.delete(`${API_BASE_URL}/api/me`, { data: { password, confirm: confirmText } });
+      const { data } = await axios.delete(`${API_BASE_URL}/api/me`, { data: { password, confirm: 'ΔΙΑΓΡΑΦΗ' } });
       const moved = data.transferred?.length ? ` Τα κοινά projects (${data.transferred.join(', ')}) πέρασαν στους συνεργάτες σου.` : '';
       toast.success(`Ο λογαριασμός διαγράφηκε.${moved}`, { duration: 7000 });
       onDeleted();
@@ -579,30 +666,39 @@ function DangerZone({ user, onDeleted }) {
   };
 
   return (
-    <Card title="Διαγραφή λογαριασμού" icon={ShieldAlert} tone="danger">
-      <p className="mt-2 text-[13px] leading-relaxed text-fog">
-        Σβήνονται ο λογαριασμός, η εικόνα σου, το ιστορικό ασφαλείας και τα projects που έχεις μόνο εσύ. Όσα projects έχουν
-        κι άλλα μέλη δεν χάνονται: περνάνε στον πρώτο συνεργάτη.
-      </p>
-      {!open ? (
-        <button type="button" onClick={() => setOpen(true)} className="l-btn l-btn-danger mt-4 w-full">
-          <Trash2 size={15} aria-hidden="true" /> Διαγραφή λογαριασμού
-        </button>
-      ) : (
-        <form onSubmit={remove} className="mt-4 space-y-3 animate-rise">
-          {hasPassword && (
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός σου" aria-label="Ο κωδικός σου" className="l-input" required />
-          )}
-          <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Γράψε ΔΙΑΓΡΑΦΗ" aria-label="Γράψε ΔΙΑΓΡΑΦΗ για επιβεβαίωση" className="l-input" required />
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setOpen(false)} className="l-btn l-btn-outline flex-1">Άκυρο</button>
-            <button type="submit" disabled={busy || confirmText.trim().toUpperCase() !== 'ΔΙΑΓΡΑΦΗ'}
-              className="l-btn flex-1 bg-[#c2452a] text-white hover:bg-[#d4502f]">
-              {busy && <Loader2 size={15} className="animate-spin" />} Οριστική διαγραφή
-            </button>
-          </div>
-        </form>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="profile-delete-trigger profile-icon-tooltip"
+        aria-label="Διαγραφή λογαριασμού" data-tooltip="Διαγραφή λογαριασμού">
+        <Trash2 size={16} aria-hidden="true" />
+      </button>
+      {open && createPortal(
+        <div className="profile-delete-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setOpen(false);
+        }}>
+          <section className="profile-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+            <div className="profile-delete-modal-icon"><Trash2 size={19} aria-hidden="true" /></div>
+            <h2 id="delete-account-title">Διαγραφή λογαριασμού</h2>
+            <p className="profile-delete-prompt">Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τον λογαριασμό σας;</p>
+            <p className="profile-delete-description">
+              Σβήνονται ο λογαριασμός, η εικόνα σου, το ιστορικό ασφαλείας και τα projects που έχεις μόνο εσύ. Όσα projects έχουν
+              κι άλλα μέλη δεν χάνονται: περνάνε στον πρώτο συνεργάτη.
+            </p>
+            <form onSubmit={remove} className="profile-delete-form">
+              {hasPassword && (
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός σου" aria-label="Ο κωδικός σου" className="l-input" required />
+              )}
+              <div className="profile-delete-actions">
+                <button type="button" onClick={() => setOpen(false)} className="l-btn l-btn-outline flex-1">Ακύρωση</button>
+                <button type="submit" disabled={busy || (hasPassword && !password)}
+                  className="l-btn profile-delete-submit flex-1">
+                  {busy && <Loader2 size={15} className="animate-spin" />} Οριστική Διαγραφή
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>,
+        document.body
       )}
-    </Card>
+    </>
   );
 }
