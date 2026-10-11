@@ -969,6 +969,16 @@ def serve_index():
     return _spa_index()
 
 
+@app.route('/license.txt')
+def license_txt():
+    # Η άδεια χρήσης (το LICENSE του repo), για το παράθυρο «Άδεια χρήσης» της σελίδας.
+    path = Path(__file__).resolve().parent.parent / 'LICENSE'
+    if not path.is_file():
+        return Response('', status=404, mimetype='text/plain')
+    return Response(path.read_text(encoding='utf-8-sig'), mimetype='text/plain',
+                    headers={'Cache-Control': 'public, max-age=3600'})
+
+
 @app.route('/robots.txt')
 def robots_txt():
     body = ('User-agent: *\n'

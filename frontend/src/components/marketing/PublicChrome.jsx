@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { ArrowRight, CodeXml, Menu, X } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import LascaLogo from '../brand/LascaLogo';
+import LicenseDialog from './LicenseDialog';
 import { SITE } from '../../site';
 
 /** Φόντο των δημόσιων σελίδων: κάνναβος + προβολέας (DESIGN.md «Background Grid Layer»). */
@@ -18,7 +19,6 @@ export function Backdrop({ spotlight = true }) {
 const NAV = [
   { href: '/#tools', label: 'Εργαλεία' },
   { href: '/#workflow', label: 'Πώς δουλεύει' },
-  { href: '/#security', label: 'Ασφάλεια' },
 ];
 
 export function PublicHeader() {
@@ -50,7 +50,7 @@ export function PublicHeader() {
           ) : (
             <>
               <Link to="/login" className="l-btn l-btn-outline l-btn-sm hidden sm:inline-flex">Σύνδεση</Link>
-              <Link to="/signup" className="l-btn l-btn-primary l-btn-sm">Ξεκίνα δωρεάν</Link>
+              <Link to="/signup" className="l-btn l-btn-primary l-btn-sm">Ξεκίνα Τώρα!</Link>
             </>
           )}
           <button type="button" className="l-btn l-btn-outline l-btn-sm !px-2.5 md:hidden" onClick={() => setOpen((v) => !v)}
@@ -72,14 +72,12 @@ export function PublicHeader() {
 }
 
 export function PublicFooter() {
+  const [licenseOpen, setLicenseOpen] = useState(false);
   return (
     <footer className="relative border-t border-glass-edge">
       <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <LascaLogo height={26} textClass="text-lg" />
-          <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-fog">
-            Land Surveying Computations Application. Δωρεάν εργαλείο τοπογραφικών υπολογισμών, φτιαγμένο από φοιτητές για φοιτητές.
-          </p>
         </div>
         <nav aria-label="Νομικά">
           <p className="l-eyebrow !text-[11px] text-fog">Νομικά</p>
@@ -87,6 +85,7 @@ export function PublicFooter() {
             <li><NavLink to="/privacy" className="text-mist hover:text-white">Πολιτική απορρήτου</NavLink></li>
             <li><NavLink to="/terms" className="text-mist hover:text-white">Όροι χρήσης</NavLink></li>
             <li><NavLink to="/cookies" className="text-mist hover:text-white">Cookies</NavLink></li>
+            <li><button type="button" onClick={() => setLicenseOpen(true)} className="text-mist hover:text-white">Άδεια χρήσης</button></li>
           </ul>
         </nav>
         <nav aria-label="Σύνδεσμοι">
@@ -102,9 +101,13 @@ export function PublicFooter() {
           </ul>
         </nav>
       </div>
-      <div className="mx-auto max-w-[1200px] px-4 pb-10 text-[13px] text-fog sm:px-6">
-        © {new Date().getFullYear()} {SITE.fullName}
+      <div className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-2.5 px-4 pb-10 text-[13px] text-fog sm:px-6">
+        <span>© {new Date().getFullYear()} {SITE.fullName}</span>
+        <span>Copyright (c) 2026 LASCA Team ·{' '}
+          <button type="button" onClick={() => setLicenseOpen(true)} className="text-mist underline decoration-white/30 underline-offset-2 hover:text-white">LASCA Source-Available License</button>
+        </span>
       </div>
+      <LicenseDialog open={licenseOpen} onClose={() => setLicenseOpen(false)} />
     </footer>
   );
 }

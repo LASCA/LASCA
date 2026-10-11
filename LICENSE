@@ -1,0 +1,121 @@
+﻿# LASCA Source-Available License
+
+Copyright (c) 2026 LASCA Team
+
+All rights reserved except as expressly granted below.
+
+## 1. Definitions
+
+For the purposes of this License:
+
+**"Software"** means the source code, documentation, assets, configuration files, and other materials contained in this repository and distributed by the LASCA Team under this License.
+
+**"LASCA Team"** means the original authors and copyright holders of the Software.
+
+**"Personal Use"** means use of the Software by an individual solely for their own private, educational, research, or non-commercial purposes.
+
+**"Commercial Use"** means any use intended or reasonably expected to generate revenue, commercial advantage, monetary compensation, or business benefit, whether directly or indirectly.
+
+**"Competing Product"** means a software application, service, website, platform, library, or other product whose primary purpose includes providing surveying, geodetic, topographic, engineering, land-measurement, or substantially similar computational functionality that competes with LASCA or its commercial services.
+
+## 2. Permission for Personal Use
+
+Subject to the terms and conditions of this License, the LASCA Team grants you a non-exclusive, non-transferable, worldwide license to:
+
+* view the Software;
+* download and copy the Software;
+* install and run the Software;
+* study the source code;
+* modify the Software; and
+* create derivative works from the Software,
+
+provided that such activities are strictly for Personal Use and comply with all other provisions of this License.
+
+## 3. Attribution
+
+Any permitted copy, modification, or derivative work based substantially on the Software must retain:
+
+1. the original copyright notice;
+2. this License; and
+3. a visible attribution to the LASCA Team.
+
+The attribution must substantially state:
+
+> "Based on LASCA by the LASCA Team."
+
+Where technically reasonable, the attribution must include a link to the official LASCA project page or repository.
+
+Attribution must not imply that the LASCA Team endorses, sponsors, or is affiliated with any modified or derivative work unless the LASCA Team has expressly agreed to such use in writing.
+
+## 4. Commercial Use Prohibited
+
+Commercial Use of the Software is prohibited without prior written permission from the LASCA Team.
+
+You may not use the Software, modified versions of the Software, or derivative works:
+
+* as part of a commercial product or service;
+* to provide paid services to third parties;
+* in a commercial organization for business operations;
+* to generate revenue or other commercial benefit; or
+* as a component of a product or service that is offered for payment.
+
+The LASCA Team may grant separate commercial licenses at its discretion.
+
+## 5. Competing Products
+
+Without prior written permission from the LASCA Team, you may not use the Software or any substantial portion of its source code to create, develop, operate, distribute, or assist in the creation of a Competing Product.
+
+This restriction applies whether the Competing Product is free, paid, open-source, source-available, or otherwise distributed.
+
+## 6. Redistribution
+
+Redistribution of the Software or modified versions is permitted only for Personal Use and only when:
+
+* this License is included in its entirety;
+* the original copyright notices are preserved;
+* the required LASCA Team attribution is preserved; and
+* the redistributed material is not used for Commercial Use or as part of a Competing Product.
+
+Redistribution must not imply that the redistributed work is an official LASCA release.
+
+## 7. No Trademark Rights
+
+This License does not grant permission to use the names, trademarks, logos, or branding of LASCA or the LASCA Team except where necessary to provide the attribution required by this License.
+
+You may not use "LASCA", the LASCA logo, or LASCA branding in a manner that suggests that a modified or derivative work is an official LASCA product without prior written permission.
+
+## 8. Contributions
+
+Unless otherwise agreed in writing, contributions submitted to the LASCA project may be incorporated into the Software and distributed under the license applicable to the relevant LASCA release.
+
+By submitting a contribution, you represent that you have the necessary rights to submit it and grant the LASCA Team permission to use, modify, reproduce, and distribute the contribution as part of the Software.
+
+## 9. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, OR NON-INFRINGEMENT.
+
+IN NO EVENT SHALL THE LASCA TEAM OR ITS AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE.
+
+## 10. Termination
+
+Any rights granted under this License automatically terminate if you violate its terms.
+
+Upon termination, you must cease use and distribution of the Software and any derivative works, except where continued use is expressly permitted by applicable law.
+
+## 11. Reservation of Rights
+
+All rights not expressly granted by this License are reserved by the LASCA Team.
+
+Nothing in this License grants permission for Commercial Use, creation of Competing Products, or use of LASCA trademarks or branding except as expressly stated above.
+
+## 12. Contact
+
+For commercial licensing, partnership, or other permissions not granted by this License, contact the LASCA Team through the official LASCA project contact information.
+
+---
+
+**LASCA — Land Surveying Computations Application**
+
+Copyright (c) 2026 LASCA Team
+
+This project is source-available and is not licensed under an OSI-approved Open Source license.
