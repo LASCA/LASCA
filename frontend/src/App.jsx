@@ -581,9 +581,9 @@ function App() {
               {currentProject && (
                 <div className="hidden lg:block min-w-0">
                   <span
-                    title={currentProject}
+                    aria-label={`Project: ${currentProject}`}
                     className={`${TOPBAR_ITEM} px-3.5 max-w-[260px] text-emerald-300 ${bare
-                      ? 'border-transparent bg-transparent shadow-none backdrop-blur-none hover:bg-emerald-500/10 hover:border-emerald-500/25'
+                      ? 'border-transparent bg-transparent shadow-none backdrop-blur-none'
                       : 'border-emerald-500/25 bg-emerald-500/10'}`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
@@ -595,7 +595,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setIsProjectModalOpen(true)}
-                title={currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}
+                aria-label={currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}
                 className={`${TOPBAR_ITEM} ${bare ? TOPBAR_BARE : TOPBAR_NEUTRAL} px-2.5 md:px-3.5 group`}
               >
                 <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />

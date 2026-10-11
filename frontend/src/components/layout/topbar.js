@@ -7,7 +7,7 @@ export const TOPBAR_ITEM =
 export const TOPBAR_NEUTRAL =
   'border-slate-700/50 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:border-slate-600';
 
-// Αρχική σελίδα (dashboard): χωρίς πλαίσιο, μόνο κείμενο/εικονίδιο. Το πλαίσιο εμφανίζεται στο hover.
+// Αρχική σελίδα (dashboard): χωρίς πλαίσιο, ούτε στο hover (εκεί απλώς φωτίζει το κείμενο).
 export const TOPBAR_BARE =
   'border-transparent bg-transparent shadow-none backdrop-blur-none text-slate-200 ' +
-  'hover:bg-slate-800/60 hover:border-slate-700/50';
+  'hover:text-white';

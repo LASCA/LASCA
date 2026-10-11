@@ -69,7 +69,7 @@ const UserMenu = ({ bare = false }) => {
       <button
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
-        title={displayName}
+        aria-label={`Λογαριασμός: ${displayName}`}
         className={`${TOPBAR_ITEM} ${bare ? TOPBAR_BARE : TOPBAR_NEUTRAL} max-w-[220px] px-1.5 md:px-3`}
       >
         {!currentUser?.avatar_url || avatarFailed ? (
