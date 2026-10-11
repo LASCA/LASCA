@@ -551,7 +551,7 @@ function EmailVerificationStatus({ user }) {
 
 // --- Κωδικός και συσκευές ---
 function PasswordCard({ user, setUser }) {
-  const { passwordMin } = useAuth();
+  const { passwordMin, passwordRecommended } = useAuth();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirmNext, setConfirmNext] = useState('');
@@ -594,7 +594,7 @@ function PasswordCard({ user, setUser }) {
             <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="Τρέχων κωδικός" aria-label="Τρέχων κωδικός" autoComplete="current-password" className="l-input" required />
           )}
           <input type="password" value={next} onChange={(e) => setNext(e.target.value)} placeholder="Νέος κωδικός" aria-label="Νέος κωδικός" autoComplete="new-password" className="l-input" required maxLength={128} aria-describedby="new-pw-strength" />
-          <PasswordStrength id="new-pw-strength" password={next} email={user?.email} name={user?.display_name} min={passwordMin} onValidity={setValid} />
+          <PasswordStrength id="new-pw-strength" password={next} email={user?.email} name={user?.display_name} min={passwordMin} recommended={passwordRecommended} onValidity={setValid} />
           <input type="password" value={confirmNext} onChange={(e) => setConfirmNext(e.target.value)} placeholder="Επιβεβαίωση νέου κωδικού" aria-label="Επιβεβαίωση νέου κωδικού" autoComplete="new-password" className="l-input" required maxLength={128} />
           <div className="flex gap-2">
             <button type="button" onClick={() => setOpen(false)} className="l-btn l-btn-outline flex-1">Άκυρο</button>

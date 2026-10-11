@@ -113,9 +113,16 @@ def init_team_gate(app, allowed_origins, public_api_paths=()):
             return None
         # Κλειδί συσκευής (exe): μόνο για endpoints που θέλουν σύνδεση — ένα ψεύτικο «Bearer» δεν
         # ανοίγει ούτε τις σελίδες ούτε τα δημόσια endpoints (π.χ. εγγραφή).
-        if (request.headers.get('Authorization', '').startswith('Bearer ') and request.path.startswith('/api/')
-                and request.path not in public_api_paths()):
-            return None
+        if request.headers.get('Authorization', '').startswith('Bearer ') and request.path.startswith('/api/'):
+            if request.path not in public_api_paths():
+                return None
+            # Δημόσια endpoints (π.χ. /api/me που ζητάει το exe για όνομα/εικόνα): μόνο με ΠΡΑΓΜΑΤΙΚΟ
+            # κλειδί συσκευής. Αλλιώς το exe έπαιρνε 401 και νόμιζε ότι αποσυνδέθηκε.
+            from flask_login import current_user
+            if current_user.is_authenticated:
+                return None
+            # Άκυρο/ακυρωμένο κλειδί: το exe πρέπει να καταλάβει ότι αποσυνδέθηκε (όχι «πόρτα»).
+            return json_error('Η σύνδεση έληξε. Συνδέσου ξανά.', 401, code='invalid_token')
         if request.path.startswith('/api/'):
             return json_error('Η σελίδα είναι σε δοκιμές: χρειάζεται ο κωδικός της ομάδας.', 401, code='team_gate')
         if request.method != 'GET':

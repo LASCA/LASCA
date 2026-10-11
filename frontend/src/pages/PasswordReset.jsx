@@ -76,7 +76,7 @@ export function ForgotPassword() {
 /** Ορισμός νέου κωδικού από τον σύνδεσμο του email (/reset-password#token=...). */
 export function ResetPassword() {
   usePageMeta({ title: 'Νέος κωδικός', noindex: true });
-  const { passwordMin } = useAuth();
+  const { passwordMin, passwordRecommended } = useAuth();
   const navigate = useNavigate();
   // Το token είναι στο # για να μη φτάνει ποτέ σε logs ή σε τρίτους (Referer). Το αφαιρούμε από τη γραμμή διευθύνσεων.
   const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') || '');
@@ -128,7 +128,7 @@ export function ResetPassword() {
         <div className="space-y-2">
           <TextField id="password" label="Νέος κωδικός" type="password" value={password} onChange={setPassword}
             autoComplete="new-password" maxLength={128} describedBy="pw-strength" autoFocus />
-          <PasswordStrength id="pw-strength" password={password} min={passwordMin} onValidity={setValid} />
+          <PasswordStrength id="pw-strength" password={password} min={passwordMin} recommended={passwordRecommended} onValidity={setValid} />
         </div>
         <TextField id="confirm" label="Επιβεβαίωση" type="password" value={confirm} onChange={setConfirm}
           autoComplete="new-password" maxLength={128} error={confirm && confirm !== password ? 'Οι κωδικοί δεν ταιριάζουν.' : ''} />

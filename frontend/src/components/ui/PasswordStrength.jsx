@@ -1,13 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Check, Loader2, X } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, X } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 
 // Οι ίδιοι κανόνες με τον server (code/auth_security.py). Ο server ελέγχει ξανά: εδώ είναι μόνο
 // για να βλέπει ο χρήστης αμέσως τι λείπει.
-export function passwordRules(pw, min = 12) {
+// Μήκος: κάτω από min απορρίπτεται· από min έως recommended γίνεται δεκτός με πορτοκαλί προειδοποίηση.
+export function passwordRules(pw, min = 8, recommended = 12) {
+  const short = pw.length >= min && pw.length < recommended;
   return [
-    { id: 'len', label: `Τουλάχιστον ${min} χαρακτήρες`, ok: pw.length >= min },
+    {
+      id: 'len', ok: pw.length >= min, warn: short,
+      label: pw.length < min ? `Τουλάχιστον ${min} χαρακτήρες` : `${recommended}+ χαρακτήρες (προτείνεται)`,
+    },
     { id: 'lower', label: 'Ένα πεζό γράμμα', ok: /[a-zα-ωά-ώ]/.test(pw) },
     { id: 'upper', label: 'Ένα κεφαλαίο γράμμα', ok: /[A-ZΑ-ΩΆ-Ώ]/.test(pw) },
     { id: 'digit', label: 'Έναν αριθμό', ok: /\d/.test(pw) },
@@ -51,11 +56,12 @@ const loadZxcvbn = () => {
  * Μετρητής ισχύος κωδικού σε πραγματικό χρόνο: κανόνες + zxcvbn + έλεγχος server
  * (συνηθισμένος / διαρρευμένος κωδικός). onValidity(true|false) όταν αλλάζει.
  */
-export default function PasswordStrength({ password, email = '', name = '', min = 12, onValidity, id }) {
+export default function PasswordStrength({ password, email = '', name = '', min = 8, recommended = 12, onValidity, id }) {
   const [score, setScore] = useState(null);
   const [warning, setWarning] = useState('');
   const [server, setServer] = useState({ state: 'idle', error: '' });
-  const rules = useMemo(() => passwordRules(password, min), [password, min]);
+  const rules = useMemo(() => passwordRules(password, min, recommended), [password, min, recommended]);
+  const tooShortWarn = rules.some((r) => r.warn);
   const rulesOk = rules.every((r) => r.ok);
   const timer = useRef(null);
 
@@ -94,7 +100,7 @@ export default function PasswordStrength({ password, email = '', name = '', min 
   useEffect(() => { cbRef.current?.(valid); }, [valid]);
 
   if (!password) {
-    return <p id={id} className="text-[13px] text-fog">Τουλάχιστον {min} χαρακτήρες, με κεφαλαία, πεζά, αριθμό και σύμβολο. Μια φράση από 3–4 λέξεις είναι ιδανική.</p>;
+    return <p id={id} className="text-[13px] text-fog">Προτείνονται {recommended}+ χαρακτήρες (τουλάχιστον {min}), με κεφαλαία, πεζά, αριθμό και σύμβολο. Μια φράση από 3–4 λέξεις είναι ιδανική.</p>;
   }
   // Αν λείπει κάποιος κανόνας, ο κωδικός δεν γίνεται δεκτός: δεν τον δείχνουμε ως «καλό».
   const shown = score === null ? null : (rulesOk ? score : Math.min(score, 1));
@@ -114,12 +120,18 @@ export default function PasswordStrength({ password, email = '', name = '', min 
       </div>
       <ul className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
         {rules.map((r) => (
-          <li key={r.id} className={`flex items-center gap-1.5 text-[12.5px] ${r.ok ? 'text-[#7fdcc9]' : 'text-fog'}`}>
-            {r.ok ? <Check size={13} aria-hidden="true" /> : <X size={13} aria-hidden="true" />}
-            <span>{r.label}<span className="sr-only">{r.ok ? ': εντάξει' : ': λείπει'}</span></span>
+          <li key={r.id} className={`flex items-center gap-1.5 text-[12.5px] ${r.warn ? 'text-[#f0b35f]' : r.ok ? 'text-[#7fdcc9]' : 'text-fog'}`}>
+            {r.warn ? <AlertTriangle size={13} aria-hidden="true" /> : r.ok ? <Check size={13} aria-hidden="true" /> : <X size={13} aria-hidden="true" />}
+            <span>{r.label}<span className="sr-only">{r.warn ? ': προειδοποίηση' : r.ok ? ': εντάξει' : ': λείπει'}</span></span>
           </li>
         ))}
       </ul>
+      {tooShortWarn && (
+        <p className="flex items-start gap-1.5 rounded-lg border border-[#f0b35f]/30 bg-[#f0b35f]/[0.08] px-2.5 py-1.5 text-[12.5px] text-[#f0b35f]">
+          <AlertTriangle size={13} className="mt-[3px] shrink-0" aria-hidden="true" />
+          <span>Ο κωδικός έχει λιγότερους από {recommended} χαρακτήρες. Γίνεται δεκτός, αλλά ένας μεγαλύτερος είναι πιο ασφαλής.</span>
+        </p>
+      )}
       {warning && <p className="text-[12.5px] text-[#f0c38a]">{warning}</p>}
       {server.state === 'checking' && (
         <p className="flex items-center gap-1.5 text-[12.5px] text-fog"><Loader2 size={12} className="animate-spin" /> Έλεγχος σε λίστες διαρρευμένων κωδικών…</p>

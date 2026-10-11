@@ -14,7 +14,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export default function Signup() {
   usePageMeta({ title: 'Δημιουργία λογαριασμού', description: 'Φτιάξε δωρεάν λογαριασμό στη LASCA: τοπογραφικοί υπολογισμοί, αναφορές και κοινά projects.' });
-  const { register, captchaSiteKey, passwordMin, minAge } = useAuth();
+  const { register, captchaSiteKey, passwordMin, passwordRecommended, minAge } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [displayName, setDisplayName] = useState('');
@@ -91,7 +91,7 @@ export default function Signup() {
           <TextField id="password" label="Κωδικός" type="password" value={password} onChange={setPassword}
             autoComplete="new-password" maxLength={128} describedBy="password-strength" />
           <PasswordStrength id="password-strength" password={password} email={email} name={displayName}
-            min={passwordMin} onValidity={setPwValid} />
+            min={passwordMin} recommended={passwordRecommended} onValidity={setPwValid} />
         </div>
         <TextField id="confirm" label="Επιβεβαίωση κωδικού" type="password" value={confirm} onChange={setConfirm}
           autoComplete="new-password" maxLength={128} error={confirmError} />

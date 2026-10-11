@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './topbar';
+import { TOPBAR_BARE, TOPBAR_ITEM, TOPBAR_NEUTRAL } from './topbar';
 import { ChevronDown, LogOut, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Η κοινοποίηση project έγινε κουμπί δίπλα στο «Επιλογή Project» (App.jsx).
-const UserMenu = () => {
+const UserMenu = ({ bare = false }) => {
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -70,7 +70,7 @@ const UserMenu = () => {
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
         title={displayName}
-        className={`${TOPBAR_ITEM} ${TOPBAR_NEUTRAL} max-w-[220px] px-1.5 md:px-3`}
+        className={`${TOPBAR_ITEM} ${bare ? TOPBAR_BARE : TOPBAR_NEUTRAL} max-w-[220px] px-1.5 md:px-3`}
       >
         {!currentUser?.avatar_url || avatarFailed ? (
           <div className="w-6 h-6 shrink-0 rounded-full bg-slate-700 text-[10px] font-bold text-slate-100 flex items-center justify-center border border-slate-600">

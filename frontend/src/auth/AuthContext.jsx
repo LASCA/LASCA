@@ -105,7 +105,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     user, setUser, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout,
     config, googleClientId: config.google_client_id || null, captchaSiteKey: config.captcha_site_key || null,
-    passwordMin: config.password_min || 12, minAge: config.min_age || 15,
+    passwordMin: config.password_min || 8, passwordRecommended: config.password_recommended || 12, minAge: config.min_age || 15,
   }), [user, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

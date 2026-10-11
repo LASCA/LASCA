@@ -40,7 +40,10 @@ from security import client_ip
 bp = Blueprint('auth_security', __name__)
 A = SimpleNamespace()  # μοντέλα/ρυθμίσεις (γεμίζει στην init_auth)
 
-PASSWORD_MIN = 12
+# Κάτω από PASSWORD_MIN ο κωδικός απορρίπτεται. Από PASSWORD_MIN έως PASSWORD_RECOMMENDED γίνεται δεκτός,
+# αλλά η σελίδα δείχνει πορτοκαλί προειδοποίηση («προτείνονται 12+ χαρακτήρες»).
+PASSWORD_MIN = 8
+PASSWORD_RECOMMENDED = 12
 PASSWORD_MAX = 128
 DISPLAY_NAME_MAX = 60
 
@@ -710,6 +713,7 @@ def auth_config():
         'captcha_site_key': A.turnstile_site if captcha_enabled() else None,
         'email_enabled': email_enabled(),
         'password_min': PASSWORD_MIN,
+        'password_recommended': PASSWORD_RECOMMENDED,
         'min_age': A.MIN_AGE,
     })
 

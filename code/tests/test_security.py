@@ -103,11 +103,14 @@ for rule in m.app.url_map.iter_rules():
 ok(not leaks, f'every private API route needs login ({len(leaks)} leaks: {leaks[:5]})')
 
 # ---------------------------------------------------------------- password policy
-for weak, why in [('short1!A', 'too short'), ('alllowercase-123', 'no uppercase'), ('NoSymbolsHere123', 'no symbol'),
+for weak, why in [('shrt1!A', 'too short'), ('alllowercase-123', 'no uppercase'), ('NoSymbolsHere123', 'no symbol'),
                   ('Password123!', 'common word + digits'), ('P@ssw0rd2024!', 'leet common'),
                   ('aaaaaaaaaaaA1!', 'repeated chars'), ('bob-SURVEYOR-1!x', 'contains email')]:
     _, r = signup('bob-surveyor@lasca.test' if why == 'contains email' else f'weak{abs(hash(weak)) % 999}@lasca.test', weak)
     ok(r.status_code == 400 and r.json.get('code') in ('weak_password', 'common_password'), f'weak password rejected ({why})')
+_, r = signup('shortok@lasca.test', 'Γεφ-7πόλ!x')
+ok(r.status_code in (200, 201), 'short (8-11 chars) but complete password accepted (only a warning in the page)')
+ok(client().get('/api/auth/config').json.get('password_recommended') == 12, 'config tells the page the recommended length')
 ok(sec.is_common_password('password123') and sec.is_common_password('12345678'), 'common list blocks password123/12345678')
 _, r = signup('noterms@lasca.test', accept_terms=False)
 ok(r.status_code == 400 and r.json['code'] == 'terms_required', 'signup requires accepting terms')

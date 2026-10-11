@@ -19,7 +19,7 @@ import TrigonometricHeight from './components/calculations/Levelings/trig_leveli
 import LascaLoader from './components/animations/LascaLoader';
 import LascaIntro from './components/animations/LascaIntro';
 import UserMenu from './components/layout/UserMenu';
-import { TOPBAR_ITEM, TOPBAR_NEUTRAL } from './components/layout/topbar';
+import { TOPBAR_BARE, TOPBAR_ITEM, TOPBAR_NEUTRAL } from './components/layout/topbar';
 import ShareDialog from './components/collab/ShareDialog';
 import ShareButton from './components/collab/ShareButton';
 import { LiveBar, ConflictBanner } from './components/collab/LiveBar';
@@ -562,19 +562,29 @@ function App() {
         {/* Μπάρα πάνω δεξιά: είναι κανονική γραμμή (όχι absolute), οπότε το περιεχόμενο
             περνάει από κάτω της στο scroll και δεν πέφτει ποτέ πάνω της. */}
         {(() => {
+          const bare = activeTab === 'dashboard';
           const topActions = (
             <div className="flex items-center gap-2 sm:gap-3 flex-nowrap min-w-0">
-              {currentProject && projectMeta && (
-                <LiveBar presence={live.presence} activity={live.activity} online={live.online}
-                  readOnly={isReadOnly} asset={collabApi.asset} itemClass={TOPBAR_ITEM}
-                  unread={live.unread} lastSeen={live.lastSeen} onOpenHistory={live.markAllSeen}
-                  onOpenTool={setActiveTab} currentUserId={currentUser?.id} />
+              {currentProject && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {projectMeta && (
+                    <LiveBar presence={live.presence} activity={live.activity} online={live.online}
+                      readOnly={isReadOnly} asset={collabApi.asset} itemClass={TOPBAR_ITEM}
+                      unread={live.unread} lastSeen={live.lastSeen} onOpenHistory={live.markAllSeen}
+                      onOpenTool={setActiveTab} currentUserId={currentUser?.id} />
+                  )}
+                  <ShareButton itemClass={TOPBAR_ITEM} members={shareMembers}
+                    disabled={!projectMeta?.public_id} onClick={() => setIsShareProjectOpen(true)}
+                    hint={!projectMeta?.public_id ? 'Το project δεν είναι ακόμα στο cloud' : undefined} />
+                </div>
               )}
               {currentProject && (
                 <div className="hidden lg:block min-w-0">
                   <span
                     title={currentProject}
-                    className={`${TOPBAR_ITEM} px-3.5 max-w-[260px] border-emerald-500/25 bg-emerald-500/10 text-emerald-300`}
+                    className={`${TOPBAR_ITEM} px-3.5 max-w-[260px] text-emerald-300 ${bare
+                      ? 'border-transparent bg-transparent shadow-none backdrop-blur-none hover:bg-emerald-500/10 hover:border-emerald-500/25'
+                      : 'border-emerald-500/25 bg-emerald-500/10'}`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                     <span className="font-medium text-emerald-500/80">Project</span>
@@ -586,15 +596,12 @@ function App() {
                 type="button"
                 onClick={() => setIsProjectModalOpen(true)}
                 title={currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}
-                className={`${TOPBAR_ITEM} ${TOPBAR_NEUTRAL} px-2.5 md:px-3.5 group`}
+                className={`${TOPBAR_ITEM} ${bare ? TOPBAR_BARE : TOPBAR_NEUTRAL} px-2.5 md:px-3.5 group`}
               >
                 <FolderKanban size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
                 <span className="hidden md:inline">{currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}</span>
               </button>
-              <ShareButton itemClass={TOPBAR_ITEM} asset={collabApi.asset} members={shareMembers}
-                disabled={!projectMeta?.public_id} onClick={() => setIsShareProjectOpen(true)}
-                hint={!projectMeta?.public_id ? 'Άνοιξε πρώτα ένα project για να το κοινοποιήσεις' : undefined} />
-              <UserMenu />
+              <UserMenu bare={bare} />
             </div>
           );
           return activeTab === 'dashboard' ? (

@@ -455,9 +455,14 @@ class User(db.Model, UserMixin):
 
     @property
     def avatar_url(self):
-        if not self.avatar_path or not Path(self.avatar_path).exists():
+        if not self.avatar_path:
             return None
-        return f'/api/users/{self.id}/avatar?ts={uuid.uuid4().hex}'
+        try:
+            # Σταθερό όσο δεν αλλάζει η εικόνα (ο browser/το exe την κρατάει στην cache), νέο μόλις αλλάξει.
+            version = int(Path(self.avatar_path).stat().st_mtime_ns // 1000)
+        except OSError:
+            return None
+        return f'/api/users/{self.id}/avatar?v={version}'
 
     def to_public_dict(self):
         display_name = (self.display_name or '').strip() or self.email.split('@', 1)[0]
