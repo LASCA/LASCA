@@ -1,0 +1,9 @@
+# Ρυθμίσεις gitleaks: κανονικοί κανόνες + εξαίρεση για τα ψεύτικα κλειδιά των tests.
+# Το 'test-secret-key-…' στο code/tests/ είναι dummy SECRET_KEY, όχι πραγματικό μυστικό.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "dummy SECRET_KEY used only by code/tests/*"
+regexTarget = "match"
+regexes = ['''test-secret-key-[0-9a-f]+''']
