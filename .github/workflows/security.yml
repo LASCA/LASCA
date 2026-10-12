@@ -2,6 +2,9 @@
 #   * gitleaks: ψάχνει κλειδιά/κωδικούς σε ΟΛΟ το ιστορικό του git
 #   * pip-audit / npm audit: γνωστά κενά ασφαλείας στις βιβλιοθήκες
 #   * οι δοκιμές «επίθεσης» της εφαρμογής (code/tests/test_security.py) και των κοινών projects
+#
+# Κάθε εύρημα γράφεται και ως annotation (::error::), ώστε να φαίνεται απευθείας
+# στη σελίδα του run και στο email, χωρίς να ανοίξεις τα logs.
 name: security
 on:
   push:
@@ -13,20 +16,48 @@ permissions:
 jobs:
   secrets:
     runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Το gitleaks-action@v2 θέλει πληρωμένη άδεια για repos οργανισμών.
+      # Τρέχουμε κατευθείαν το δωρεάν gitleaks CLI (ίδιος έλεγχος, χωρίς άδεια).
+      - name: gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          st=0
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner \
+            --report-format json --report-path gitleaks.json . || st=$?
+          if [ -s gitleaks.json ]; then
+            jq -r '.[] | "::error file=\(.File),line=\(.StartLine),title=gitleaks \(.RuleID)::commit \(.Commit[0:7]) — \(.Description)"' gitleaks.json
+          fi
+          exit $st
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install -r deploy/requirements-web.txt pip-audit
-      - run: pip-audit -r deploy/requirements-web.txt
+      - name: pip-audit
+        run: |
+          st=0
+          pip-audit -r deploy/requirements-web.txt -f json -o pip-audit.json 2> pip-audit.err || st=$?
+          python - <<'PY'
+          import json, os
+          if os.path.exists("pip-audit.json") and os.path.getsize("pip-audit.json"):
+              d = json.load(open("pip-audit.json"))
+              for dep in d.get("dependencies", []):
+                  for v in dep.get("vulns", []):
+                      fix = ", ".join(v.get("fix_versions") or []) or "καμία ακόμη"
+                      print(f"::error title=pip-audit {dep['name']}::{dep['name']}=={dep['version']} → {v['id']} — διόρθωση σε: {fix}")
+          PY
+          if [ "$st" != 0 ] && [ -s pip-audit.err ]; then
+            echo "::error title=pip-audit stderr::$(tail -c 900 pip-audit.err | tr '\n' ' ')"
+          fi
+          exit $st
       - run: python code/tests/test_security.py
       - run: python code/tests/test_collab.py
       - run: python code/tests/test_history.py
@@ -35,9 +66,15 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '22' }
       - run: npm install --no-audit --no-fund
-      - run: npm audit --omit=dev --audit-level=high
+      - name: npm audit
+        run: |
+          npm audit --omit=dev --json > npm-audit.json || true
+          jq -r '.vulnerabilities // {} | to_entries[]
+                 | select(.value.severity == "high" or .value.severity == "critical")
+                 | "::error title=npm audit \(.key)::\(.key) \(.value.range) — \(.value.severity) — \([.value.via[] | if type == "object" then .title else "μέσω " + . end] | unique | join("; ")) — fix: \(.value.fixAvailable | if type == "object" then "\(.name)@\(.version)" else tostring end)"' npm-audit.json
+          npm audit --omit=dev --audit-level=high
       - run: npm run build
