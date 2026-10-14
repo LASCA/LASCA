@@ -56,7 +56,7 @@ const loadZxcvbn = () => {
  * Μετρητής ισχύος κωδικού σε πραγματικό χρόνο: κανόνες + zxcvbn + έλεγχος server
  * (συνηθισμένος / διαρρευμένος κωδικός). onValidity(true|false) όταν αλλάζει.
  */
-export default function PasswordStrength({ password, email = '', name = '', min = 8, recommended = 12, onValidity, id }) {
+export default function PasswordStrength({ password, email = '', name = '', min = 8, recommended = 12, onValidity, id, compact = false }) {
   const [score, setScore] = useState(null);
   const [warning, setWarning] = useState('');
   const [server, setServer] = useState({ state: 'idle', error: '' });
@@ -98,6 +98,37 @@ export default function PasswordStrength({ password, email = '', name = '', min 
   const cbRef = useRef(onValidity);
   cbRef.current = onValidity;
   useEffect(() => { cbRef.current?.(valid); }, [valid]);
+
+  if (compact) {
+    // Μικρή εκδοχή (εγγραφή): μπάρα + μία γραμμή με ό,τι λείπει, ώστε η φόρμα να χωράει χωρίς scroll.
+    if (!password) {
+      return <p id={id} className="text-[12px] text-slate-500">{min}+ χαρακτήρες (προτείνονται {recommended}+), κεφαλαίο, πεζό, αριθμός και σύμβολο.</p>;
+    }
+    const shownC = score === null ? null : (rulesOk ? score : Math.min(score, 1));
+    const levelC = shownC === null ? null : LEVELS[shownC];
+    const missing = rules.filter((r) => !r.ok).map((r) => r.label.toLowerCase());
+    let note = null;
+    if (missing.length) note = <span className="text-slate-400">Λείπει: {missing.join(', ')}</span>;
+    else if (server.state === 'bad') note = <span className="text-red-300">{server.error}</span>;
+    else if (server.state === 'checking') note = <span className="inline-flex items-center gap-1 text-slate-500"><Loader2 size={11} className="animate-spin" /> Έλεγχος σε λίστες διαρρευμένων κωδικών…</span>;
+    else if (tooShortWarn) note = <span className="inline-flex items-center gap-1 text-[#f0b35f]"><AlertTriangle size={12} aria-hidden="true" /> Λιγότεροι από {recommended} χαρακτήρες: δεκτός, αλλά καλύτερα μεγαλύτερος.</span>;
+    else if (warning) note = <span className="text-[#f0c38a]">{warning}</span>;
+    else if (score !== null && score < 2) note = <span className="text-[#f0c38a]">Μαντεύεται εύκολα. Πρόσθεσε μια ακόμα λέξη.</span>;
+    return (
+      <div id={id} className="space-y-1" aria-live="polite">
+        <div className="flex items-center gap-2.5">
+          <div className="flex flex-1 gap-1" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className="h-1 flex-1 rounded-full transition-colors duration-300"
+                style={{ background: shownC !== null && shownC > i ? levelC.color : 'rgb(186 215 247 / 0.12)' }} />
+            ))}
+          </div>
+          <span className="min-w-[80px] text-right text-[11.5px] font-medium" style={{ color: levelC?.color || '#9da7ba' }}>{levelC ? levelC.label : '…'}</span>
+        </div>
+        {note && <p className="text-[12px] leading-snug">{note}</p>}
+      </div>
+    );
+  }
 
   if (!password) {
     return <p id={id} className="text-[13px] text-fog">Προτείνονται {recommended}+ χαρακτήρες (τουλάχιστον {min}), με κεφαλαία, πεζά, αριθμό και σύμβολο. Μια φράση από 3–4 λέξεις είναι ιδανική.</p>;

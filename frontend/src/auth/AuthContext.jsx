@@ -7,6 +7,16 @@ axios.defaults.withCredentials = true;
 
 const AuthContext = createContext(null);
 
+// Υπόδειξη (μόνο στον browser, χωρίς κανένα στοιχείο) ότι την προηγούμενη φορά ήταν συνδεδεμένος:
+// η αρχική περιμένει τον server πριν δείξει τη σελίδα, για να πάει κατευθείαν στην εφαρμογή χωρίς «αναλαμπή».
+const SIGNED_IN_HINT = 'lasca_signed_in';
+export function wasSignedIn() {
+  try { return localStorage.getItem(SIGNED_IN_HINT) === '1'; } catch { return false; }
+}
+function rememberSignedIn(on) {
+  try { if (on) localStorage.setItem(SIGNED_IN_HINT, '1'); else localStorage.removeItem(SIGNED_IN_HINT); } catch { /* ιδιωτική περιήγηση */ }
+}
+
 // Λέει στο backend ποιος είναι συνδεδεμένος και κρατάει τον χρήστη για όλη την εφαρμογή.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -23,6 +33,8 @@ export function AuthProvider({ children }) {
       return null;
     }
   }, []);
+
+  useEffect(() => { if (!loading) rememberSignedIn(Boolean(user)); }, [user, loading]);
 
   useEffect(() => {
     let alive = true;
@@ -75,14 +87,26 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const register = useCallback(async ({ email, password, displayName, remember, acceptTerms, ageConfirmed, captchaToken, website }) => {
+  // Επιστρέφει { verify: { emailHint } } όταν πρέπει πρώτα να επιβεβαιωθεί το email, αλλιώς { user }.
+  const register = useCallback(async ({ email, password, displayName, school, company, remember, acceptTerms, ageConfirmed, captchaToken, website }) => {
     const { data } = await axios.post(`${API_BASE_URL}/api/register`, {
-      email, password, display_name: displayName, remember,
+      email, password, display_name: displayName, school: school || undefined, company: company || undefined, remember,
       accept_terms: acceptTerms, age_confirmed: ageConfirmed,
       captcha_token: captchaToken || undefined, website: website || undefined,
     });
+    if (data?.status === 'verify_email') return { verify: { emailHint: data.email_hint } };
     setUser(data.user);
-    return data.user;
+    return { user: data.user };
+  }, []);
+
+  const resendVerification = useCallback(async (email) => {
+    await axios.post(`${API_BASE_URL}/api/auth/resend-verification`, { email });
+  }, []);
+
+  const acceptTerms = useCallback(async () => {
+    const { data } = await axios.post(`${API_BASE_URL}/api/me/accept-terms`, { accept: true });
+    setUser(data);
+    return data;
   }, []);
 
   const loginWithGoogle = useCallback(async (credential, { remember = true, acceptTerms, ageConfirmed } = {}) => {
@@ -104,9 +128,12 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => ({
     user, setUser, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout,
+    resendVerification, acceptTerms,
     config, googleClientId: config.google_client_id || null, captchaSiteKey: config.captcha_site_key || null,
     passwordMin: config.password_min || 8, passwordRecommended: config.password_recommended || 12, minAge: config.min_age || 15,
-  }), [user, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout, config]);
+    emailVerificationRequired: Boolean(config.email_verification_required),
+  }), [user, loading, refresh, login, verifyTwoFactor, sendTwoFactorEmail, register, loginWithGoogle, logout,
+    resendVerification, acceptTerms, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

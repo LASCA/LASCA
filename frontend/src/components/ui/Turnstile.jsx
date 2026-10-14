@@ -22,7 +22,7 @@ function loadScript() {
 }
 
 /** onToken(token|null). resetKey: άλλαξέ το για νέο έλεγχο (π.χ. μετά από αποτυχημένη υποβολή). */
-export default function Turnstile({ siteKey, onToken, resetKey = 0, action }) {
+export default function Turnstile({ siteKey, onToken, resetKey = 0, action, compact = false }) {
   const box = useRef(null);
   const widget = useRef(null);
   const cb = useRef(onToken);
@@ -38,6 +38,8 @@ export default function Turnstile({ siteKey, onToken, resetKey = 0, action }) {
         theme: 'dark',
         language: 'el',
         action,
+        // compact: το widget εμφανίζεται μόνο αν η Cloudflare χρειαστεί αλληλεπίδραση (εξοικονομεί χώρο)
+        ...(compact ? { appearance: 'interaction-only' } : {}),
         callback: (token) => cb.current?.(token),
         'expired-callback': () => cb.current?.(null),
         'error-callback': () => cb.current?.(null),
@@ -50,8 +52,8 @@ export default function Turnstile({ siteKey, onToken, resetKey = 0, action }) {
       }
       widget.current = null;
     };
-  }, [siteKey, resetKey, action]);
+  }, [siteKey, resetKey, action, compact]);
 
   if (!siteKey) return null;
-  return <div ref={box} className="min-h-[65px] flex justify-center" aria-label="Έλεγχος ασφαλείας" />;
+  return <div ref={box} className={`${compact ? '' : 'min-h-[65px]'} flex justify-center`} aria-label="Έλεγχος ασφαλείας" />;
 }

@@ -89,6 +89,8 @@ export default function Profile() {
   const fileInput = useRef(null);
 
   const [displayName, setDisplayName] = useState(user?.display_name || '');
+  const [school, setSchool] = useState(user?.school || '');
+  const [company, setCompany] = useState(user?.company || '');
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -110,8 +112,9 @@ export default function Profile() {
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
 
   const dirty = useMemo(
-    () => Boolean(avatarFile) || displayName.trim() !== (user?.display_name || ''),
-    [avatarFile, displayName, user]
+    () => Boolean(avatarFile) || displayName.trim() !== (user?.display_name || '')
+      || school.trim() !== (user?.school || '') || company.trim() !== (user?.company || ''),
+    [avatarFile, displayName, school, company, user]
   );
 
   const pickAvatar = (file) => {
@@ -139,10 +142,14 @@ export default function Profile() {
     try {
       const payload = new FormData();
       payload.append('display_name', displayName.trim());
+      payload.append('school', school.trim());
+      payload.append('company', company.trim());
       if (avatarFile) payload.append('avatar', avatarFile);
       const { data } = await axios.put(`${API_BASE_URL}/api/me`, payload);
       setUser(data);
       setDisplayName(data.display_name);
+      setSchool(data.school || '');
+      setCompany(data.company || '');
       setAvatarFile(null);
       setAvatarPreview(null);
       setIsEditing(false);
@@ -168,6 +175,8 @@ export default function Profile() {
 
   const cancelEdit = () => {
     setDisplayName(user?.display_name || '');
+    setSchool(user?.school || '');
+    setCompany(user?.company || '');
     setAvatarFile(null);
     setAvatarPreview(null);
     setIsEditing(false);
@@ -249,6 +258,23 @@ export default function Profile() {
                     </button>
                   )}
                 </div>
+                {isEditing ? (
+                  <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Σχολή <span className="normal-case tracking-normal font-normal">(προαιρετικό)</span></span>
+                      <input value={school} maxLength={120} onChange={(e) => setSchool(e.target.value)} className={INPUT} placeholder="π.χ. ΑΤΜ ΑΠΘ" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Εταιρεία <span className="normal-case tracking-normal font-normal">(προαιρετικό)</span></span>
+                      <input value={company} maxLength={120} onChange={(e) => setCompany(e.target.value)} className={INPUT} />
+                    </label>
+                  </div>
+                ) : (user?.school || user?.company) && (
+                  <dl className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-800/60 pt-3 text-[12px] sm:grid-cols-2">
+                    {user?.school && <div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Σχολή</dt><dd className="truncate text-slate-300">{user.school}</dd></div>}
+                    {user?.company && <div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Εταιρεία</dt><dd className="truncate text-slate-300">{user.company}</dd></div>}
+                  </dl>
+                )}
                 {isEditing && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-4">
                     <button type="submit" disabled={!dirty || saving} className={BTN_PRIMARY}>

@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from './AuthContext';
 import LascaLoader from '../components/animations/LascaLoader';
+import { TermsGate, VerifyEmailGate } from '../components/auth/AccountGates';
 
 export function FullScreenLoader({ label = 'ΦΟΡΤΩΣΗ...' }) {
   return (
@@ -17,13 +18,16 @@ export function FullScreenLoader({ label = 'ΦΟΡΤΩΣΗ...' }) {
 // Με ?signup=1 (π.χ. «Δημιουργία λογαριασμού» από το πρόγραμμα των Windows) πάει στην εγγραφή
 // αντί για τη σύνδεση· και στις δύο περιπτώσεις μετά γυρνάει εδώ.
 export function RequireAuth({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, emailVerificationRequired } = useAuth();
   const location = useLocation();
   if (loading) return <FullScreenLoader />;
   if (!user) {
     const signup = new URLSearchParams(location.search || window.location.search).get('signup') === '1';
     return <Navigate to={signup ? '/signup' : '/login'} replace state={{ from: location.pathname }} />;
   }
+  // Πρώτα επιβεβαίωση email (αν την απαιτεί ο server), μετά αποδοχή των τρεχόντων Όρων.
+  if (emailVerificationRequired && !user.email_verified) return <VerifyEmailGate />;
+  if (user.terms_current === false) return <TermsGate />;
   return children;
 }
 

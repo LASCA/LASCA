@@ -4,7 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Loader2, MailCheck } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
-import { FormError, SubmitButton, TextField, formatWait, useCooldown } from '../components/auth/FormParts';
+import { FormError, PRIMARY_BUTTON, SubmitButton, TextField, formatWait, useCooldown } from '../components/auth/FormParts';
 import PasswordStrength from '../components/ui/PasswordStrength';
 import Turnstile from '../components/ui/Turnstile';
 import { API_BASE_URL } from '../config';
@@ -111,13 +111,13 @@ export function ResetPassword() {
   };
 
   if (check.state === 'loading') {
-    return <AuthLayout title="Έλεγχος συνδέσμου…"><Loader2 className="mx-auto animate-spin text-fog" /></AuthLayout>;
+    return <AuthLayout title="Έλεγχος συνδέσμου…"><Loader2 className="mx-auto animate-spin text-slate-500" /></AuthLayout>;
   }
   if (check.state === 'invalid') {
     return (
       <AuthLayout eyebrow="Επαναφορά κωδικού" title="Ο σύνδεσμος δεν ισχύει"
         subtitle="Μπορεί να έληξε (ισχύει 30 λεπτά), να χρησιμοποιήθηκε ήδη ή να αντιγράφηκε λάθος.">
-        <Link to="/forgot-password" className="l-btn l-btn-primary l-btn-lg w-full">Ζήτησε νέο σύνδεσμο</Link>
+        <Link to="/forgot-password" className={PRIMARY_BUTTON}>Ζήτησε νέο σύνδεσμο</Link>
       </AuthLayout>
     );
   }
@@ -145,27 +145,30 @@ export function VerifyEmail() {
   const { user, refresh } = useAuth();
   const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') || '');
   const [state, setState] = useState('loading');
+  const [verifiedEmail, setVerifiedEmail] = useState('');
 
   useEffect(() => {
     if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
     if (!token) { setState('invalid'); return; }
     axios.post(`${API_BASE_URL}/api/auth/verify-email`, { token })
-      .then(() => { setState('ok'); refresh(); })
+      .then(({ data }) => { setVerifiedEmail(data?.email || ''); setState('ok'); refresh(); })
       .catch(() => setState('invalid'));
   }, [token, refresh]);
 
-  if (state === 'loading') return <AuthLayout title="Επιβεβαίωση…"><Loader2 className="mx-auto animate-spin text-fog" /></AuthLayout>;
+  if (state === 'loading') return <AuthLayout title="Επιβεβαίωση…"><Loader2 className="mx-auto animate-spin text-slate-500" /></AuthLayout>;
   if (state === 'invalid') {
     return (
       <AuthLayout eyebrow="Email" title="Ο σύνδεσμος δεν ισχύει"
-        subtitle="Μπορεί να έληξε (ισχύει 48 ώρες) ή να χρησιμοποιήθηκε ήδη. Ζήτησε νέο από το Προφίλ.">
-        <Link to={user ? '/profile' : '/login'} className="l-btn l-btn-primary l-btn-lg w-full">{user ? 'Στο προφίλ' : 'Σύνδεση'}</Link>
+        subtitle="Μπορεί να έληξε (ισχύει 48 ώρες) ή να χρησιμοποιήθηκε ήδη. Δοκίμασε να συνδεθείς: αν ο λογαριασμός δεν έχει επιβεβαιωθεί, θα μπορείς να ζητήσεις νέο σύνδεσμο.">
+        <Link to={user ? '/app' : '/login'} className={PRIMARY_BUTTON}>{user ? 'Άνοιγμα εφαρμογής' : 'Σύνδεση'}</Link>
       </AuthLayout>
     );
   }
   return (
-    <AuthLayout eyebrow="Email" title="Το email επιβεβαιώθηκε" subtitle="Ευχαριστούμε! Ο λογαριασμός σου είναι πλέον πλήρως ενεργός.">
-      <Link to={user ? '/app' : '/login'} className="l-btn l-btn-primary l-btn-lg w-full">{user ? 'Άνοιγμα εφαρμογής' : 'Σύνδεση'}</Link>
+    <AuthLayout eyebrow="Email" title="Το email επιβεβαιώθηκε" subtitle="Ευχαριστούμε! Ο λογαριασμός σου είναι πλέον ενεργός.">
+      {user
+        ? <Link to="/app" className={PRIMARY_BUTTON}>Άνοιγμα εφαρμογής</Link>
+        : <Link to="/login" state={{ email: verifiedEmail }} className={PRIMARY_BUTTON}>Σύνδεση</Link>}
     </AuthLayout>
   );
 }
