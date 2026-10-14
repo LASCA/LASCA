@@ -85,7 +85,6 @@ The basic-calculation module provides tools for:
 | Backend | Python, Flask 3.1, Flask-CORS | Local API, project persistence, and application orchestration |
 | Survey computation | NumPy, Pandas, SciPy, Matplotlib, project-specific Python modules | Numerical processing, tabular data, calculations, and plots |
 | Export and desktop runtime | ReportLab, ezdxf, PyWebView | PDF reports, DXF output, and the desktop window |
-| Packaging | PyInstaller and Inno Setup 6 | Windows executable and installer builds |
 
 ### Application Architecture
 
@@ -93,132 +92,76 @@ The frontend keeps the active project state in `frontend/src/App.jsx` and sends 
 
 The backend exposes endpoints for project management, goniometry, adjustment, traverse, traverse height, tachymetry, stakeout, basic calculations, geometric leveling, and trigonometric leveling. The frontend API base URL is configurable through `VITE_API_BASE_URL`; when it is unset, the frontend uses a same-origin base URL.
 
-## Installation and Running Locally
+## Installation and Running Locally (website)
+
+This branch (`web-pages`) is the website at lasca.gr. The Windows program lives in the `redesign-desktop-2` branch.
 
 ### Prerequisites
 
-- Windows 10 or later is recommended for the packaged workflow.
-- Node.js and npm for frontend development.
-- Python 3.10 or newer recommended for the backend environment.
-- PowerShell or another terminal available on the system path.
+- Python 3.10 or newer, Node.js and npm.
 
-### Install the frontend
-
-From the repository root:
-
-```powershell
-Push-Location frontend
-npm install
-Pop-Location
-```
-
-### Create a Python environment
+### Backend
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r deploy/requirements-web.txt
+copy code\.env.example code\.env      # then fill in the values
+python code\main_4_app.py               # http://127.0.0.1:5000
 ```
 
-The repository also contains a pre-existing `Lasca.venv` directory in some development environments. A new environment is preferred for a clean setup; do not commit virtual-environment files.
+Test accounts for local work: `python code\dev_tools.py seed` (`reset` clears them).
 
-### Run the desktop/backend application
-
-```powershell
-python code\main_4_app.py
-```
-
-The backend selects an available loopback port, starts Flask on `127.0.0.1`, and opens a PyWebView window. For the packaged experience, the backend serves the built frontend from `frontend/dist`.
-
-### Run the Vite frontend during development
-
-In a separate terminal:
+### Frontend
 
 ```powershell
 Push-Location frontend
-npm run dev
+npm install
+npm run build    # the Flask server serves frontend/dist
 Pop-Location
 ```
 
-For a split frontend/backend development session, set `VITE_API_BASE_URL` to the loopback URL and port reported by the Flask process before starting Vite:
+During development you can also run `npm run dev` with `VITE_API_BASE_URL=http://127.0.0.1:5000`.
+
+### Tests
 
 ```powershell
-$env:VITE_API_BASE_URL = "http://127.0.0.1:<backend-port>"
-Push-Location frontend
-npm run dev
-Pop-Location
+python code\tests\test_security.py
+python code\tests\test_collab.py
+python code\tests\test_history.py
+python code\tests\test_team_gate.py
 ```
 
-The frontend package also provides these scripts:
+### Deploy
 
-```powershell
-npm run build    # Create frontend/dist
-npm run preview  # Preview the production frontend build
-npm run lint     # Run ESLint
-```
+See `deploy/README.md` (Oracle Cloud, nginx, gunicorn, HTTPS). Updates: `bash deploy/update.sh` on the server.
 
-### Build the Windows release
-
-The repository includes an end-to-end PowerShell release script:
-
-```powershell
-.\build_release.ps1
-```
-
-This script builds the Vite frontend, runs PyInstaller using `LASCA.spec`, and compiles the installer with Inno Setup 6. It expects the repository's `Lasca.venv` Python executable and an available `ISCC.exe` installation. The installer is written to `installer-output\LASCA_Setup.exe` when all three build stages succeed.
-
-## Project Structure and Storage
+## Project Structure
 
 ```text
-survey_project/
-├── README.md
-├── requirements.txt
-├── build_release.ps1
-├── LASCA.spec
-├── installer/
-│   └── LASCA_Setup.iss
+LASCA/
+├── LICENSE
 ├── code/
-│   ├── main_4_app.py
-│   ├── data_proccessing.py
-│   ├── project_manager.py
-│   ├── gwn.py
-│   ├── visualization.py
-│   ├── vis_4_app.py
-│   └── assets/
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── src/
-│       ├── App.jsx
-│       ├── config.js
-│       └── components/
-└── data/
+│   ├── main_4_app.py        # Flask app: pages, calculations, reports
+│   ├── auth_security.py     # accounts, 2FA, e-mail verification, desktop sign-in
+│   ├── collab.py            # shared projects, members, history
+│   ├── history_diff.py      # detailed change history
+│   ├── security.py          # security headers, origin checks, rate limits
+│   ├── team_gate.py         # optional team password for the test period
+│   ├── data_proccessing.py  # survey computations
+│   ├── vis_4_app.py         # plots
+│   ├── project_manager.py   # project storage
+│   ├── dev_tools.py         # local test accounts
+│   └── tests/
+├── deploy/                  # server setup and update scripts
+└── frontend/                # React + Vite
+    ├── public/              # icons, landing-page videos
+    └── src/
 ```
 
 ### User project storage
 
-The backend stores projects below the current user's home directory:
-
-```text
-C:\Users\<username>\LASCA\
-└── <project-name>\
-    ├── project_data.json
-    ├── data\
-    ├── results\
-    │   ├── charaxi\
-    │   ├── odeusi\
-    │   └── taxymetria\
-    └── reports\
-        ├── charaxi\
-        ├── odeusi\
-        └── taxymetria\
-```
-
-This path is generated dynamically with Python's `Path.home()` and therefore changes with the Windows user account. It is not tied to the repository location or the installation directory. The `Topo_Workspace` directories included in the repository are development/sample data and should not be treated as the production storage root.
-
-`project_data.json` contains project metadata and the persisted application state, including observations, traverse data and metrics, tachymetry data, stakeout data, goniometry, leveling data, and trigonometric-height data. Calculation endpoints may also write files such as `latest_traverse.json` and `latest_leveling.json` inside the active project directory.
+On the server, projects are stored under `LASCA_PROJECTS_DIR` (see `code/.env.example`), one folder per project with `project_data.json`.
 
 ## Development Team
 
@@ -230,6 +173,6 @@ LASCA was developed by students of Surveying and Geomatics Engineering at Aristo
 | Ilias Saoulias | [GitHub](https://github.com/iliasaou) |
 | Savvas Tsigou | [GitHub](https://github.com/Savvas-Tsigou) |
 
-## License and Distribution
+## License
 
-No `LICENSE` file is currently present in this repository. Licensing and redistribution terms should be confirmed with the project owners before publishing or distributing the software.
+LASCA Source-Available License — see `LICENSE`.
