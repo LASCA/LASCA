@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # Φορτώνει την εφαρμογή (και το code/.env) χωρίς να ξεκινήσει τον server.
 import main_4_app as lasca  # noqa: E402
+from auth_security import utcnow  # noqa: E402
 from project_manager import TopoProject  # noqa: E402
 
 app, db = lasca.app, lasca.db
@@ -99,6 +100,12 @@ def seed():
                 user.set_password(SEED_PASSWORD)
                 db.session.add(user)
                 print(f'✔ Χρήστης {spec["email"]}')
+            # Δοκιμαστικοί λογαριασμοί: έτοιμοι για χρήση, χωρίς email επιβεβαίωσης και οθόνη νέων Όρων.
+            user.email_verified = True
+            user.age_confirmed = True
+            if user.terms_version != lasca.TERMS_VERSION:
+                user.terms_version = lasca.TERMS_VERSION
+                user.terms_accepted_at = utcnow()
             users[spec['email']] = user
         db.session.commit()
 

@@ -23,6 +23,8 @@ os.environ.update({
     'MAX_PROJECTS_PER_USER': '6', 'PUBLIC_URL': 'http://localhost', 'RESEND_API_KEY': '',
 })
 os.environ.pop('LASCA_ENV', None)
+# Τα περισσότερα tests: χωρίς υποχρεωτική επιβεβαίωση email (ελέγχεται χωριστά πιο κάτω).
+os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 os.environ.pop('TURNSTILE_SECRET_KEY', None)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -129,6 +131,53 @@ sec.pwned_count = _orig_pwned
 sec.A.hibp_enabled = False
 ok(client().post('/api/auth/password-check', json={'password': 'Password123!'}).json['ok'] is False,
    'live password check endpoint flags weak passwords')
+
+
+# ---------------------------------------------------------------- email verification required (anti-bot)
+os.environ['REQUIRE_EMAIL_VERIFICATION'] = '1'
+SENT.clear()
+nv, r = signup('needs-verify@lasca.test', school='ΑΠΘ', company='')
+ok(r.status_code == 201 and r.json.get('status') == 'verify_email' and 'Set-Cookie' not in r.headers or
+   'lasca_session' not in r.headers.get('Set-Cookie', ''), 'signup does not log in until the email is verified')
+ok(nv.get('/api/me').status_code == 401, 'no session after signup')
+ok(any(to == 'needs-verify@lasca.test' for to, *_ in SENT), 'verification email sent')
+r = client().post('/api/login', json={'email': 'needs-verify@lasca.test', 'password': PW})
+ok(r.status_code == 403 and r.json.get('code') == 'email_unverified', 'login blocked until verified')
+r = client().post('/api/auth/device-token', json={'email': 'needs-verify@lasca.test', 'password': PW})
+ok(r.status_code == 403 and r.json.get('code') == 'email_unverified', 'desktop login blocked until verified')
+_, r = signup('needs-verify@lasca.test', 'Other-Strong-Pass-55!', school='ΑΠΘ')
+ok(r.status_code == 201, 'unverified signup can be repeated (e.g. typo) without revealing anything')
+r = client().post('/api/auth/resend-verification', json={'email': 'nobody-here@lasca.test'})
+ok(r.status_code == 200 and r.json['status'] == 'sent', 'resend: same answer for unknown emails')
+_, r = signup('noname@lasca.test', display_name='')
+ok(r.status_code == 400 and r.json.get('code') == 'name_required', 'name is required')
+import re as _re
+link = [h for to, subj, h in SENT if to == 'needs-verify@lasca.test'][-1]
+token = _re.search(r'token=([\w-]+)', link).group(1)
+r = client().post('/api/auth/verify-email', json={'token': token})
+ok(r.status_code == 200 and r.json.get('email') == 'needs-verify@lasca.test', 'verification link works')
+c = client()
+r = c.post('/api/login', json={'email': 'needs-verify@lasca.test', 'password': 'Other-Strong-Pass-55!'})
+ok(r.status_code == 200, 'login works after verification')
+me = c.get('/api/me').json
+ok(me['school'] == 'ΑΠΘ' and me['company'] == '' and me['terms_current'] is True, 'school/company and terms version stored')
+# παλιός λογαριασμός χωρίς επιβεβαίωση, με ανοιχτή σύνδεση: μόνο τα απαραίτητα
+with m.app.app_context():
+    u = m.User.query.filter_by(email='needs-verify@lasca.test').first(); u.email_verified = False; m.db.session.commit()
+ok(c.get('/api/me').status_code == 200, 'unverified session can still read /api/me')
+r = c.get('/api/me/projects')
+ok(r.status_code == 403 and r.json.get('code') == 'email_unverified', 'unverified session cannot use the app')
+ok(c.post('/api/me/verify-email').status_code == 200, 'unverified session can ask for a new link')
+with m.app.app_context():
+    u = m.User.query.filter_by(email='needs-verify@lasca.test').first(); u.email_verified = True; u.terms_version = '2000-01-01'
+    m.db.session.commit()
+ok(c.get('/api/me').json['terms_current'] is False, 'old terms version is reported')
+ok(c.post('/api/me/accept-terms', json={}).status_code == 400, 'accepting terms needs explicit consent')
+r = c.post('/api/me/accept-terms', json={'accept': True})
+ok(r.status_code == 200 and r.json['terms_current'] is True, 'new terms accepted')
+r = c.put('/api/me', json={'school': 'ΑΠΘ - Αγρονόμοι', 'company': 'Γεωμετρική ΙΚΕ'})
+ok(r.json['school'] == 'ΑΠΘ - Αγρονόμοι' and r.json['company'] == 'Γεωμετρική ΙΚΕ', 'school/company editable in profile')
+os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 
 # ---------------------------------------------------------------- brute force protection
 carol, _ = signup('carol@lasca.test')

@@ -85,7 +85,7 @@ from PIL import Image
 buf=io.BytesIO(); Image.new('RGB',(600,300),(200,40,40)).save(buf,'PNG'); buf.seek(0)
 r=S.put('/api/me',data={'display_name':'Σάββας','avatar':(buf,'a.png')},content_type='multipart/form-data'); ok(r.status_code==200 and r.json['avatar_url'],'avatar upload processed')
 ok(A.get(r.json['avatar_url'].split('?')[0]).status_code==200,'collaborator sees avatar')
-lonely=m.app.test_client(); lonely.environ_base['HTTP_ORIGIN']='http://localhost'; lonely.post('/api/register',json={'email':'x@lasca.test','password':'Another-Strong-Pass-77?','accept_terms':True,'age_confirmed':True})
+lonely=m.app.test_client(); lonely.environ_base['HTTP_ORIGIN']='http://localhost'; lonely.post('/api/register',json={'email':'x@lasca.test','password':'Another-Strong-Pass-77?','display_name':'X','accept_terms':True,'age_confirmed':True})
 ok(lonely.get(r.json['avatar_url'].split('?')[0]).status_code==403,'stranger cannot see avatar')
 ok(S.get('/api/me/projects').json['stats']['collaborators']==2,'profile stats')
 ok(S.post('/api/me/password',json={'current_password':'wrong','new_password':'Brand-New-Pass-2026#'}).status_code==403,'wrong current password rejected')

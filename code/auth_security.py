@@ -620,6 +620,28 @@ def email_enabled():
     return bool(A.resend is not None and os.getenv('RESEND_API_KEY', '').strip())
 
 
+def email_verification_required():
+    """Νέοι λογαριασμοί (με κωδικό) μπαίνουν μόνο αφού επιβεβαιώσουν το email τους (προστασία από bots).
+    Προεπιλογή: ενεργό όταν ο server στέλνει email. REQUIRE_EMAIL_VERIFICATION=0/1 το ορίζει ρητά
+    (π.χ. τοπικά χωρίς Resend είναι ανενεργό, για να δουλεύουν οι λογαριασμοί του dev_tools.py)."""
+    value = os.getenv('REQUIRE_EMAIL_VERIFICATION', '').strip().lower()
+    if value in {'1', 'true', 'yes', 'on'}:
+        return True
+    if value in {'0', 'false', 'no', 'off'}:
+        return False
+    return email_enabled()
+
+
+def require_verified(user):
+    if email_verification_required() and not user.email_verified:
+        raise AuthError('Επιβεβαίωσε πρώτα το email σου: σου στείλαμε σύνδεσμο. Δεν το βρίσκεις; Ζήτα νέο.',
+                        403, code='email_unverified', email_hint=mask_email(user.email))
+
+
+def clean_optional(value, limit=120):
+    return clean_display_name(value)[:limit] or None
+
+
 def send_email(to, subject, html, dev_hint=None):
     """Όρια κόστους (ανά ημέρα / ανά παραλήπτη) και αποστολή στο παρασκήνιο (ίδιος χρόνος απάντησης
     είτε υπάρχει λογαριασμός είτε όχι). Στα logs δεν γράφεται ποτέ θέμα, κωδικός ή σύνδεσμος."""
@@ -715,6 +737,8 @@ def auth_config():
         'password_min': PASSWORD_MIN,
         'password_recommended': PASSWORD_RECOMMENDED,
         'min_age': A.MIN_AGE,
+        'email_verification_required': email_verification_required(),
+        'terms_version': A.TERMS_VERSION,
     })
 
 
@@ -751,18 +775,35 @@ def register_user():
     require_captcha(data)
     throttle(f'signup:{client_ip()}', SIGNUP_IP_LIMIT, timedelta(hours=1),
              'Πάρα πολλές εγγραφές από αυτό το δίκτυο. Δοκίμασε ξανά αργότερα.')
+    if not display_name:
+        raise AuthError('Γράψε το όνομά σου.', 400, code='name_required')
     validate_new_password(password, email, display_name)
-    if find_user(email):
+    must_verify = email_verification_required()
+    existing = find_user(email)
+    if existing and not (must_verify and not existing.email_verified and existing.has_password):
         record('signup_failed', email=email, detail={'reason': 'exists'})
         raise AuthError('Υπάρχει ήδη λογαριασμός με αυτό το email. Σύνδεση ή «Ξέχασα τον κωδικό».', 409,
                         code='email_taken')
-    user = A.User(email=email, display_name=display_name or email.split('@', 1)[0][:DISPLAY_NAME_MAX],
-                  terms_accepted_at=utcnow(), age_confirmed=True, password_changed_at=utcnow())
+    if existing:
+        # Λογαριασμός που δεν επιβεβαιώθηκε ποτέ (π.χ. λάθος στο email ή ξαναγράφτηκε): νέα στοιχεία, νέο email.
+        # Δεν δίνει πρόσβαση σε τίποτα: μπαίνει μόνο όποιος ανοίξει το email.
+        user = existing
+        user.display_name = display_name
+        user.session_version = (user.session_version or 0) + 1
+    else:
+        user = A.User(email=email)
+        A.db.session.add(user)
+    user.display_name = display_name
+    user.school = clean_optional(data.get('school'))
+    user.company = clean_optional(data.get('company'))
+    user.terms_accepted_at, user.terms_version, user.age_confirmed = utcnow(), A.TERMS_VERSION, True
+    user.password_changed_at = utcnow()
     user.set_password(password)
-    A.db.session.add(user)
     A.db.session.commit()
     record('signup', user=user)
     send_verification(user)
+    if must_verify:
+        return jsonify({'status': 'verify_email', 'email_hint': mask_email(user.email)}), 201
     return start_session(user, data.get('remember'), 'signup')
 
 
@@ -780,6 +821,7 @@ def login_route():
         login_failed(email, reason='unknown_email')
     if not user.check_password(password):
         login_failed(email, user=user)
+    require_verified(user)
     return begin_login(user, data.get('remember'), 'password')
 
 
@@ -813,7 +855,8 @@ def google_login_route():
             raise AuthError('Για νέο λογαριασμό αποδέξου πρώτα τους όρους στη σελίδα εγγραφής.', 403,
                             code='terms_required')
         user = A.User(email=email, display_name=clean_display_name(info.get('name') or email.split('@', 1)[0]),
-                      terms_accepted_at=utcnow(), age_confirmed=True, email_verified=True)
+                      terms_accepted_at=utcnow(), terms_version=A.TERMS_VERSION, age_confirmed=True,
+                      email_verified=True)
         user.set_password(secrets.token_hex(32))   # κανείς δεν τον ξέρει: μπαίνει μόνο με Google
         user.has_password = False
         A.db.session.add(user)
@@ -977,6 +1020,7 @@ def create_device_token():
     if not user.has_password:
         raise AuthError('Ο λογαριασμός σου μπαίνει με Google. Όρισε πρώτα κωδικό από το Προφίλ στη σελίδα.',
                         403, code='no_password')
+    require_verified(user)
     if user.totp_enabled:
         code = text_field(data, 'otp', 64)
         method = user.twofa_method or 'totp'
@@ -1354,7 +1398,33 @@ def verify_email():
         user.email_verified = True
     A.db.session.commit()
     record('email_verified', user=user)
-    return jsonify({'status': 'verified'})
+    return jsonify({'status': 'verified', 'email': user.email if user is not None else None})
+
+
+@bp.post('/api/auth/resend-verification')
+def resend_verification_public():
+    """Νέο email επιβεβαίωσης από τη σελίδα σύνδεσης/εγγραφής. Ίδια απάντηση πάντα (δεν φανερώνει
+    αν υπάρχει λογαριασμός)."""
+    data = body()
+    throttle(f'verifyresend-ip:{client_ip()}', 10, timedelta(hours=1), 'Στάλθηκαν ήδη αρκετά emails. Δοκίμασε σε λίγο.')
+    email = A.normalize_email(text_field(data, 'email'))
+    user = find_user(email) if email else None
+    if user is not None and not user.email_verified \
+            and not db_hit(f'verifyresend:{user.id}', 3, timedelta(hours=1)):
+        send_verification(user)
+    return jsonify({'status': 'sent'})
+
+
+@bp.post('/api/me/accept-terms')
+@login_required
+def accept_terms():
+    if body().get('accept') is not True:
+        raise AuthError('Πρέπει να αποδεχτείς τους Όρους για να συνεχίσεις.', 400, code='terms_required')
+    user = current_user._get_current_object()
+    user.terms_version, user.terms_accepted_at = A.TERMS_VERSION, utcnow()
+    A.db.session.commit()
+    record('terms_accepted', user=user, detail={'version': A.TERMS_VERSION})
+    return jsonify(user.to_me_dict())
 
 
 @bp.post('/api/me/verify-email')
@@ -1375,7 +1445,7 @@ EVENT_LABELS = {
     'password_changed': 'Αλλαγή κωδικού', 'backup_codes_regenerated': 'Νέοι εφεδρικοί κωδικοί',
     'backup_code_used': 'Χρήση εφεδρικού κωδικού', 'signup': 'Δημιουργία λογαριασμού',
     'logout_all': 'Αποσύνδεση από όλες τις συσκευές', 'reset_requested': 'Αίτημα επαναφοράς κωδικού',
-    'email_verified': 'Επιβεβαίωση email', 'unverified_account_reclaimed': 'Ανάκτηση λογαριασμού μέσω Google',
+    'email_verified': 'Επιβεβαίωση email', 'terms_accepted': 'Αποδοχή νέων Όρων χρήσης', 'unverified_account_reclaimed': 'Ανάκτηση λογαριασμού μέσω Google',
     'desktop_login_approved': 'Έγκριση του προγράμματος των Windows',
     'desktop_login_denied': 'Απόρριψη σύνδεσης προγράμματος',
 }

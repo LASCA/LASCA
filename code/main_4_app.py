@@ -418,6 +418,11 @@ USER_AVATAR_DIR = LASCA_DATA / 'avatars'
 USER_AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# Έκδοση των Όρων χρήσης (ίδια με το TERMS_VERSION στο frontend/src/site.js). Όταν αλλάζουν ουσιαστικά οι Όροι,
+# αλλάζει και αυτή: όσοι είχαν αποδεχτεί παλαιότερη βλέπουν τους νέους και τους αποδέχονται ξανά.
+TERMS_VERSION = '2026-10-14'
+
+
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -443,6 +448,10 @@ class User(db.Model, UserMixin):
     password_changed_at = db.Column(db.DateTime, nullable=True)
     twofa_method = db.Column(db.String(10), nullable=False, default='totp')   # totp | email
     email_verified = db.Column(db.Boolean, nullable=False, default=False)
+    # Ποια έκδοση των Όρων αποδέχτηκε (βλ. TERMS_VERSION). Παλαιότερη → ζητάμε ξανά αποδοχή.
+    terms_version = db.Column(db.String(20), nullable=True)
+    school = db.Column(db.String(120), nullable=True)      # προαιρετικό (εγγραφή / Προφίλ)
+    company = db.Column(db.String(120), nullable=True)     # προαιρετικό
 
     def get_id(self):
         return f"{self.id}:{self.session_version or 0}"
@@ -478,6 +487,10 @@ class User(db.Model, UserMixin):
         data['has_password'] = bool(self.has_password)
         data['two_factor_enabled'] = bool(self.totp_enabled)
         data['email_verified'] = bool(self.email_verified)
+        data['school'] = self.school or ''
+        data['company'] = self.company or ''
+        data['terms_version'] = self.terms_version
+        data['terms_current'] = self.terms_version == TERMS_VERSION
         data['created_at'] = self.created_at.isoformat() + 'Z' if self.created_at else None
         return data
 
@@ -698,8 +711,9 @@ PUBLIC_API_PATHS = {
     '/api/auth/config', '/api/auth/google', '/api/auth/device-token',
     '/api/auth/2fa/verify', '/api/auth/2fa/email', '/api/auth/forgot', '/api/auth/reset',
     '/api/auth/reset/check', '/api/auth/password-check', '/api/auth/verify-email',
-    '/api/auth/desktop/start', '/api/desktop-link/poll',
+    '/api/auth/desktop/start', '/api/desktop-link/poll', '/api/auth/resend-verification',
 }
+UNVERIFIED_ALLOWED = {'/api/me/verify-email', '/api/me/accept-terms', '/api/me/security-events'}
 # Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
 PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
 
@@ -714,6 +728,12 @@ def require_login_for_api():
     if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS \
             and not current_user.is_authenticated:
         return jsonify({"error": "Απαιτείται σύνδεση"}), 401
+    # Λογαριασμός χωρίς επιβεβαιωμένο email (π.χ. φτιάχτηκε πριν γίνει υποχρεωτική η επιβεβαίωση):
+    # μόνο τα απαραίτητα (ποιος είμαι, νέο email επιβεβαίωσης, αποσύνδεση, διαγραφή λογαριασμού).
+    if request.path.startswith('/api/') and current_user.is_authenticated and not current_user.email_verified \
+            and email_verification_required() and request.path not in PUBLIC_API_PATHS \
+            and request.path not in UNVERIFIED_ALLOWED and not (request.path == '/api/me' and request.method == 'DELETE'):
+        return jsonify({"error": "Επιβεβαίωσε πρώτα το email σου. Σου στείλαμε σύνδεσμο.", "code": "email_unverified"}), 403
     # Υπολογισμοί/εξαγωγές που αναφέρουν project (header, ?project=, form, JSON): έλεγχος πρόσβασης
     # ΠΡΙΝ τρέξει ο κώδικας, ώστε κανείς να μη διαβάζει/γράφει αρχεία project άλλου χρήστη (IDOR).
     if request.path.startswith('/api/') and not request.path.startswith(_PROJECT_API_PREFIXES):
@@ -752,6 +772,9 @@ def _migrate_schema():
             ('password_changed_at', 'DATETIME'),
             ('twofa_method', "VARCHAR(10) NOT NULL DEFAULT 'totp'"),
             ('email_verified', 'BOOLEAN NOT NULL DEFAULT 0'),
+            ('terms_version', 'VARCHAR(20)'),
+            ('school', 'VARCHAR(120)'),
+            ('company', 'VARCHAR(120)'),
         ],
         'projects': [
             ('public_id', 'VARCHAR(32)'),
@@ -1299,7 +1322,7 @@ def logout_user_route():
 # Λογαριασμοί, projects, κοινοποίηση και ζωντανή συνεργασία: code/collab.py
 # ==========================================
 from collab import init_collab  # noqa: E402
-from auth_security import init_auth  # noqa: E402
+from auth_security import email_verification_required, init_auth  # noqa: E402
 
 init_auth(
     app, db=db, User=User, AuthEvent=AuthEvent, RateHit=RateHit, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
@@ -1307,7 +1330,7 @@ init_auth(
     DesktopLogin=DesktopLogin,
     EMAIL_RE=EMAIL_RE, logger=logger, resend=resend, GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID,
     PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(), is_development=IS_DEVELOPMENT,
-    MIN_AGE=int(os.getenv('MIN_SIGNUP_AGE', '15')),
+    MIN_AGE=int(os.getenv('MIN_SIGNUP_AGE', '15')), TERMS_VERSION=TERMS_VERSION,
 )
 
 init_collab(

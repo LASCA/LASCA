@@ -447,6 +447,9 @@ def update_me():
         if not name:
             raise ApiError('Το όνομα χρήστη δεν μπορεί να είναι κενό.')
         current_user.display_name = name
+    for field in ('school', 'company'):          # προαιρετικά· κενό = σβήνεται
+        if field in data:
+            setattr(current_user, field, clean_display_name(data.get(field))[:120] or None)
     avatar = request.files.get('avatar')
     if avatar is not None and avatar.filename:
         raw = avatar.read(MAX_AVATAR_BYTES + 1)
