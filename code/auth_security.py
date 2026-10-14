@@ -81,6 +81,14 @@ def init_auth(app, **refs):
     A.hmac_key = hashlib.sha256(('lasca-codes:' + key_material).encode()).digest()
     if not A.turnstile_secret and not A.dev:
         A.logger.warning('TURNSTILE_SECRET_KEY is not set: CAPTCHA is disabled (rate limits still apply)')
+    if email_verification_required() and not email_enabled():
+        A.logger.error('Email verification is required but email is not configured (resend package=%s, '
+                       'RESEND_API_KEY=%s): NEW SIGNUPS ARE CLOSED until this is fixed',
+                       'ok' if A.resend is not None else 'missing',
+                       'set' if os.getenv('RESEND_API_KEY', '').strip() else 'missing')
+    if not A.dev and 'resend.dev' in A.email_from:
+        A.logger.warning('EMAIL_FROM uses onboarding@resend.dev: Resend delivers it ONLY to the Resend account '
+                         'owner. Verify your domain in Resend and set EMAIL_FROM (e.g. LASCA <noreply@lasca.gr>)')
     app.register_blueprint(bp)
 
 
@@ -621,15 +629,15 @@ def email_enabled():
 
 
 def email_verification_required():
-    """Νέοι λογαριασμοί (με κωδικό) μπαίνουν μόνο αφού επιβεβαιώσουν το email τους (προστασία από bots).
-    Προεπιλογή: ενεργό όταν ο server στέλνει email. REQUIRE_EMAIL_VERIFICATION=0/1 το ορίζει ρητά
-    (π.χ. τοπικά χωρίς Resend είναι ανενεργό, για να δουλεύουν οι λογαριασμοί του dev_tools.py)."""
+    """Κάθε λογαριασμός με κωδικό μπαίνει μόνο αφού επιβεβαιώσει το email του (προστασία από bots).
+    Πάντα ενεργό στον server, ακόμα κι αν λείπει το Resend (τότε κλείνουν οι νέες εγγραφές, δεν ανοίγουν χωρίς έλεγχο).
+    Ανενεργό μόνο τοπικά (LASCA_ENV=development) ή ρητά με REQUIRE_EMAIL_VERIFICATION=0."""
     value = os.getenv('REQUIRE_EMAIL_VERIFICATION', '').strip().lower()
     if value in {'1', 'true', 'yes', 'on'}:
         return True
     if value in {'0', 'false', 'no', 'off'}:
         return False
-    return email_enabled()
+    return not A.dev
 
 
 def require_verified(user):
@@ -642,9 +650,11 @@ def clean_optional(value, limit=120):
     return clean_display_name(value)[:limit] or None
 
 
-def send_email(to, subject, html, dev_hint=None):
+def send_email(to, subject, html, dev_hint=None, wait=False):
     """Όρια κόστους (ανά ημέρα / ανά παραλήπτη) και αποστολή στο παρασκήνιο (ίδιος χρόνος απάντησης
-    είτε υπάρχει λογαριασμός είτε όχι). Στα logs δεν γράφεται ποτέ θέμα, κωδικός ή σύνδεσμος."""
+    είτε υπάρχει λογαριασμός είτε όχι). wait=True: περιμένει την απάντηση του Resend και επιστρέφει αν πέτυχε
+    (μόνο όπου δεν προδίδει αν υπάρχει λογαριασμός, π.χ. στην εγγραφή). Στα logs δεν γράφεται ποτέ θέμα,
+    κωδικός ή σύνδεσμος."""
     if db_hit('email:global', A.max_emails_day, timedelta(days=1)):
         A.logger.error('Daily email cap (%s) reached: email not sent', A.max_emails_day)
         return False
@@ -663,9 +673,15 @@ def send_email(to, subject, html, dev_hint=None):
         try:
             A.resend.api_key = os.getenv('RESEND_API_KEY', '').strip()
             A.resend.Emails.send({'from': A.email_from, 'to': [to], 'subject': subject, 'html': html})
+            return True
         except Exception as exc:
-            A.logger.error('Resend email failed: %s', type(exc).__name__)
+            # Το μήνυμα του Resend λέει την αιτία (π.χ. «domain is not verified», «API key is invalid»).
+            A.logger.error('Resend email to %s failed: %s: %s', mask_email(to), type(exc).__name__,
+                           str(exc)[:300].replace('\n', ' '))
+            return False
 
+    if wait:
+        return _deliver()
     import threading
     threading.Thread(target=_deliver, daemon=True).start()
     return True
@@ -779,6 +795,11 @@ def register_user():
         raise AuthError('Γράψε το όνομά σου.', 400, code='name_required')
     validate_new_password(password, email, display_name)
     must_verify = email_verification_required()
+    if must_verify and not email_enabled():
+        # Χωρίς email δεν μπορεί να γίνει επιβεβαίωση: καλύτερα κλειστές εγγραφές παρά λογαριασμοί χωρίς έλεγχο.
+        A.logger.error('Signup refused: email verification required but email is not configured')
+        raise AuthError('Οι νέες εγγραφές είναι προσωρινά κλειστές. Δοκίμασε ξανά αργότερα.', 503,
+                        code='email_unavailable')
     existing = find_user(email)
     if existing and not (must_verify and not existing.email_verified and existing.has_password):
         record('signup_failed', email=email, detail={'reason': 'exists'})
@@ -801,8 +822,12 @@ def register_user():
     user.set_password(password)
     A.db.session.commit()
     record('signup', user=user)
-    send_verification(user)
+    sent = send_verification(user, wait=must_verify)
     if must_verify:
+        if not sent:
+            # Ο λογαριασμός μένει ανενεργός· με νέα εγγραφή ή «Στείλε ξανά» γίνεται νέα προσπάθεια.
+            raise AuthError('Δεν μπορέσαμε να στείλουμε το email επιβεβαίωσης. Έλεγξε ότι το email είναι σωστό '
+                            'και δοκίμασε ξανά σε λίγο.', 502, code='email_failed')
         return jsonify({'status': 'verify_email', 'email_hint': mask_email(user.email)}), 201
     return start_session(user, data.get('remember'), 'signup')
 
@@ -1369,7 +1394,7 @@ def regenerate_backup_codes():
 VERIFY_TTL = timedelta(hours=48)
 
 
-def send_verification(user):
+def send_verification(user, wait=False):
     token = secrets.token_urlsafe(32)
     A.EmailOtp.query.filter_by(user_id=user.id, purpose='verify', used=False).update({'used': True})
     A.db.session.add(A.EmailOtp(user_id=user.id, purpose='verify', code_hash=keyed_hash(f'verify:{token}'),
@@ -1378,10 +1403,10 @@ def send_verification(user):
     link = f'{public_base()}/verify-email#token={token}'
     html = _email_layout('Επιβεβαίωσε το email σου', (
         '<p>Καλώς ήρθες στη LASCA! Πάτα το κουμπί για να επιβεβαιώσεις ότι αυτό το email είναι δικό σου.</p>'
-        f'<p><a href="{escape(link)}" style="display:inline-block;background:#663af3;color:#fff;'
-        'padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600">Επιβεβαίωση email</a></p>'
+        f'<p><a href="{escape(link)}" style="display:inline-block;background:#2563eb;color:#fff;'
+        'padding:12px 22px;border-radius:12px;text-decoration:none;font-weight:600">Επιβεβαίωση email</a></p>'
         '<p>Ο σύνδεσμος ισχύει 48 ώρες.</p>'))
-    return send_email(user.email, 'Επιβεβαίωσε το email σου', html, dev_hint=link)
+    return send_email(user.email, 'Επιβεβαίωσε το email σου', html, dev_hint=link, wait=wait)
 
 
 @bp.post('/api/auth/verify-email')

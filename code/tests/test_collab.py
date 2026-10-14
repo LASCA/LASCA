@@ -11,6 +11,7 @@ TMP = Path(tempfile.mkdtemp(prefix='lasca-test-'))
 os.environ.update({'SECRET_KEY': 'test-secret-key-0123456789abcdef0123456789', 'COOKIE_SECURE': '0', 'HIBP_CHECK': '0', 'LASCA_DATA': str(TMP),
                    'LASCA_SQLITE_DB': str(TMP / 'lasca.db'), 'LASCA_PROJECTS_DIR': str(TMP / 'projects')})
 os.environ.pop('LASCA_ENV', None)
+os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'  # εδώ δεν ελέγχεται η επιβεβαίωση email (βλ. test_security)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main_4_app as m  # noqa: E402

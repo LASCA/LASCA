@@ -62,7 +62,8 @@ def signup(email, pw=PW, **extra):
 
 
 SENT = []
-sec.send_email = lambda to, subject, html, dev_hint=None: SENT.append((to, subject, html)) or True
+MAIL_OK = [True]
+sec.send_email = lambda to, subject, html, dev_hint=None, wait=False: SENT.append((to, subject, html)) or MAIL_OK[0]
 sec.email_enabled = lambda: True
 
 # ---------------------------------------------------------------- headers / cookies
@@ -177,6 +178,25 @@ r = c.post('/api/me/accept-terms', json={'accept': True})
 ok(r.status_code == 200 and r.json['terms_current'] is True, 'new terms accepted')
 r = c.put('/api/me', json={'school': 'ΑΠΘ - Αγρονόμοι', 'company': 'Γεωμετρική ΙΚΕ'})
 ok(r.json['school'] == 'ΑΠΘ - Αγρονόμοι' and r.json['company'] == 'Γεωμετρική ΙΚΕ', 'school/company editable in profile')
+# προεπιλογή στον server (χωρίς REQUIRE_EMAIL_VERIFICATION): πάντα ενεργή
+os.environ.pop('REQUIRE_EMAIL_VERIFICATION')
+ok(sec.email_verification_required() is True, 'verification is on by default on the server')
+_, r = signup('default-on@lasca.test')
+ok(r.status_code == 201 and r.json.get('status') == 'verify_email', 'default: signup waits for the email link')
+# χωρίς Resend: κλειστές εγγραφές, όχι λογαριασμοί χωρίς έλεγχο
+sec.email_enabled = lambda: False
+_, r = signup('no-mail@lasca.test')
+ok(r.status_code == 503 and r.json.get('code') == 'email_unavailable', 'no email configured: signups closed')
+with m.app.app_context():
+    ok(m.User.query.filter_by(email='no-mail@lasca.test').first() is None, 'no account created when email is down')
+sec.email_enabled = lambda: True
+# το Resend απέρριψε το email: ο χρήστης το μαθαίνει, ο λογαριασμός μένει ανενεργός
+MAIL_OK[0] = False
+_, r = signup('bounce@lasca.test')
+ok(r.status_code == 502 and r.json.get('code') == 'email_failed', 'failed verification email is reported')
+r = client().post('/api/login', json={'email': 'bounce@lasca.test', 'password': PW})
+ok(r.status_code == 403, 'account with undelivered email stays locked')
+MAIL_OK[0] = True
 os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 
 # ---------------------------------------------------------------- brute force protection

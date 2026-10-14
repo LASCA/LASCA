@@ -1153,20 +1153,25 @@ def _send_feedback_email(
             f'<p>{escape(feedback["message"]).replace(chr(10), "<br>")}</p>'
             f'<p><strong>Timestamp:</strong> {escape(feedback["created_at"])}</p>'
         )
+        # Ίδιος αποστολέας με τα email λογαριασμού (EMAIL_FROM, από επιβεβαιωμένο domain στο Resend).
         email_data = {
-            'from': 'LASCA App <onboarding@resend.dev>',
+            'from': os.getenv('EMAIL_FROM', '').strip() or 'LASCA <onboarding@resend.dev>',
             'to': [receiver_email],
             'subject': subject,
             'html': html_body,
-            'reply_to': current_user.email if current_user.is_authenticated else (feedback.get('email') or 'Anonymous'),
         }
+        reply_to = current_user.email if current_user.is_authenticated else feedback.get('email')
+        if reply_to and EMAIL_RE.fullmatch(reply_to):
+            email_data['reply_to'] = reply_to
         if screenshot_content is not None:
             email_data['attachments'] = [{
                 'filename': screenshot_filename,
                 'content': base64.b64encode(screenshot_content).decode('ascii'),
             }]
         resend.Emails.send(email_data)
-    except Exception:
+    except Exception as exc:
+        # Το μήνυμα του Resend λέει την αιτία (π.χ. «domain is not verified», «API key is invalid»).
+        logger.error('Feedback email failed: %s: %s', type(exc).__name__, str(exc)[:300].replace('\n', ' '))
         logger.exception('Failed to send feedback email notification through Resend')
         print('Feedback email exception:\n' + traceback.format_exc(), file=sys.stderr, flush=True)
         raise
