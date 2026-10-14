@@ -9,7 +9,10 @@ export const SITE = {
   url: import.meta.env.VITE_PUBLIC_URL || (typeof window !== 'undefined' ? window.location.origin : ''),
   contactEmail: import.meta.env.VITE_CONTACT_EMAIL || '',
   github: 'https://github.com/LASCA/LASCA',
-  legalUpdated: '4 Οκτωβρίου 2026',
+  legalUpdated: '14 Οκτωβρίου 2026',
+  // Ίδιο με το TERMS_VERSION στο code/main_4_app.py. Όταν αλλάζουν ουσιαστικά οι Όροι, αλλάζουν και τα δύο:
+  // οι υπάρχοντες χρήστες τότε τους αποδέχονται ξανά πριν συνεχίσουν.
+  termsVersion: '2026-10-14',
   minAge: 15,
   hosting: 'Oracle Cloud Infrastructure (περιοχή ΕΕ: Μιλάνο, Ιταλία)',
 };
