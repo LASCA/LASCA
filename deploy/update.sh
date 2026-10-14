@@ -16,7 +16,9 @@ venv/bin/pip install --quiet -r deploy/requirements-web.txt
 
 echo "→ Build της σελίδας"
 cd frontend
-npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+# Αν το package-lock.json δεν ταιριάζει με το package.json, εγκατάσταση χωρίς να αλλάξει το lock
+# (αλλιώς ο φάκελος του server θα είχε τοπικές αλλαγές και το επόμενο deploy θα σταματούσε).
+npm ci --no-audit --no-fund || npm install --no-audit --no-fund --no-package-lock
 npm run build
 cd ..
 
