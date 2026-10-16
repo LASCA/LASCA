@@ -452,6 +452,8 @@ class User(db.Model, UserMixin):
     terms_version = db.Column(db.String(20), nullable=True)
     school = db.Column(db.String(120), nullable=True)      # προαιρετικό (εγγραφή / Προφίλ)
     company = db.Column(db.String(120), nullable=True)     # προαιρετικό
+    # Clerk user ID for JWT-based authentication
+    clerk_user_id = db.Column(db.String(255), nullable=True, unique=True, index=True)
 
     def get_id(self):
         return f"{self.id}:{self.session_version or 0}"
@@ -775,6 +777,7 @@ def _migrate_schema():
             ('terms_version', 'VARCHAR(20)'),
             ('school', 'VARCHAR(120)'),
             ('company', 'VARCHAR(120)'),
+            ('clerk_user_id', 'VARCHAR(255)'),
         ],
         'projects': [
             ('public_id', 'VARCHAR(32)'),
@@ -798,6 +801,7 @@ def _migrate_schema():
                 if name not in existing:
                     conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {ddl}'))
         conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ix_projects_public_id ON projects (public_id)'))
+        conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ix_users_clerk_user_id ON users (clerk_user_id)'))
     # Projects από πριν την αλλαγή: παίρνουν public_id
     changed = False
     for project in Project.query.filter(Project.public_id.is_(None)).all():
@@ -1321,6 +1325,76 @@ def logout_user_route():
     session.clear()
     logout_user()
     return jsonify({"status": "success", "message": "Αποσυνδεθήκατε επιτυχώς"})
+
+
+# Clerk JWT authentication endpoints
+from clerk_auth import fetch_clerk_profile, verify_clerk_token  # noqa: E402
+
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    """Get current user from Clerk JWT token."""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    token_str = auth_header[7:].strip()
+    claims, error = verify_clerk_token(token_str)
+    
+    if error:
+        return jsonify({'error': error}), 401
+    
+    clerk_user_id = claims.get('sub')
+    if not clerk_user_id:
+        return jsonify({'error': 'Invalid token: missing user ID'}), 401
+    
+    # Find or create user by clerk_user_id
+    user = User.query.filter_by(clerk_user_id=clerk_user_id).first()
+    
+    if not user:
+        # Πρώτη σύνδεση: το email δεν υπάρχει στο session token, το ζητάμε από το Clerk.
+        profile = fetch_clerk_profile(clerk_user_id)
+        email = (profile or {}).get('email', '')
+        if not email or not EMAIL_RE.match(email):
+            return jsonify({'error': 'Could not read email from Clerk'}), 502
+        verified = bool(profile.get('email_verified'))
+
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            if existing_user.clerk_user_id and existing_user.clerk_user_id != clerk_user_id:
+                return jsonify({'error': 'Email already linked to another account'}), 409
+            if not verified:
+                return jsonify({'error': 'Email not verified'}), 403
+            existing_user.clerk_user_id = clerk_user_id
+            existing_user.email_verified = True
+            user = existing_user
+        else:
+            user = User(
+                email=email,
+                clerk_user_id=clerk_user_id,
+                display_name=(profile.get('display_name') or email.split('@')[0])[:150],
+                email_verified=verified,
+                has_password=False,
+                password_hash=generate_password_hash(secrets.token_urlsafe(32)),  # άχρηστος κωδικός: το Clerk κάνει την ταυτοποίηση
+            )
+            db.session.add(user)
+
+    user.last_seen_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify(user.to_me_dict()), 200
+
+
+@app.route('/api/auth/config', methods=['GET'])
+def get_auth_config():
+    """Get authentication configuration."""
+    return jsonify({
+        'google_client_id': GOOGLE_CLIENT_ID,
+        'captcha_site_key': os.getenv('TURNSTILE_SITE_KEY', '').strip(),
+        'password_min': 8,
+        'password_recommended': 12,
+        'min_age': int(os.getenv('MIN_SIGNUP_AGE', '15')),
+        'email_verification_required': False,
+    }), 200
 
 
 # ==========================================
