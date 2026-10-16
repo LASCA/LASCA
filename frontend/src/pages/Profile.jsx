@@ -189,7 +189,6 @@ export default function Profile() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/', { replace: true });
   };
 
   const logoutEverywhere = async () => {

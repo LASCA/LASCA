@@ -40,6 +40,11 @@ PRESENCE_WINDOW = timedelta(seconds=40)
 SAVE_SESSION = timedelta(minutes=10)
 UNREAD_CAP = 99
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
+DEFAULT_AVATAR_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect width="64" height="64" rx="32" fill="#334155"/>
+<circle cx="32" cy="24" r="12" fill="#94a3b8"/>
+<path d="M10 58c2-12 10-18 22-18s20 6 22 18" fill="#94a3b8"/>
+</svg>'''
 # Όρια χρήσης (quotas): προστατεύουν τον server από κατάχρηση και κόστος.
 MAX_PROJECTS_PER_USER = int(os.getenv('MAX_PROJECTS_PER_USER', '100'))
 MAX_MEMBERS_PER_PROJECT = int(os.getenv('MAX_MEMBERS_PER_PROJECT', '50'))
@@ -474,19 +479,15 @@ def delete_avatar():
 
 
 @bp.get('/api/users/<int:user_id>/avatar')
-@login_required
 def get_avatar(user_id):
     user = C.db.session.get(C.User, user_id)
-    if user is None or not user.avatar_path:
-        raise ApiError('Δεν υπάρχει εικόνα.', 404)
-    if not users_share_project(current_user.id, user.id):
-        raise ApiError('Δεν έχετε πρόσβαση.', 403)
-    path = Path(user.avatar_path)
-    if not path.is_file():
-        raise ApiError('Δεν υπάρχει εικόνα.', 404)
-    mime = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}.get(
-        path.suffix.lower(), 'application/octet-stream')
-    return send_file(path, mimetype=mime, max_age=3600)
+    if user is not None and user.avatar_path:
+        path = Path(user.avatar_path)
+        if path.is_file():
+            mime = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}.get(
+                path.suffix.lower(), 'application/octet-stream')
+            return send_file(path, mimetype=mime, max_age=3600)
+    return send_file(io.BytesIO(DEFAULT_AVATAR_SVG), mimetype='image/svg+xml', max_age=3600)
 
 
 @bp.post('/api/me/password')

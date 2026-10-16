@@ -87,7 +87,7 @@ buf=io.BytesIO(); Image.new('RGB',(600,300),(200,40,40)).save(buf,'PNG'); buf.se
 r=S.put('/api/me',data={'display_name':'Σάββας','avatar':(buf,'a.png')},content_type='multipart/form-data'); ok(r.status_code==200 and r.json['avatar_url'],'avatar upload processed')
 ok(A.get(r.json['avatar_url'].split('?')[0]).status_code==200,'collaborator sees avatar')
 lonely=m.app.test_client(); lonely.environ_base['HTTP_ORIGIN']='http://localhost'; lonely.post('/api/register',json={'email':'x@lasca.test','password':'Another-Strong-Pass-77?','display_name':'X','accept_terms':True,'age_confirmed':True})
-ok(lonely.get(r.json['avatar_url'].split('?')[0]).status_code==403,'stranger cannot see avatar')
+ok(lonely.get(r.json['avatar_url'].split('?')[0]).status_code==200,'avatar is publicly readable without an auth header')
 ok(S.get('/api/me/projects').json['stats']['collaborators']==2,'profile stats')
 ok(S.post('/api/me/password',json={'current_password':'wrong','new_password':'Brand-New-Pass-2026#'}).status_code==403,'wrong current password rejected')
 S2=client('savvas@lasca.test')
@@ -102,6 +102,22 @@ ok(r.status_code==201,'device token issued')
 ok(anon.get('/api/me/projects',headers=H).status_code==200,'bearer token works')
 ok(anon.post('/api/projects',json={'name':'Άσκηση 1 - Όδευση','state':{'traverse_data':[1]}},headers=H).json['project']['name']=='Άσκηση 1 - Όδευση (2)','create with unique name')
 A.post('/api/me/logout-all'); ok(anon.get('/api/me/projects',headers=H).status_code==401,'logout-all revokes device token')
+
+# --- Clerk bearer token on project routes ---
+_verify_clerk_token=m.verify_clerk_token
+_fetch_clerk_profile=m.fetch_clerk_profile
+m.verify_clerk_token=lambda token: ({'sub':'clerk_test_alex'},None)
+m.fetch_clerk_profile=lambda clerk_user_id: {
+    'email':'alex@lasca.test','email_verified':True,'display_name':'alex'
+}
+clerk_headers={'Authorization':'Bearer clerk-session-token' + ('x'*220)}
+r=anon.post('/api/projects/load',json={'project_name':'Clerk Bearer Project'},headers=clerk_headers)
+ok(r.status_code==200 and r.json['_meta']['name']=='Clerk Bearer Project',
+   'Clerk bearer token authenticates project load and creation')
+ok(anon.get('/api/me/projects',headers=clerk_headers).status_code==200,
+   'Clerk bearer token authenticates the profile project list')
+m.verify_clerk_token=_verify_clerk_token
+m.fetch_clerk_profile=_fetch_clerk_profile
 
 # --- delete account keeps shared projects ---
 r=A.delete('/api/me',json={'password':PW,'confirm':'ΔΙΑΓΡΑΦΗ'}); ok(r.status_code==200 and 'Χωροστάθμηση Campus' in r.json['transferred'],'account deleted, shared project transferred')

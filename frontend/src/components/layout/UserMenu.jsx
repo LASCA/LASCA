@@ -56,7 +56,6 @@ const UserMenu = ({ bare = false }) => {
     try {
       await logout();
       toast.success('Αποσυνδεθήκατε επιτυχώς');
-      navigate('/', { replace: true });
     } catch {
       toast.error('Αποτυχία αποσύνδεσης');
     } finally {

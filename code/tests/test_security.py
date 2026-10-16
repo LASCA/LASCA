@@ -100,10 +100,36 @@ for rule in m.app.url_map.iter_rules():
         continue
     url = re.sub(r'<(?:int:)?[^>]+>', '1', path)
     for method in sorted(rule.methods - {'HEAD', 'OPTIONS'}):
+        if method == 'GET' and re.fullmatch(r'/api/users/\d+/avatar', path):
+            continue
         resp = anon.open(url, method=method, json={})
         if resp.status_code != 401:
             leaks.append(f'{method} {path} -> {resp.status_code}')
 ok(not leaks, f'every private API route needs login ({len(leaks)} leaks: {leaks[:5]})')
+avatar_id = alice.get('/api/me').json['id']
+avatar_response = anon.get(f'/api/users/{avatar_id}/avatar')
+ok(avatar_response.status_code == 200 and avatar_response.mimetype == 'image/svg+xml',
+   'avatar fallback is available to unauthenticated image requests')
+
+# ---------------------------------------------------------------- Clerk bearer authentication for protected routes
+_verify_clerk_token = m.verify_clerk_token
+_fetch_clerk_profile = m.fetch_clerk_profile
+m.verify_clerk_token = lambda token: ({'sub': 'user_clerk_test'}, None)
+m.fetch_clerk_profile = lambda clerk_user_id: {
+    'email': 'clerk@lasca.test', 'email_verified': True, 'display_name': 'Clerk User',
+}
+clerk_client = client()
+clerk_headers = {'Authorization': 'Bearer clerk-session-token' + ('x' * 220)}
+ok(clerk_client.get('/api/me', headers=clerk_headers).status_code == 200, 'Clerk token syncs the local user')
+ok(clerk_client.get('/api/me/projects', headers=clerk_headers).status_code == 200,
+   'Clerk token authenticates protected project routes')
+with m.app.app_context():
+    clerk_user_id = m.User.query.filter_by(clerk_user_id='user_clerk_test').first().id
+clerk_avatar = clerk_client.get(f'/api/users/{clerk_user_id}/avatar', headers=clerk_headers)
+ok(clerk_avatar.status_code == 200 and clerk_avatar.mimetype == 'image/svg+xml',
+   'Clerk-authenticated avatar request receives the fallback image')
+m.verify_clerk_token = _verify_clerk_token
+m.fetch_clerk_profile = _fetch_clerk_profile
 
 # ---------------------------------------------------------------- password policy
 for weak, why in [('shrt1!A', 'too short'), ('alllowercase-123', 'no uppercase'), ('NoSymbolsHere123', 'no symbol'),
@@ -389,7 +415,7 @@ mid = owner.get('/api/me').json['id']
 from PIL import Image as _Img  # noqa: E402
 _b = io.BytesIO(); _Img.new('RGB', (64, 64), (9, 9, 9)).save(_b, 'PNG'); _b.seek(0)
 ok(owner.put('/api/me', data={'avatar': (_b, 'a.png')}, content_type='multipart/form-data').status_code == 200, 'owner uploads avatar')
-ok(mallory.get(f'/api/users/{mid}/avatar').status_code == 403, 'cannot fetch avatar of a stranger (403)')
+ok(mallory.get(f'/api/users/{mid}/avatar').status_code == 200, 'profile avatars are available without project membership')
 lk = mallory.get('/api/users/lookup?q=owner').json['users']
 ok(lk == [], 'user lookup does not list strangers by partial name')
 

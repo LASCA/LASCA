@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { useAuth as useClerkAuth } from '@clerk/react';
+import { useAuth as useClerkAuth, useClerk } from '@clerk/react';
 import { API_BASE_URL } from '../config';
 
 // All axios requests send credentials with requests
@@ -19,6 +19,7 @@ function rememberSignedIn(on) {
 
 export function AuthProvider({ children }) {
   const { isLoaded, isSignedIn, getToken: clerkGetToken } = useClerkAuth();
+  const { signOut } = useClerk();
   // Το getToken του Clerk αλλάζει ταυτότητα σε κάθε render· το κρατάμε σε ref ώστε να μην ξαναπυροδοτεί effects.
   const getTokenRef = useRef(clerkGetToken);
   useEffect(() => { getTokenRef.current = clerkGetToken; });
@@ -26,6 +27,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState({});
+
+  const logout = useCallback(async () => {
+    try {
+      await signOut({ redirectUrl: '/login' });
+    } finally {
+      setUser(null);
+    }
+  }, [signOut]);
 
   // Fetch user data from backend using Clerk token
   const refresh = useCallback(async () => {
@@ -134,6 +143,7 @@ export function AuthProvider({ children }) {
     user,
     setUser,
     loading,
+    logout,
     refresh,
     acceptTerms,
     config,
@@ -143,7 +153,7 @@ export function AuthProvider({ children }) {
     passwordRecommended: config.password_recommended || 12,
     minAge: config.min_age || 15,
     emailVerificationRequired: Boolean(config.email_verification_required),
-  }), [user, loading, refresh, acceptTerms, config]);
+  }), [user, loading, logout, refresh, acceptTerms, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

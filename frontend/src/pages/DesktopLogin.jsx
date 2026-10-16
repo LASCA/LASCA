@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle2, Loader2, Monitor, ShieldAlert, XCircle } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -16,7 +16,6 @@ export default function DesktopLogin() {
   usePageMeta({ title: 'Σύνδεση προγράμματος', noindex: true });
   const { rid } = useParams();
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [info, setInfo] = useState(null);
   const [state, setState] = useState('loading');   // loading | pending | approved | denied | expired | invalid
   const [error, setError] = useState('');
@@ -42,7 +41,6 @@ export default function DesktopLogin() {
 
   const switchAccount = async () => {
     await logout();
-    navigate('/login', { replace: true, state: { from: `/desktop-login/${rid}` } });
   };
 
   if (state === 'loading') {

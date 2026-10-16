@@ -680,29 +680,30 @@ def load_user(user_id):
 
 
 @login_manager.request_loader
-def load_user_from_device_token(req):
-    """Σύνδεση του exe: κεφαλίδα «Authorization: Bearer <token>»."""
+def load_user_from_bearer_token(req):
+    """Load a user from a desktop device token or a Clerk bearer token."""
     header = req.headers.get('Authorization', '')
     if not header.startswith('Bearer '):
         return None
     token = header[7:].strip()
     if not token:
         return None
-    if len(token) > 200:
-        return None
-    record = DeviceToken.query.filter_by(token_hash=hash_device_token(token)).first()
-    if record is None:
-        return None
-    now = datetime.utcnow()
-    # Κλειδί που δεν χρησιμοποιήθηκε για DEVICE_TOKEN_IDLE_DAYS ημέρες λήγει.
-    if (now - (record.last_used_at or record.created_at or now)).days > DEVICE_TOKEN_IDLE_DAYS:
-        db.session.delete(record)
-        db.session.commit()
-        return None
-    if record.last_used_at is None or (now - record.last_used_at).total_seconds() > 300:
-        record.last_used_at = now
-        db.session.commit()
-    return db.session.get(User, record.user_id)
+    if len(token) <= 200:
+        record = DeviceToken.query.filter_by(token_hash=hash_device_token(token)).first()
+        if record is not None:
+            now = datetime.utcnow()
+            # Κλειδί που δεν χρησιμοποιήθηκε για DEVICE_TOKEN_IDLE_DAYS ημέρες λήγει.
+            if (now - (record.last_used_at or record.created_at or now)).days > DEVICE_TOKEN_IDLE_DAYS:
+                db.session.delete(record)
+                db.session.commit()
+            else:
+                if record.last_used_at is None or (now - record.last_used_at).total_seconds() > 300:
+                    record.last_used_at = now
+                    db.session.commit()
+                return db.session.get(User, record.user_id)
+
+    user, _, _ = _resolve_clerk_user(token)
+    return user
 
 
 # Endpoints που επιτρέπονται χωρίς σύνδεση. Όλα τα υπόλοιπα /api/* (υπολογισμοί,
@@ -721,13 +722,23 @@ PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
 
 
 @app.before_request
+def authenticate_bearer_request():
+    """Resolve Bearer auth before API access checks using Flask-Login's request loader."""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        # Accessing current_user invokes the request loader without creating a persistent session cookie.
+        current_user.is_authenticated
+
+
+@app.before_request
 def require_login_for_api():
     if request.method == 'OPTIONS':
         return None
     if request.method == 'GET' and request.path.startswith(PUBLIC_API_PREFIXES_GET) \
             and not request.path.endswith('/accept'):
         return None
-    if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS \
+    is_public_avatar = request.method == 'GET' and re.fullmatch(r'/api/users/\d+/avatar', request.path)
+    if request.path.startswith('/api/') and request.path not in PUBLIC_API_PATHS and not is_public_avatar \
             and not current_user.is_authenticated:
         return jsonify({"error": "Απαιτείται σύνδεση"}), 401
     # Λογαριασμός χωρίς επιβεβαιωμένο email (π.χ. φτιάχτηκε πριν γίνει υποχρεωτική η επιβεβαίωση):
@@ -1330,43 +1341,36 @@ def logout_user_route():
 # Clerk JWT authentication endpoints
 from clerk_auth import fetch_clerk_profile, verify_clerk_token  # noqa: E402
 
-@app.route('/api/me', methods=['GET'])
-def get_current_user():
-    """Get current user from Clerk JWT token."""
-    auth_header = request.headers.get('Authorization', '')
-    if not auth_header.startswith('Bearer '):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    token_str = auth_header[7:].strip()
-    claims, error = verify_clerk_token(token_str)
-    
+
+def _resolve_clerk_user(token, update_last_seen=False):
+    """Verify a Clerk token and retrieve or create its matching local user."""
+    claims, error = verify_clerk_token(token)
     if error:
-        return jsonify({'error': error}), 401
-    
+        return None, error, 401
+
     clerk_user_id = claims.get('sub')
     if not clerk_user_id:
-        return jsonify({'error': 'Invalid token: missing user ID'}), 401
-    
-    # Find or create user by clerk_user_id
+        return None, 'Invalid token: missing user ID', 401
+
     user = User.query.filter_by(clerk_user_id=clerk_user_id).first()
-    
+    changed = False
     if not user:
-        # Πρώτη σύνδεση: το email δεν υπάρχει στο session token, το ζητάμε από το Clerk.
         profile = fetch_clerk_profile(clerk_user_id)
         email = (profile or {}).get('email', '')
         if not email or not EMAIL_RE.match(email):
-            return jsonify({'error': 'Could not read email from Clerk'}), 502
-        verified = bool(profile.get('email_verified'))
+            return None, 'Could not read email from Clerk', 502
 
+        verified = bool(profile.get('email_verified'))
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             if existing_user.clerk_user_id and existing_user.clerk_user_id != clerk_user_id:
-                return jsonify({'error': 'Email already linked to another account'}), 409
+                return None, 'Email already linked to another account', 409
             if not verified:
-                return jsonify({'error': 'Email not verified'}), 403
+                return None, 'Email not verified', 403
             existing_user.clerk_user_id = clerk_user_id
             existing_user.email_verified = True
             user = existing_user
+            changed = True
         else:
             user = User(
                 email=email,
@@ -1374,12 +1378,32 @@ def get_current_user():
                 display_name=(profile.get('display_name') or email.split('@')[0])[:150],
                 email_verified=verified,
                 has_password=False,
-                password_hash=generate_password_hash(secrets.token_urlsafe(32)),  # άχρηστος κωδικός: το Clerk κάνει την ταυτοποίηση
+                password_hash=generate_password_hash(secrets.token_urlsafe(32)),
             )
             db.session.add(user)
+            changed = True
 
-    user.last_seen_at = datetime.utcnow()
-    db.session.commit()
+    if update_last_seen:
+        user.last_seen_at = datetime.utcnow()
+        changed = True
+    if changed:
+        db.session.commit()
+    return user, None, None
+
+
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    """Get current user from Clerk JWT token."""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        if current_user.is_authenticated:
+            return jsonify(current_user.to_me_dict()), 200
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    token_str = auth_header[7:].strip()
+    user, error, status = _resolve_clerk_user(token_str, update_last_seen=True)
+    if error:
+        return jsonify({'error': error}), status
 
     return jsonify(user.to_me_dict()), 200
 
