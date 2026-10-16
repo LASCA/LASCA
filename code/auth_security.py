@@ -1441,11 +1441,47 @@ def resend_verification_public():
 
 
 @bp.post('/api/me/accept-terms')
-@login_required
 def accept_terms():
+    """Accept Terms of Use. Supports both Flask-Login and Clerk authentication."""
+    from clerk_auth import verify_clerk_token, fetch_clerk_profile
+    from werkzeug.security import generate_password_hash
+    
     if body().get('accept') is not True:
         raise AuthError('Πρέπει να αποδεχτείς τους Όρους για να συνεχίσεις.', 400, code='terms_required')
-    user = current_user._get_current_object()
+    
+    # Try to get user from Clerk Bearer token (new auth method)
+    user = None
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token_str = auth_header[7:].strip()
+        claims, error = verify_clerk_token(token_str)
+        if not error:
+            clerk_user_id = claims.get('sub')
+            if clerk_user_id:
+                user = A.User.query.filter_by(clerk_user_id=clerk_user_id).first()
+                if not user:
+                    # Create user from Clerk profile
+                    profile = fetch_clerk_profile(clerk_user_id)
+                    email = (profile or {}).get('email', '')
+                    if email:
+                        user = A.User(
+                            email=email,
+                            clerk_user_id=clerk_user_id,
+                            display_name=(profile.get('display_name') or email.split('@')[0])[:150],
+                            email_verified=bool(profile.get('email_verified')),
+                            has_password=False,
+                            password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+                        )
+                        A.db.session.add(user)
+                        A.db.session.flush()
+    
+    # Fallback to Flask-Login (old auth method)
+    if not user and current_user.is_authenticated:
+        user = current_user._get_current_object()
+    
+    if not user:
+        raise AuthError('Unauthorized', 401)
+    
     user.terms_version, user.terms_accepted_at = A.TERMS_VERSION, utcnow()
     A.db.session.commit()
     record('terms_accepted', user=user, detail={'version': A.TERMS_VERSION})

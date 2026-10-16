@@ -46,6 +46,15 @@ export function AuthProvider({ children }) {
     }
   }, [getToken]);
 
+  // Accept Terms of Use
+  const acceptTerms = useCallback(async () => {
+    const token = await getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const { data } = await axios.post(`${API_BASE_URL}/api/me/accept-terms`, { accept: true }, { headers });
+    setUser(data);
+    return data;
+  }, [getToken]);
+
   useEffect(() => {
     if (!loading) rememberSignedIn(Boolean(user));
   }, [user, loading]);
@@ -126,6 +135,7 @@ export function AuthProvider({ children }) {
     setUser,
     loading,
     refresh,
+    acceptTerms,
     config,
     googleClientId: config.google_client_id || null,
     captchaSiteKey: config.captcha_site_key || null,
@@ -133,7 +143,7 @@ export function AuthProvider({ children }) {
     passwordRecommended: config.password_recommended || 12,
     minAge: config.min_age || 15,
     emailVerificationRequired: Boolean(config.email_verification_required),
-  }), [user, loading, refresh, config]);
+  }), [user, loading, refresh, acceptTerms, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
