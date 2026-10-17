@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from './config';
 import { useAuth } from './auth/AuthContext';
-import { FolderKanban } from 'lucide-react';
+import { FolderKanban, Home } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import Dashboard from './components/Dashboard';
@@ -602,6 +602,15 @@ function App() {
                 <span className="hidden md:inline">{currentProject ? 'Αλλαγή Project' : 'Επιλογή Project'}</span>
               </button>
               <UserMenu bare={bare} />
+              <a
+                href="https://lasca.gr"
+                rel="noopener noreferrer"
+                title="Επιστροφή στην αρχική ιστοσελίδα (lasca.gr)"
+                aria-label="Επιστροφή στην ιστοσελίδα"
+                className={`${TOPBAR_ITEM} ${bare ? TOPBAR_BARE : TOPBAR_NEUTRAL} px-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70`}
+              >
+                <Home size={16} aria-hidden="true" className="group-hover:scale-110 transition-transform" />
+              </a>
             </div>
           );
           return activeTab === 'dashboard' ? (

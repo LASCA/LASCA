@@ -1,19 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
+import { useClerk, useUser } from '@clerk/react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowUpRight, Camera, Check, ChevronDown, Copy, Download, FolderOpen, KeyRound, Loader2, LogOut, Mail,
-  MonitorSmartphone, Pencil, ShieldCheck, Trash2, Users, X,
+  ArrowLeft, ArrowUpRight, ChevronDown, Copy, Download, FolderOpen, KeyRound, Loader2, LockKeyhole,
+  LogOut, MonitorSmartphone, Pencil, ShieldCheck, Trash2, Users, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiErrorMessage, useAuth } from '../auth/AuthContext';
 import LascaLogo from '../components/brand/LascaLogo';
-import PasswordStrength from '../components/ui/PasswordStrength';
 import usePageMeta from '../hooks/usePageMeta';
+import './Profile.css';
 
-const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ROLE_LABEL = { owner: 'Ιδιοκτήτης', editor: 'Επεξεργαστής', viewer: 'Αναγνώστης' };
 
 // Ίδιο λεξιλόγιο με την εφαρμογή (Dashboard): σκούρες κάρτες, μικροί τίτλοι ενοτήτων, μπλε κουμπί.
@@ -34,18 +34,10 @@ function formatDate(iso, withTime = false) {
     : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const SectionTitle = ({ children, right }) => (
-  <div className="flex min-h-[38px] items-center justify-between gap-3 mb-2">
-    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] ml-2">{children}</h3>
-    {right}
-  </div>
-);
-
 function Avatar({ url, name, size = 64 }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [url]);
+  const [failedUrl, setFailedUrl] = useState(null);
   const initials = (name || 'U').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
-  if (!url || failed) {
+  if (!url || failedUrl === url) {
     return (
       <div style={{ width: size, height: size }}
         className="flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 text-lg font-bold text-slate-100">
@@ -53,11 +45,11 @@ function Avatar({ url, name, size = 64 }) {
       </div>
     );
   }
-  return <img src={url} alt="" style={{ width: size, height: size }} onError={() => setFailed(true)} className="rounded-full object-cover" />;
+  return <img src={url} alt="" style={{ width: size, height: size }} onError={() => setFailedUrl(url)} className="rounded-full object-cover" />;
 }
 
-/** Γραμμή ρυθμίσεων όπως τα κουμπιά του Dashboard: εικονίδιο, τίτλος, υπότιτλος· ανοίγει από κάτω. */
-function Row({ icon: Icon, title, subtitle, right, open, onClick, tone, children }) {
+/** Γραμμή ρυθμίσεων με εικονίδιο, τίτλο και υπότιτλο. */
+function Row({ icon: Icon, title, subtitle, onClick, tone, right, open, children }) {
   const danger = tone === 'danger';
   return (
     <div className="border-b border-slate-800/60 last:border-0">
@@ -85,18 +77,16 @@ function Row({ icon: Icon, title, subtitle, right, open, onClick, tone, children
 export default function Profile() {
   usePageMeta({ title: 'Προφίλ', noindex: true });
   const { user, setUser, logout } = useAuth();
+  const { openUserProfile } = useClerk();
+  const { user: clerkUser } = useUser();
   const navigate = useNavigate();
-  const fileInput = useRef(null);
 
-  const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [school, setSchool] = useState(user?.school || '');
   const [company, setCompany] = useState(user?.company || '');
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [openRow, setOpenRow] = useState(null);   // password | 2fa | log
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [openRow, setOpenRow] = useState(null);
 
   const [projects, setProjects] = useState({ owned: [], shared: [] });
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -109,49 +99,22 @@ export default function Profile() {
       .finally(() => setProjectsLoading(false));
   }, []);
 
-  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
-
   const dirty = useMemo(
-    () => Boolean(avatarFile) || displayName.trim() !== (user?.display_name || '')
-      || school.trim() !== (user?.school || '') || company.trim() !== (user?.company || ''),
-    [avatarFile, displayName, school, company, user]
+    () => school.trim() !== (user?.school || '') || company.trim() !== (user?.company || ''),
+    [school, company, user]
   );
-
-  const pickAvatar = (file) => {
-    if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-      toast.error('Επιτρέπονται μόνο εικόνες PNG, JPG ή WEBP');
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      toast.error('Η εικόνα πρέπει να είναι μικρότερη από 5MB');
-      return;
-    }
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-    setIsEditing(true);
-  };
 
   const save = async (e) => {
     e.preventDefault();
-    if (!displayName.trim()) {
-      toast.error('Το όνομα χρήστη δεν μπορεί να είναι κενό');
-      return;
-    }
     setSaving(true);
     try {
       const payload = new FormData();
-      payload.append('display_name', displayName.trim());
       payload.append('school', school.trim());
       payload.append('company', company.trim());
-      if (avatarFile) payload.append('avatar', avatarFile);
       const { data } = await axios.put(`${API_BASE_URL}/api/me`, payload);
       setUser(data);
-      setDisplayName(data.display_name);
       setSchool(data.school || '');
       setCompany(data.company || '');
-      setAvatarFile(null);
-      setAvatarPreview(null);
       setIsEditing(false);
       toast.success('Το προφίλ αποθηκεύτηκε');
     } catch (err) {
@@ -161,24 +124,9 @@ export default function Profile() {
     }
   };
 
-  const removeAvatar = async () => {
-    try {
-      const { data } = await axios.delete(`${API_BASE_URL}/api/me/avatar`);
-      setUser(data);
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      toast.success('Η εικόνα αφαιρέθηκε');
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Αποτυχία'));
-    }
-  };
-
   const cancelEdit = () => {
-    setDisplayName(user?.display_name || '');
     setSchool(user?.school || '');
     setCompany(user?.company || '');
-    setAvatarFile(null);
-    setAvatarPreview(null);
     setIsEditing(false);
   };
 
@@ -192,191 +140,215 @@ export default function Profile() {
   };
 
   const logoutEverywhere = async () => {
-    if (!window.confirm('Να αποσυνδεθούν όλες οι άλλες συσκευές (browsers και πρόγραμμα Windows);')) return;
+    if (!window.confirm('Να αποσυνδεθούν όλες οι άλλες συσκευές;')) return;
     try {
       await axios.post(`${API_BASE_URL}/api/me/logout-all`);
       toast.success('Αποσυνδέθηκαν όλες οι άλλες συσκευές');
-    } catch (err) { toast.error(apiErrorMessage(err, 'Αποτυχία')); }
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Αποτυχία αποσύνδεσης συσκευών'));
+    }
   };
 
-  const toggle = (key) => setOpenRow((v) => (v === key ? null : key));
-  const hasPassword = user?.has_password !== false;
+  const toggleRow = (key) => setOpenRow((current) => (current === key ? null : key));
+
   const list = tab === 'owned' ? projects.owned : projects.shared;
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-950 text-slate-200 font-sans">
-      <header className="sticky top-0 z-20 h-[72px] bg-[#0b1120] border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-4">
-          <Link to="/app" aria-label="Πίσω στην εφαρμογή"
-            className="w-9 h-9 shrink-0 rounded-xl border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-            <ArrowLeft size={16} aria-hidden="true" />
-          </Link>
-          <LascaLogo height={24} textClass="text-base" />
-          <span className="hidden sm:block h-6 w-px bg-slate-800" aria-hidden="true" />
-          <h1 className="hidden sm:block text-[13px] font-bold tracking-wide text-slate-300">Προφίλ</h1>
+    <div className="profile-page relative h-full overflow-y-auto bg-slate-950 text-slate-200 font-sans">
+      <div aria-hidden="true" className="l-grid-bg profile-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
+      <header className="sticky top-0 z-20 bg-canvas/80 backdrop-blur-xl shadow-[inset_0_-1px_0_rgb(186_215_247/0.1)]">
+        <div className="profile-nav mx-auto flex h-[72px] max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+            <Link to="/app" className="profile-back-link profile-icon-tooltip" aria-label="Πίσω στην εφαρμογή"
+              data-tooltip="Πίσω στην εφαρμογή">
+              <ArrowLeft size={17} aria-hidden="true" />
+            </Link>
+            <span className="profile-nav-divider hidden h-7 w-px sm:block" aria-hidden="true" />
+            <span className="inline-flex"><LascaLogo height={27} textClass="text-lg" /></span>
+          </div>
+          <button type="button" onClick={handleLogout} className="l-btn l-btn-sm profile-logout">
+            <LogOut size={15} aria-hidden="true" /> Αποσύνδεση
+          </button>
         </div>
-        <button type="button" onClick={handleLogout}
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-xl text-[12px] font-bold text-slate-400 hover:text-red-300 hover:bg-red-500/[0.06] transition-colors">
-          <LogOut size={15} aria-hidden="true" /> Αποσύνδεση
-        </button>
       </header>
 
-      <main id="main" className="mx-auto grid max-w-[1400px] gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[380px_1fr] lg:px-10">
-        <div className="flex flex-col gap-6 min-w-0">
-          {/* ----- Λογαριασμός ----- */}
-          <section aria-labelledby="account-title">
-            <SectionTitle><span id="account-title">Λογαριασμός</span></SectionTitle>
-            <div className={`${CARD} p-4`}>
-              <form onSubmit={save}>
-                <div className="flex items-center gap-4">
-                  <button type="button" onClick={() => fileInput.current?.click()}
-                    className="group relative shrink-0 rounded-full" aria-label="Αλλαγή εικόνας προφίλ" title="Αλλαγή εικόνας">
-                    <Avatar url={avatarPreview || user?.avatar_url} name={displayName || user?.display_name} size={64} />
-                    <span className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/60 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                      <Camera size={17} aria-hidden="true" />
-                    </span>
+      <main id="main" className="profile-layout relative mx-auto grid max-w-[1440px] gap-8 px-4 py-8 sm:px-6 lg:gap-10 lg:px-10 lg:py-10">
+        <aside className="profile-settings-stack flex min-w-0 flex-col gap-6" aria-label="Ρυθμίσεις προφίλ">
+          <section className="profile-id-card h-fit" aria-labelledby="settings-title">
+            <div className="profile-id-topbar">
+              <div className="profile-id-title">
+                <span className="profile-id-indicator" aria-hidden="true" />
+                <h2 id="settings-title">ΤΑΥΤΟΤΗΤΑ ΧΡΗΣΤΗ</h2>
+              </div>
+              <div className="profile-id-header-actions">
+                {!isEditing ? (
+                  <button type="button" onClick={() => setIsEditing(true)}
+                    className="profile-edit-toggle profile-icon-tooltip" aria-label="Επεξεργασία προφίλ"
+                    data-tooltip="Επεξεργασία προφίλ">
+                    <Pencil size={15} aria-hidden="true" />
                   </button>
-                  <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                    onChange={(e) => { pickAvatar(e.target.files?.[0]); e.target.value = ''; }} aria-label="Επιλογή εικόνας προφίλ" />
-                  <div className="min-w-0 flex-1">
-                    {isEditing ? (
-                      <input id="display_name" value={displayName} maxLength={60} onChange={(e) => setDisplayName(e.target.value)}
-                        className={INPUT} autoFocus aria-label="Όνομα χρήστη" />
-                    ) : (
-                      <p className="truncate text-[15px] font-bold text-white">{user?.display_name || '—'}</p>
-                    )}
-                    <p className="mt-0.5 truncate text-[12px] text-slate-500" title={user?.email}>{user?.email || '—'}</p>
-                    <div className="mt-1.5 flex">
-                      <EmailVerificationStatus user={user} />
-                    </div>
-                  </div>
-                  {!isEditing && (
-                    <button type="button" onClick={() => setIsEditing(true)} aria-label="Επεξεργασία προφίλ" title="Επεξεργασία"
-                      className="w-8 h-8 shrink-0 rounded-lg border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-                      <Pencil size={14} aria-hidden="true" />
-                    </button>
-                  )}
+                ) : (
+                  <button type="button" onClick={cancelEdit}
+                    className="profile-edit-toggle profile-icon-tooltip" aria-label="Κλείσιμο επεξεργασίας"
+                    data-tooltip="Κλείσιμο επεξεργασίας">
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="profile-id-content">
+              <div className="profile-id-avatar-column">
+                <div className="profile-id-avatar rounded-full">
+                  <Avatar url={clerkUser?.imageUrl} name={clerkUser?.fullName || clerkUser?.firstName || user?.display_name} size={86} />
                 </div>
-                {isEditing ? (
-                  <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Σχολή <span className="normal-case tracking-normal font-normal">(προαιρετικό)</span></span>
-                      <input value={school} maxLength={120} onChange={(e) => setSchool(e.target.value)} className={INPUT} placeholder="π.χ. ΑΤΜ ΑΠΘ" />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Εταιρεία <span className="normal-case tracking-normal font-normal">(προαιρετικό)</span></span>
-                      <input value={company} maxLength={120} onChange={(e) => setCompany(e.target.value)} className={INPUT} />
-                    </label>
+              </div>
+
+              <div className="profile-id-fields">
+                <form onSubmit={save} className="profile-id-edit-form">
+                  <div className="profile-id-field">
+                    <span className="profile-id-label">Email</span>
+                    <p className="profile-id-value profile-id-email">
+                      <LockKeyhole size={13} aria-hidden="true" />
+                      <span className="profile-id-email-text">{user?.email || '—'}</span>
+                    </p>
                   </div>
-                ) : (user?.school || user?.company) && (
-                  <dl className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-800/60 pt-3 text-[12px] sm:grid-cols-2">
-                    {user?.school && <div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Σχολή</dt><dd className="truncate text-slate-300">{user.school}</dd></div>}
-                    {user?.company && <div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Εταιρεία</dt><dd className="truncate text-slate-300">{user.company}</dd></div>}
-                  </dl>
-                )}
-                {isEditing && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-4">
-                    <button type="submit" disabled={!dirty || saving} className={BTN_PRIMARY}>
-                      {saving && <Loader2 size={14} className="animate-spin" />} Αποθήκευση
-                    </button>
-                    <button type="button" onClick={cancelEdit} className={BTN_GHOST}>Άκυρο</button>
-                    {user?.avatar_url && !avatarPreview && (
-                      <button type="button" onClick={removeAvatar} className="ml-auto text-[11px] font-bold text-slate-500 hover:text-red-300">
-                        Αφαίρεση εικόνας
+                  {(isEditing || user?.school || user?.company) && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="profile-id-field">
+                        <label className="profile-id-label" htmlFor="profile-school">Σχολή</label>
+                        {isEditing ? (
+                          <input id="profile-school" value={school} maxLength={120} onChange={(e) => setSchool(e.target.value)}
+                            className="l-input profile-id-input" placeholder="π.χ. ΑΤΜ ΑΠΘ" />
+                        ) : (
+                          <p className="profile-id-value">{user?.school || '—'}</p>
+                        )}
+                      </div>
+                      <div className="profile-id-field">
+                        <label className="profile-id-label" htmlFor="profile-company">Εταιρεία</label>
+                        {isEditing ? (
+                          <input id="profile-company" value={company} maxLength={120} onChange={(e) => setCompany(e.target.value)}
+                            className="l-input profile-id-input" />
+                        ) : (
+                          <p className="profile-id-value">{user?.company || '—'}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isEditing && (
+                    <div className="profile-id-actions">
+                      <button type="submit" disabled={!dirty || saving} className="l-btn l-btn-primary l-btn-sm">
+                        {saving && <Loader2 size={15} className="animate-spin" />} Αποθήκευση αλλαγών
                       </button>
-                    )}
-                  </div>
-                )}
-              </form>
+                      <button type="button" onClick={cancelEdit} className="l-btn l-btn-outline l-btn-sm">Άκυρο</button>
+                    </div>
+                  )}
+                </form>
+              </div>
+            </div>
+
+          </section>
+
+          <section className="profile-id-card h-fit" aria-labelledby="security-title">
+            <div className="profile-id-topbar">
+              <div className="profile-id-title">
+                <span className="profile-id-indicator" aria-hidden="true" />
+                <h2 id="security-title">ΑΣΦΑΛΕΙΑ &amp; ΔΙΑΧΕΙΡΙΣΗ</h2>
+              </div>
+            </div>
+            <div className="profile-id-security">
+              <div className={`${CARD} l-card overflow-hidden`}>
+                <Row icon={KeyRound} title="Διαχείριση Λογαριασμού & Ασφάλειας"
+                  subtitle="Αλλαγή κωδικού, φωτογραφίας & ασφάλεια μέσω Clerk"
+                  onClick={() => openUserProfile()} />
+                <Row icon={Trash2} tone="danger" title="Διαγραφή λογαριασμού"
+                  subtitle="Οριστική διαγραφή του λογαριασμού σου" onClick={() => setDeleteOpen(true)} />
+              </div>
             </div>
           </section>
 
-          {/* ----- Ασφάλεια ----- */}
-          <section aria-labelledby="security-title">
-            <SectionTitle><span id="security-title">Ασφάλεια</span></SectionTitle>
-            <div className={`${CARD} overflow-hidden`}>
-              <Row icon={KeyRound} title={hasPassword ? 'Κωδικός' : 'Ορισμός κωδικού'}
-                subtitle={hasPassword ? 'Αλλαγή του κωδικού σύνδεσης' : 'Μπαίνεις με Google· όρισε κωδικό για email και πρόγραμμα Windows'}
-                open={openRow === 'password'} onClick={() => toggle('password')}>
-                <PasswordForm user={user} setUser={setUser} onDone={() => setOpenRow(null)} />
-              </Row>
-              <TwoFactorRow user={user} setUser={setUser} open={openRow === '2fa'} onToggle={() => toggle('2fa')} />
-              <Row icon={MonitorSmartphone} title="Πρόσφατες συνδέσεις" subtitle="Συνδέσεις και αλλαγές ασφαλείας"
-                open={openRow === 'log'} onClick={() => toggle('log')}>
-                <SecurityLog />
-              </Row>
-              <Row icon={LogOut} title="Αποσύνδεση από άλλες συσκευές" subtitle="Browsers και πρόγραμμα Windows" onClick={logoutEverywhere} />
-              <Row icon={Trash2} tone="danger" title="Διαγραφή λογαριασμού" subtitle="Οριστική διαγραφή του λογαριασμού σου"
-                onClick={() => setDeleteOpen(true)} />
+          <section className="profile-id-card h-fit" aria-labelledby="devices-security-title">
+            <div className="profile-id-topbar">
+              <div className="profile-id-title">
+                <span className="profile-id-indicator" aria-hidden="true" />
+                <h2 id="devices-security-title">ΣΥΣΚΕΥΕΣ &amp; ΕΠΙΠΛΕΟΝ ΑΣΦΑΛΕΙΑ</h2>
+              </div>
+            </div>
+            <div className="profile-id-security">
+              <div className={`${CARD} l-card overflow-hidden`}>
+                <TwoFactorRow user={user} setUser={setUser}
+                  open={openRow === '2fa'} onToggle={() => toggleRow('2fa')} />
+                <Row icon={MonitorSmartphone} title="Πρόσφατες συνδέσεις"
+                  subtitle="Συνδέσεις και αλλαγές ασφαλείας" open={openRow === 'log'}
+                  onClick={() => toggleRow('log')}>
+                  <SecurityLog />
+                </Row>
+                <Row icon={LogOut} title="Αποσύνδεση από όλες τις συσκευές"
+                  subtitle="Απενεργοποιεί όλες τις άλλες συνδέσεις" onClick={logoutEverywhere} />
+              </div>
             </div>
           </section>
-        </div>
+        </aside>
 
-        {/* ----- Projects ----- */}
         <section className="min-w-0" aria-labelledby="projects-title">
-          <SectionTitle right={(
-            <div role="tablist" aria-label="Projects" className="inline-flex rounded-xl border border-slate-800 bg-[#0B1221] p-1">
+          <div className="profile-projects-heading flex flex-col justify-between gap-4 pb-6 sm:flex-row sm:items-center">
+            <div>
+              <p className="profile-workspace-label mb-2"><span aria-hidden="true">•</span> ΧΩΡΟΣ ΕΡΓΑΣΙΑΣ</p>
+              <h1 id="projects-title" className="l-display text-2xl font-bold leading-tight tracking-tight text-white">Τα projects μου</h1>
+            </div>
+            <div role="tablist" aria-label="Projects" className="profile-project-tabs inline-flex p-1 text-[13px] font-medium">
               {[
                 ['owned', 'Δικά μου', projects.owned.length],
                 ['shared', 'Κοινά', projects.shared.length],
               ].map(([key, label, count]) => (
                 <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-                  className={`h-7 inline-flex items-center gap-2 rounded-lg px-3 text-[11px] font-bold transition-colors ${tab === key
-                    ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-200'}`}>
-                  {label}
-                  <span className={`rounded-md px-1.5 text-[10px] ${tab === key ? 'bg-blue-600/30 text-blue-200' : 'bg-slate-800/70 text-slate-500'}`}>{count}</span>
+                  className={`profile-project-tab h-9 rounded-xl px-5 transition-colors ${tab === key ? 'profile-tab-active text-white' : 'text-mist hover:text-white'}`}>
+                  <span>{label}</span>
+                  <span className={`profile-project-tab-count ${tab === key ? 'is-active' : ''}`}>{count}</span>
                 </button>
               ))}
             </div>
-          )}>
-            <span id="projects-title">Τα projects μου</span>
-          </SectionTitle>
+          </div>
 
-          <div role="tabpanel">
+          <div className="mt-6" role="tabpanel">
             {projectsLoading ? (
-              <div className={`${CARD} flex items-center justify-center gap-2 py-16 text-[12px] text-slate-500`}>
-                <Loader2 size={15} className="animate-spin" /> Φόρτωση...
+              <div className="flex items-center justify-center gap-2 py-16 text-[14px] text-fog">
+                <Loader2 size={16} className="animate-spin" /> Φόρτωση...
               </div>
             ) : list.length === 0 ? (
-              <div className={`${CARD} py-16 text-center`}>
-                <FolderOpen size={26} strokeWidth={1.5} className="mx-auto text-slate-600" aria-hidden="true" />
-                <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-600">
-                  {tab === 'owned' ? 'Δεν έχεις δημιουργήσει ακόμα project' : 'Κανείς δεν έχει κοινοποιήσει project σε εσένα'}
+              <div className="profile-empty rounded-[16px] py-16 text-center">
+                <FolderOpen size={27} strokeWidth={1.5} className="profile-empty-icon mx-auto" aria-hidden="true" />
+                <p className="profile-empty-label mt-3">
+                  {tab === 'owned' ? 'Δεν έχεις δημιουργήσει ακόμα project.' : 'Κανείς δεν έχει κοινοποιήσει project σε εσένα.'}
                 </p>
               </div>
             ) : (
-              <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              <ul className="profile-project-grid grid grid-cols-1 gap-4 md:grid-cols-2">
                 {list.map((p) => (
-                  <li key={p.public_id || p.name}>
-                    <button type="button" onClick={() => openProject(p.name)}
-                      className={`${CARD} group w-full p-4 text-left transition-all hover:border-slate-700 hover:bg-[#0e1628]`}>
+                  <li key={p.public_id || p.name} className="profile-project-item">
+                    <button type="button" onClick={() => openProject(p.name)} className="profile-project-card l-card l-lift w-full p-5 text-left">
                       <div className="flex min-w-0 items-start gap-3">
-                        <span className={`w-8 h-8 shrink-0 rounded-lg border flex items-center justify-center ${tab === 'shared'
-                          ? 'bg-violet-500/10 border-violet-500/20 text-violet-300' : 'bg-blue-500/10 border-blue-500/20 text-blue-300'}`}>
-                          {tab === 'shared' ? <Users size={15} aria-hidden="true" /> : <FolderOpen size={15} aria-hidden="true" />}
+                        <span className="profile-project-icon" aria-hidden="true">
+                          {tab === 'shared' ? <Users size={18} /> : <FolderOpen size={18} />}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-bold tracking-wide text-slate-200 group-hover:text-white">{p.name}</p>
-                          <p className="mt-0.5 truncate text-[10.5px] text-slate-500">
+                          <p className="truncate font-semibold text-ice">{p.name}</p>
+                          <p className="mt-2 text-[12.5px] text-fog">
                             {tab === 'shared' && p.owner_name ? `Από ${p.owner_name} · ` : ''}
-                            Αλλαγή {formatDate(p.updated_at || p.created_at)}
+                            Τελευταία αλλαγή {formatDate(p.updated_at || p.created_at)}
                             {p.updated_by?.display_name && p.updated_by.id !== user?.id ? ` από ${p.updated_by.display_name}` : ''}
                           </p>
                         </div>
-                        <ArrowUpRight size={14} className="shrink-0 text-slate-600 transition-colors group-hover:text-slate-300" aria-hidden="true" />
+                        <span className="profile-project-open" aria-hidden="true"><ArrowUpRight size={14} /></span>
                       </div>
-                      {(tab === 'shared' || p.members_count > 1) && (
-                        <div className="mt-3 flex gap-1.5 pl-11">
-                          {tab === 'shared' && (
-                            <span className="rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400">{ROLE_LABEL[p.role] || p.role}</span>
-                          )}
-                          {p.members_count > 1 && (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400">
-                              <Users size={10} aria-hidden="true" /> {p.members_count}
-                            </span>
-                          )}
+                      <div className="profile-project-meta flex shrink-0 gap-1.5">
+                        <span className={`profile-project-status ${tab === 'shared' ? 'is-shared' : ''}`}
+                          aria-label={tab === 'shared' ? 'Κοινό project' : 'Δικό σου project'} />
+                        <div className="flex shrink-0 gap-1.5">
+                          {tab === 'shared' && <span className="l-badge">{ROLE_LABEL[p.role] || p.role}</span>}
+                          {p.members_count > 1 && <span className="l-badge"><Users size={11} aria-hidden="true" /> {p.members_count}</span>}
                         </div>
-                      )}
+                      </div>
                     </button>
                   </li>
                 ))}
@@ -384,6 +356,7 @@ export default function Profile() {
             )}
           </div>
         </section>
+
       </main>
 
       <DeleteAccountDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} user={user}
@@ -392,28 +365,47 @@ export default function Profile() {
   );
 }
 
-// --- Έλεγχος δύο βημάτων ---
 function TwoFactorRow({ user, setUser, open, onToggle }) {
   const [status, setStatus] = useState(null);
-  const [mode, setMode] = useState(null);         // null | 'choose' | 'totp' | 'email'
-  const [setup, setSetup] = useState(null);       // { secret, qr } για εφαρμογή authenticator
+  const [mode, setMode] = useState(null);
+  const [setup, setSetup] = useState(null);
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [codes, setCodes] = useState(null);       // εφεδρικοί κωδικοί (εμφανίζονται μία φορά)
-  const [manage, setManage] = useState(null);     // null | 'disable' | 'regenerate'
+  const [backupCodes, setBackupCodes] = useState(null);
+  const [manage, setManage] = useState(null);
   const [busy, setBusy] = useState(false);
   const hasPassword = user?.has_password !== false;
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/me/2fa`).then(({ data }) => setStatus(data)).catch(() => setStatus({ enabled: false }));
+    axios.get(`${API_BASE_URL}/api/me/2fa`)
+      .then(({ data }) => setStatus(data))
+      .catch((err) => {
+        toast.error(apiErrorMessage(err, 'Αποτυχία φόρτωσης ρυθμίσεων δύο βημάτων'));
+        setStatus({ enabled: false });
+      });
   }, []);
 
-  const reset = () => { setMode(null); setSetup(null); setPassword(''); setCode(''); setManage(null); };
-  const run = async (fn) => { setBusy(true); try { await fn(); } catch (err) { toast.error(apiErrorMessage(err)); } finally { setBusy(false); } };
+  const reset = () => {
+    setMode(null);
+    setSetup(null);
+    setPassword('');
+    setCode('');
+    setManage(null);
+  };
 
-  // Βήμα 1: επιβεβαίωση κωδικού λογαριασμού (ένα κλεμμένο cookie δεν αρκεί για να αλλάξει το 2FA)
-  const start = (e) => {
-    e.preventDefault();
+  const run = async (operation) => {
+    setBusy(true);
+    try {
+      await operation();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startSetup = (event) => {
+    event.preventDefault();
     run(async () => {
       if (mode === 'totp') {
         const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/setup`, { password });
@@ -427,18 +419,16 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
     });
   };
 
-  const enable = (e) => {
-    e.preventDefault();
+  const enable = (event) => {
+    event.preventDefault();
     run(async () => {
-      const url = mode === 'totp' ? '/api/me/2fa/enable' : '/api/me/2fa/email/enable';
-      try {
-        const { data } = await axios.post(`${API_BASE_URL}${url}`, { code });
-        setCodes(data.backup_codes);
-        setStatus(data);
-        reset();
-        setUser({ ...user, two_factor_enabled: true });
-        toast.success('Ο έλεγχος δύο βημάτων ενεργοποιήθηκε. Οι άλλες συσκευές θα ζητήσουν ξανά σύνδεση.');
-      } catch (err) { setCode(''); throw err; }
+      const path = mode === 'totp' ? '/api/me/2fa/enable' : '/api/me/2fa/email/enable';
+      const { data } = await axios.post(`${API_BASE_URL}${path}`, { code });
+      setBackupCodes(data.backup_codes);
+      setStatus(data);
+      reset();
+      setUser({ ...user, two_factor_enabled: true });
+      toast.success('Ο έλεγχος δύο βημάτων ενεργοποιήθηκε.');
     });
   };
 
@@ -447,8 +437,8 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
     toast.success(`Στείλαμε κωδικό στο ${data.email_hint}`);
   });
 
-  const submitManage = (e) => {
-    e.preventDefault();
+  const submitManage = (event) => {
+    event.preventDefault();
     run(async () => {
       if (manage === 'disable') {
         const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/disable`, { password, code });
@@ -457,7 +447,7 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
         toast.success('Ο έλεγχος δύο βημάτων απενεργοποιήθηκε');
       } else {
         const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/backup-codes`, { code });
-        setCodes(data.backup_codes);
+        setBackupCodes(data.backup_codes);
         setStatus(data);
       }
       reset();
@@ -465,46 +455,57 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
   };
 
   const copyCodes = async () => {
-    try { await navigator.clipboard.writeText(codes.join('\n')); toast.success('Αντιγράφηκαν'); } catch { toast.error('Η αντιγραφή απέτυχε'); }
+    try {
+      await navigator.clipboard.writeText(backupCodes.join('\n'));
+      toast.success('Αντιγράφηκαν');
+    } catch {
+      toast.error('Η αντιγραφή απέτυχε');
+    }
   };
+
   const downloadCodes = () => {
-    const blob = new Blob([`Εφεδρικοί κωδικοί LASCA (${user.email})\nΚάθε κωδικός ισχύει μία φορά.\n\n${codes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'lasca-backup-codes.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const blob = new Blob([`Εφεδρικοί κωδικοί LASCA (${user.email})\n\n${backupCodes.join('\n')}\n`], {
+      type: 'text/plain;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'lasca-backup-codes.txt';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const emailMethod = status?.method === 'email';
   const codeInput = (
-    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={emailMethod || mode === 'email' ? 'Κωδικός από το email' : 'Κωδικός εφαρμογής'}
+    <input value={code} onChange={(event) => setCode(event.target.value)}
+      placeholder={emailMethod || mode === 'email' ? 'Κωδικός από το email' : 'Κωδικός εφαρμογής'}
       autoComplete="one-time-code" className={INPUT} required aria-label="Κωδικός δύο βημάτων" maxLength={11} />
   );
   const badge = (
     <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold ${status?.enabled
-      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+      : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
       {status === null ? '…' : status.enabled ? 'Ενεργός' : 'Ανενεργός'}
     </span>
   );
-  const opt = 'w-full rounded-xl border border-slate-800 p-3 text-left transition-colors hover:bg-slate-800 hover:border-slate-700 disabled:opacity-50 disabled:hover:bg-transparent';
+  const optionClass = 'w-full rounded-xl border border-slate-800 p-3 text-left transition-colors hover:bg-slate-800 hover:border-slate-700 disabled:opacity-50';
 
   return (
-    <Row icon={ShieldCheck} title="Έλεγχος δύο βημάτων" subtitle="Δεύτερος κωδικός σε κάθε σύνδεση" right={badge}
-      open={open || Boolean(codes)} onClick={onToggle}>
-      {codes ? (
+    <Row icon={ShieldCheck} title="Έλεγχος δύο βημάτων" subtitle="Δεύτερος κωδικός σε κάθε σύνδεση"
+      right={badge} open={open || Boolean(backupCodes)} onClick={onToggle}>
+      {backupCodes ? (
         <div className="space-y-3">
           <p className="rounded-xl border border-blue-500/25 bg-blue-500/[0.07] px-3 py-2 text-[12px] leading-relaxed text-blue-100">
-            Αποθήκευσε αυτούς τους κωδικούς κάπου ασφαλές. Αν χάσεις το κινητό ή την πρόσβαση στο email σου, θα μπεις μόνο με αυτούς. <strong>Δεν θα τους ξαναδείς.</strong>
+            Αποθήκευσε αυτούς τους κωδικούς σε ασφαλές σημείο. Δεν θα εμφανιστούν ξανά.
           </p>
           <ul className="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 font-mono text-[13px] text-slate-100">
-            {codes.map((c) => <li key={c}>{c}</li>)}
+            {backupCodes.map((backupCode) => <li key={backupCode}>{backupCode}</li>)}
           </ul>
           <div className="flex gap-2">
             <button type="button" onClick={copyCodes} className={`${BTN_GHOST} flex-1`}><Copy size={14} /> Αντιγραφή</button>
             <button type="button" onClick={downloadCodes} className={`${BTN_GHOST} flex-1`}><Download size={14} /> Λήψη .txt</button>
           </div>
-          <button type="button" onClick={() => setCodes(null)} className={`${BTN_PRIMARY} w-full`}>Τους αποθήκευσα</button>
+          <button type="button" onClick={() => setBackupCodes(null)} className={`${BTN_PRIMARY} w-full`}>Τους αποθήκευσα</button>
         </div>
       ) : status === null ? (
         <Loader2 size={15} className="animate-spin text-slate-500" />
@@ -521,14 +522,20 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
           ) : (
             <form onSubmit={submitManage} className="space-y-2.5">
               {manage === 'disable' && hasPassword && (
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός του λογαριασμού" autoComplete="current-password" className={INPUT} required aria-label="Ο κωδικός του λογαριασμού" />
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Ο κωδικός του λογαριασμού" autoComplete="current-password" className={INPUT} required
+                  aria-label="Ο κωδικός του λογαριασμού" />
               )}
               {codeInput}
-              {emailMethod && <button type="button" onClick={sendManageCode} disabled={busy} className="text-[11px] font-bold text-slate-400 hover:text-white">Αποστολή κωδικού στο email</button>}
+              {emailMethod && (
+                <button type="button" onClick={sendManageCode} disabled={busy}
+                  className="text-[11px] font-bold text-slate-400 hover:text-white">Αποστολή κωδικού στο email</button>
+              )}
               <div className="flex gap-2">
                 <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-                <button type="submit" disabled={busy} className={`${manage === 'disable' ? BTN_DANGER : BTN_PRIMARY} flex-1`}>
-                  {busy && <Loader2 size={14} className="animate-spin" />} {manage === 'disable' ? 'Απενεργοποίηση' : 'Δημιουργία'}
+                <button type="submit" disabled={busy} className={`${BTN_DANGER} flex-1`}>
+                  {busy && <Loader2 size={14} className="animate-spin" />}
+                  {manage === 'disable' ? 'Απενεργοποίηση' : 'Δημιουργία'}
                 </button>
               </div>
             </form>
@@ -536,30 +543,41 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
         </div>
       ) : !mode ? (
         <div className="space-y-3">
-          <p className="text-[12px] leading-relaxed text-slate-400">Ακόμα κι αν κάποιος μάθει τον κωδικό σου, δεν θα μπορεί να μπει χωρίς τον δεύτερο κωδικό.</p>
+          <p className="text-[12px] leading-relaxed text-slate-400">
+            Ενεργοποίησε δεύτερο κωδικό για επιπλέον προστασία του λογαριασμού.
+          </p>
           <button type="button" onClick={() => setMode('choose')} className={`${BTN_PRIMARY} w-full`}>Ενεργοποίηση</button>
         </div>
       ) : mode === 'choose' ? (
         <div className="space-y-2">
-          <button type="button" onClick={() => setMode('totp')} className={opt}>
-            <p className="text-[12px] font-bold text-slate-200">Εφαρμογή authenticator <span className="ml-1 rounded-md bg-blue-600/25 px-1.5 py-px text-[10px] text-blue-200">Προτείνεται</span></p>
-            <p className="mt-0.5 text-[11px] text-slate-500">Google / Microsoft Authenticator, Authy, 1Password. Η πιο ασφαλής επιλογή.</p>
+          <button type="button" onClick={() => setMode('totp')} className={optionClass}>
+            <p className="text-[12px] font-bold text-slate-200">Εφαρμογή authenticator</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Google / Microsoft Authenticator, Authy, 1Password.</p>
           </button>
-          <button type="button" onClick={() => setMode('email')} disabled={!status.email_available || !user?.email_verified} className={opt}>
+          <button type="button" onClick={() => setMode('email')} disabled={!status.email_available || !user?.email_verified}
+            className={optionClass}>
             <p className="text-[12px] font-bold text-slate-200">Κωδικός στο email</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">{user?.email_verified ? 'Σε κάθε σύνδεση στέλνουμε κωδικό 6 ψηφίων στο email σου.' : 'Επιβεβαίωσε πρώτα το email σου.'}</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {user?.email_verified ? 'Κωδικός 6 ψηφίων σε κάθε σύνδεση.' : 'Επιβεβαίωσε πρώτα το email σου.'}
+            </p>
           </button>
           <button type="button" onClick={reset} className="w-full py-1 text-[11px] font-bold text-slate-500 hover:text-white">Άκυρο</button>
         </div>
       ) : !setup ? (
-        <form onSubmit={start} className="space-y-2.5">
-          <p className="text-[12px] text-slate-400">{hasPassword ? 'Για ασφάλεια, γράψε τον κωδικό του λογαριασμού σου.' : 'Επιβεβαίωσε ότι είσαι εσύ (σύνδεση με Google τα τελευταία 10 λεπτά).'}</p>
+        <form onSubmit={startSetup} className="space-y-2.5">
+          <p className="text-[12px] text-slate-400">
+            {hasPassword ? 'Για ασφάλεια, γράψε τον κωδικό του λογαριασμού σου.' : 'Επιβεβαίωσε ότι είσαι εσύ για να συνεχίσεις.'}
+          </p>
           {hasPassword && (
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Κωδικός λογαριασμού" autoComplete="current-password" className={INPUT} required autoFocus aria-label="Κωδικός λογαριασμού" />
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)}
+              placeholder="Κωδικός λογαριασμού" autoComplete="current-password" className={INPUT}
+              required aria-label="Κωδικός λογαριασμού" />
           )}
           <div className="flex gap-2">
             <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-            <button type="submit" disabled={busy} className={`${BTN_PRIMARY} flex-1`}>{busy && <Loader2 size={14} className="animate-spin" />} Συνέχεια</button>
+            <button type="submit" disabled={busy} className={`${BTN_PRIMARY} flex-1`}>
+              {busy && <Loader2 size={14} className="animate-spin" />} Συνέχεια
+            </button>
           </div>
         </form>
       ) : (
@@ -567,21 +585,26 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
           {mode === 'totp' ? (
             <>
               <ol className="space-y-1.5 text-[12px] text-slate-400 [&>li]:ml-4 [&>li]:list-decimal">
-                <li>Άνοιξε μια εφαρμογή authenticator (Google Authenticator, Microsoft Authenticator, Authy, 1Password…).</li>
-                <li>Σκάναρε τον κωδικό QR ή γράψε το κλειδί.</li>
-                <li>Γράψε τον 6ψήφιο κωδικό που εμφανίζεται.</li>
+                <li>Άνοιξε εφαρμογή authenticator.</li>
+                <li>Σκάναρε το QR ή εισήγαγε το κλειδί.</li>
+                <li>Γράψε τον κωδικό που εμφανίζεται.</li>
               </ol>
               {setup.qr && <img src={setup.qr} alt="Κωδικός QR για την εφαρμογή authenticator" className="mx-auto h-40 w-40 rounded-xl bg-white p-2" />}
-              <p className="break-all rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-center font-mono text-[12px] tracking-wider text-slate-200" aria-label="Κλειδί για χειροκίνητη εισαγωγή">{setup.secret.match(/.{1,4}/g).join(' ')}</p>
+              <p className="break-all rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-center font-mono text-[12px] tracking-wider text-slate-200">
+                {setup.secret.match(/.{1,4}/g).join(' ')}
+              </p>
             </>
           ) : (
             <p className="text-[12px] text-slate-400">Γράψε τον κωδικό που στείλαμε στο {setup.email}.</p>
           )}
-          <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={6}
-            autoComplete="one-time-code" placeholder="000000" className={`${INPUT} text-center font-mono text-lg tracking-[0.4em]`} aria-label="Κωδικός 6 ψηφίων" required />
+          <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+            inputMode="numeric" maxLength={6} autoComplete="one-time-code" placeholder="000000"
+            className={`${INPUT} text-center font-mono text-lg tracking-[0.4em]`} aria-label="Κωδικός 6 ψηφίων" required />
           <div className="flex gap-2">
             <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-            <button type="submit" disabled={busy || code.length !== 6} className={`${BTN_PRIMARY} flex-1`}>{busy && <Loader2 size={14} className="animate-spin" />} Ενεργοποίηση</button>
+            <button type="submit" disabled={busy || code.length !== 6} className={`${BTN_PRIMARY} flex-1`}>
+              {busy && <Loader2 size={14} className="animate-spin" />} Ενεργοποίηση
+            </button>
           </div>
         </form>
       )}
@@ -589,89 +612,29 @@ function TwoFactorRow({ user, setUser, open, onToggle }) {
   );
 }
 
-// --- Κατάσταση επιβεβαίωσης email ---
-function EmailVerificationStatus({ user }) {
-  const [sent, setSent] = useState(false);
-  if (!user) return null;
-  const resend = async () => {
-    try { await axios.post(`${API_BASE_URL}/api/me/verify-email`); setSent(true); } catch (err) { toast.error(apiErrorMessage(err)); }
-  };
-  if (user.email_verified) {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[10px] font-bold text-emerald-300" role="status">
-        <Check size={10} aria-hidden="true" /> Επιβεβαιωμένο
-      </span>
-    );
-  }
-  return (
-    <button type="button" onClick={resend} disabled={sent}
-      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[10px] font-bold text-amber-300 hover:bg-amber-500/20 disabled:opacity-70">
-      {sent ? <Check size={10} aria-hidden="true" /> : <Mail size={10} aria-hidden="true" />}
-      {sent ? 'Στάλθηκε' : 'Επιβεβαίωση email'}
-    </button>
-  );
-}
-
-// --- Αλλαγή / ορισμός κωδικού ---
-function PasswordForm({ user, setUser, onDone }) {
-  const { passwordMin, passwordRecommended } = useAuth();
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [confirmNext, setConfirmNext] = useState('');
-  const [valid, setValid] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const hasPassword = user?.has_password !== false;
-
-  const changePassword = async (e) => {
-    e.preventDefault();
-    if (!valid) return toast.error('Ο νέος κωδικός δεν είναι αρκετά ισχυρός');
-    if (next !== confirmNext) return toast.error('Οι κωδικοί δεν ταιριάζουν');
-    setBusy(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/me/password`, { current_password: current, new_password: next });
-      setUser(data);
-      setCurrent(''); setNext(''); setConfirmNext('');
-      onDone();
-      toast.success(hasPassword ? 'Ο κωδικός άλλαξε. Οι άλλες συσκευές αποσυνδέθηκαν.' : 'Ο κωδικός ορίστηκε. Μπορείς πλέον να μπαίνεις και από το πρόγραμμα των Windows.');
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Αποτυχία αλλαγής κωδικού'));
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <form onSubmit={changePassword} className="space-y-2.5">
-      {hasPassword && (
-        <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="Τρέχων κωδικός" aria-label="Τρέχων κωδικός" autoComplete="current-password" className={INPUT} required autoFocus />
-      )}
-      <input type="password" value={next} onChange={(e) => setNext(e.target.value)} placeholder="Νέος κωδικός" aria-label="Νέος κωδικός" autoComplete="new-password" className={INPUT} required maxLength={128} aria-describedby="new-pw-strength" />
-      <PasswordStrength id="new-pw-strength" password={next} email={user?.email} name={user?.display_name} min={passwordMin} recommended={passwordRecommended} onValidity={setValid} />
-      <input type="password" value={confirmNext} onChange={(e) => setConfirmNext(e.target.value)} placeholder="Επιβεβαίωση νέου κωδικού" aria-label="Επιβεβαίωση νέου κωδικού" autoComplete="new-password" className={INPUT} required maxLength={128} />
-      <div className="flex gap-2 pt-1">
-        <button type="button" onClick={onDone} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-        <button type="submit" disabled={busy} className={`${BTN_PRIMARY} flex-1`}>{busy && <Loader2 size={14} className="animate-spin" />} Αποθήκευση</button>
-      </div>
-    </form>
-  );
-}
-
-// --- Πρόσφατη δραστηριότητα ασφαλείας ---
 function SecurityLog() {
   const [events, setEvents] = useState(null);
+
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/me/security-events`).then(({ data }) => setEvents(data.events || [])).catch(() => setEvents([]));
+    axios.get(`${API_BASE_URL}/api/me/security-events`)
+      .then(({ data }) => setEvents(data.events || []))
+      .catch((err) => {
+        toast.error(apiErrorMessage(err, 'Αποτυχία φόρτωσης πρόσφατων συνδέσεων'));
+        setEvents([]);
+      });
   }, []);
-  const bad = (e) => /failed|blocked/.test(e.event);
+
   if (events === null) return <Loader2 size={15} className="animate-spin text-slate-500" />;
   return (
     <ul className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
       {events.length === 0 && <li className="text-[12px] text-slate-500">Δεν υπάρχει δραστηριότητα.</li>}
-      {events.map((e, i) => (
-        <li key={i} className="flex items-start justify-between gap-3 text-[12px]">
+      {events.map((event, index) => (
+        <li key={`${event.at}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
           <div className="min-w-0">
-            <p className={bad(e) ? 'text-red-300' : 'text-slate-200'}>{e.label}</p>
-            <p className="truncate text-[11px] text-slate-500">{[e.client, e.ip].filter(Boolean).join(' · ')}</p>
+            <p className={/failed|blocked/.test(event.event) ? 'text-red-300' : 'text-slate-200'}>{event.label}</p>
+            <p className="truncate text-[11px] text-slate-500">{[event.client, event.ip].filter(Boolean).join(' · ')}</p>
           </div>
-          <time className="shrink-0 text-[11px] text-slate-500" dateTime={e.at}>{formatDate(e.at, true)}</time>
+          <time className="shrink-0 text-[11px] text-slate-500" dateTime={event.at}>{formatDate(event.at, true)}</time>
         </li>
       ))}
     </ul>
@@ -685,8 +648,13 @@ function DeleteAccountDialog({ open, onClose, user, onDeleted }) {
   const hasPassword = user?.has_password !== false;
 
   useEffect(() => {
-    if (!open) { setPassword(''); return undefined; }
-    const esc = (e) => { if (e.key === 'Escape') onClose(); };
+    if (!open) return undefined;
+    const esc = (e) => {
+      if (e.key === 'Escape') {
+        setPassword('');
+        onClose();
+      }
+    };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [open, onClose]);
@@ -708,7 +676,7 @@ function DeleteAccountDialog({ open, onClose, user, onDeleted }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      onMouseDown={(event) => { if (event.target === event.currentTarget) { setPassword(''); onClose(); } }}>
       <section className={`${CARD} w-full max-w-md p-5 shadow-2xl animate-pop`} role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
         <div className="flex items-start gap-3">
           <span className="w-9 h-9 shrink-0 rounded-lg border border-red-500/25 bg-red-500/10 flex items-center justify-center text-red-400">
@@ -721,14 +689,14 @@ function DeleteAccountDialog({ open, onClose, user, onDeleted }) {
               κι άλλα μέλη δεν χάνονται: περνάνε στον πρώτο συνεργάτη.
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Κλείσιμο" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X size={15} /></button>
+          <button type="button" onClick={() => { setPassword(''); onClose(); }} aria-label="Κλείσιμο" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X size={15} /></button>
         </div>
         <form onSubmit={remove} className="mt-4 space-y-3">
           {hasPassword && (
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ο κωδικός σου" aria-label="Ο κωδικός σου" className={INPUT} required autoFocus />
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className={`${BTN_GHOST} flex-1`}>Ακύρωση</button>
+            <button type="button" onClick={() => { setPassword(''); onClose(); }} className={`${BTN_GHOST} flex-1`}>Ακύρωση</button>
             <button type="submit" disabled={busy || (hasPassword && !password)} className={`${BTN_DANGER} flex-1`}>
               {busy && <Loader2 size={14} className="animate-spin" />} Οριστική διαγραφή
             </button>

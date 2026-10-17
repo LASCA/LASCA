@@ -78,6 +78,20 @@
 }
 
 @layer components {
+  .lasca-select,
+  .collab-select,
+  .share-dialog-select,
+  select {
+    color-scheme: dark !important;
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+  }
+  select option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    padding: 8px 12px;
+  }
+
   /* --- Φόντο: κάνναβος «blueprint» + προβολέας στην κορυφή --- */
   .l-grid-bg {
     background-image:

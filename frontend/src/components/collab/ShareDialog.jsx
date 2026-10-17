@@ -1,13 +1,115 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
-  Check, Copy, Crown, Link2, Loader2, LogOut, Share2, Trash2, UserMinus, UserPlus, X,
+  Check, ChevronDown, Copy, Crown, Link2, Loader2, LogOut, Share2, Trash2, UserMinus, UserPlus, X,
 } from 'lucide-react';
 import CollabAvatar from './CollabAvatar';
 import { ROLE_HINT, ROLE_LABEL, apiError, timeAgo } from './collabApi';
 
 const inputCls = 'h-10 rounded-xl border border-slate-700/70 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 outline-none focus:border-[#5b74e6] focus:ring-2 focus:ring-[#3b5bdb]/30';
-const selectCls = 'h-10 rounded-xl border border-slate-700/70 bg-slate-950 px-2.5 text-sm text-slate-100 outline-none focus:border-[#5b74e6]';
+const selectCls = 'h-10 rounded-xl border border-slate-700/70 bg-[#0f172a] px-2.5 text-sm text-slate-100 transition-colors hover:border-slate-600 focus:border-[#5b74e6] focus:outline-none focus:ring-2 focus:ring-[#3b5bdb]/30';
+
+function CustomSelect({ value, onChange, options, className = '', containerClassName = '', title }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
+  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const selectedOption = options.find((option) => option.value === value) || options[0];
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateMenuPosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const desiredHeight = Math.min(options.length * 40 + 8, window.innerHeight - 32);
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const openAbove = spaceBelow < desiredHeight && spaceAbove > spaceBelow;
+      const availableHeight = Math.max(0, openAbove ? spaceAbove : spaceBelow);
+      const height = Math.min(desiredHeight, availableHeight);
+
+      setMenuStyle({
+        left: rect.left,
+        minWidth: rect.width,
+        maxWidth: Math.max(rect.width, window.innerWidth - rect.left - 8),
+        maxHeight: height,
+        top: openAbove ? Math.max(8, rect.top - height - 4) : rect.bottom + 4,
+      });
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [isOpen, options.length]);
+
+  if (!selectedOption) return null;
+
+  return (
+    <div ref={containerRef} className={`relative min-w-0 ${containerClassName}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        title={title}
+        onClick={() => setIsOpen((open) => !open)}
+        className={`flex w-full items-center justify-between gap-2 border bg-[#0f172a] text-left outline-none transition-colors hover:border-slate-600 focus:border-[#5b74e6] focus:ring-2 focus:ring-[#3b5bdb]/30 ${className}`}
+      >
+        <span className="truncate">{selectedOption.label}</span>
+        <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && menuStyle && createPortal(
+        <div
+          ref={menuRef}
+          role="listbox"
+          style={{ ...menuStyle, position: 'fixed' }}
+          className="z-[140] overflow-y-auto rounded-xl border border-slate-700 bg-[#0f172a] py-1.5 shadow-2xl"
+        >
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm text-slate-100 transition-colors hover:bg-slate-800 focus:bg-slate-800 focus:outline-none ${option.value === value ? 'bg-slate-800/70' : ''}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
 
 function RoleBadge({ role }) {
   const colors = {
@@ -231,10 +333,16 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
                     </div>
                   )}
                 </div>
-                <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className={selectCls} title={ROLE_HINT[newRole]}>
-                  <option value="editor">Επεξεργαστής</option>
-                  <option value="viewer">Αναγνώστης</option>
-                </select>
+                <CustomSelect
+                  value={newRole}
+                  onChange={setNewRole}
+                  options={[
+                    { value: 'editor', label: 'Επεξεργαστής' },
+                    { value: 'viewer', label: 'Αναγνώστης' },
+                  ]}
+                  className={selectCls}
+                  title={ROLE_HINT[newRole]}
+                />
                 <button type="submit" disabled={busy || !email.trim()}
                   className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 px-4 text-sm font-bold text-white">
                   {busy ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />} Προσθήκη
@@ -267,11 +375,15 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isOwner && m.role !== 'owner' ? (
                           <>
-                            <select value={m.role} onChange={(e) => changeRole(m, e.target.value)}
-                              className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-1.5 text-xs text-slate-200">
-                              <option value="editor">Επεξεργαστής</option>
-                              <option value="viewer">Αναγνώστης</option>
-                            </select>
+                            <CustomSelect
+                              value={m.role}
+                              onChange={(role) => changeRole(m, role)}
+                              options={[
+                                { value: 'editor', label: 'Επεξεργαστής' },
+                                { value: 'viewer', label: 'Αναγνώστης' },
+                              ]}
+                              className="h-8 min-w-[132px] rounded-lg border-slate-700 px-1.5 text-xs text-slate-200"
+                            />
                             <button type="button" title="Να γίνει ιδιοκτήτης" onClick={() => setConfirm({ kind: 'transfer', member: m })}
                               className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-700 text-amber-300 hover:bg-amber-500/10">
                               <Crown size={14} />
@@ -297,16 +409,28 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
             <section>
               <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-2">Σύνδεσμος πρόσκλησης</h3>
               <div className="flex flex-col sm:flex-row gap-2">
-                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className={`${selectCls} flex-1`}>
-                  <option value="editor">ως Επεξεργαστής</option>
-                  <option value="viewer">ως Αναγνώστης</option>
-                </select>
-                <select value={inviteDays} onChange={(e) => setInviteDays(e.target.value)} className={`${selectCls} flex-1`}>
-                  <option value="1">λήγει σε 1 μέρα</option>
-                  <option value="7">λήγει σε 7 μέρες</option>
-                  <option value="30">λήγει σε 30 μέρες</option>
-                  <option value="never">χωρίς λήξη</option>
-                </select>
+                <CustomSelect
+                  value={inviteRole}
+                  onChange={setInviteRole}
+                  options={[
+                    { value: 'editor', label: 'ως Επεξεργαστής' },
+                    { value: 'viewer', label: 'ως Αναγνώστης' },
+                  ]}
+                  className={selectCls}
+                  containerClassName="flex-1"
+                />
+                <CustomSelect
+                  value={inviteDays}
+                  onChange={setInviteDays}
+                  options={[
+                    { value: '1', label: 'λήγει σε 1 μέρα' },
+                    { value: '7', label: 'λήγει σε 7 μέρες' },
+                    { value: '30', label: 'λήγει σε 30 μέρες' },
+                    { value: 'never', label: 'χωρίς λήξη' },
+                  ]}
+                  className={selectCls}
+                  containerClassName="flex-1"
+                />
                 <button type="button" onClick={createInvite} disabled={busy}
                   className="h-10 inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 text-sm font-bold text-indigo-200 hover:bg-indigo-500/20">
                   <Link2 size={15} /> Νέος σύνδεσμος
