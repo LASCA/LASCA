@@ -18,7 +18,7 @@ The system is structured around a project-centric workflow:
 - Create and manage survey projects with metadata and stored observations.
 - Perform calculations for traverse, leveling, goniometry, trigonometric height, tachymetry, and stakeout.
 - Visualize computed geometry through charts, coordinate plots, and map overlays.
-- Export results to PDF, DXF, and image formats when supported by each module.
+- Export results to PDF, DXF, GeoJSON, KML and image formats when supported by each module.
 - Package the application as a desktop Windows release using PyInstaller and Inno Setup.
 
 🌐 **Live Web Application:** [lasca.gr](https://lasca.gr)
