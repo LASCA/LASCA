@@ -21,6 +21,8 @@ The system is structured around a project-centric workflow:
 - Export results to PDF, DXF, and image formats when supported by each module.
 - Package the application as a desktop Windows release using PyInstaller and Inno Setup.
 
+🌐 **Live Web Application:** [lasca.gr](https://lasca.gr)
+
 ## Key Features
 
 ### <img src="code/assets/icons/metriseis_stathmou.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Μετρήσεις Σταθμού
@@ -39,9 +41,9 @@ Process station observations to derive horizontal and zenith angles. The measure
 
 #### <img src="code/assets/icons/synorthosi_stathmou.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Network Adjustment (Συνόρθωση Σταθμού)
 
-Support vertical control workflows with geometric leveling and station-observation adjustment. LASCA provides a table-based calculation flow and network visualization for reviewing observations and results.
+Support station-observation adjustment. 
+LASCA provides a table-based calculation flow and network visualization for reviewing observations and results.
 
-- Calculate geometric leveling runs, including forward and return runs.
 - Adjust station observations and inspect network quality in the interactive preview.
 - Export supported adjustment results as a PDF report.
 
@@ -51,10 +53,9 @@ Support vertical control workflows with geometric leveling and station-observati
 
 #### <img src="code/assets/icons/trigonometriki_ypsometria.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Trigonometric Leveling (Τριγωνομετρική Υψομετρία)
 
-Compute height differences from slope-distance and zenith-angle observations, with instrument and target heights included in the calculation. Results are presented station-by-station for review.
+Compute height differences from slope-distance and zenith-angle observations, with instrument and target heights included in the calculation. 
 
-- Enter or review distances, zenith angles, and station/target heights.
-- Calculate height results and generate a PDF report.
+- Calculate height differences (ΔΗ) and generate a PDF report.
 
 <p align="center">
   <img src="code/assets/gif_demo/trig_leveling.gif" alt="Trigonometric Leveling Demo" width="100%" style="border-radius: 8px;">
@@ -62,11 +63,9 @@ Compute height differences from slope-distance and zenith-angle observations, wi
 
 ### <img src="code/assets/icons/chorostathmisi.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Leveling / Χωροστάθμη
 
-Perform geometric leveling calculations, line reductions, and height difference determinations:
+Perform geometric leveling calculations:
 
-- **Geometric Leveling:** Calculate point elevations and line closures from backsight and foresight rod readings.
-- **Error Distribution:** Compute and distribute misclosure errors across leveling loops.
-- **Data Export:** Generate detailed leveling reduction sheets and summaries.
+- **Geometric Leveling:** Calculate point elevations from backsight and foresight readings.
 
 <p align="center">
   <img src="code/assets/gif_demo/leveling.gif" alt="Leveling Demo" width="100%" style="border-radius: 8px;">
@@ -88,9 +87,10 @@ Perform geometric leveling calculations, line reductions, and height difference 
 
 #### <img src="code/assets/icons/allilotomies.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block;"> Resection & Intersection (Οπισθοτομία & Εμπροσθοτομία)
 
-Determine unknown point coordinates from known control points and measured directions or distances. LASCA includes several solution methods for common resection and forward-intersection problems.
+Determine unknown point coordinates from known control points and measured directions or distances. 
+LASCA includes several solution methods for common resection and forward-intersection problems.
 
-- Calculate resection solutions, including Collins and Tienstra methods.
+- Calculate resection solutions.
 - Solve forward intersections and review the resulting point geometry.
 - Use intersection diagrams and generate supported calculation reports.
 
@@ -106,7 +106,7 @@ Determine unknown point coordinates from known control points and measured direc
 
 ### <img src="code/assets/icons/traverse.svg" width="26" height="26" valign="middle" style="vertical-align: middle; display: inline-block;"> Traverse / Όδευση
 
-LASCA supports complete traverse workflows for station observations, horizontal network computation, and vertical control. The module combines field measurements, coordinate propagation, and reporting in one structured environment.
+LASCA supports complete traverse workflows for horizontal and vertical computation. The module combines field measurements, coordinate propagation, and reporting in one structured environment.
 
 <!-- <p align="center">
   <img src="code/assets/gif_demo/traverse.gif" alt="Traverse / Όδευση Demo" width="100%" style="border-radius: 8px;">
@@ -187,7 +187,6 @@ Before running the project, ensure the following are installed:
 
 ```bash
 git clone https://github.com/<your-user>/<your-repo>.git
-cd survey_project
 ```
 
 ### 2) Install frontend dependencies
@@ -259,7 +258,7 @@ The script performs the following:
 ## Project Structure
 
 ```text
-survey_project/
+LASCA/
 ├── LICENSE
 ├── README.md
 ├── requirements.txt
@@ -269,10 +268,8 @@ survey_project/
 │   └── LASCA_Setup.iss
 ├── code/
 │   ├── main_4_app.py
-│   ├── main.py
 │   ├── data_proccessing.py
 │   ├── project_manager.py
-│   ├── visualization.py
 │   ├── vis_4_app.py
 │   ├── configuration_settings.py
 │   ├── assets/
@@ -293,8 +290,6 @@ survey_project/
 ├── data/
 ├── dist/
 ├── installer-output/
-├── Topo_Workspace/
-└── LASCA/
 ```
 
 ## License
@@ -303,7 +298,7 @@ This project is distributed under the **LASCA Source-Available License**. Copyri
 
 ## Project Credits
 
-LASCA was developed by students and contributors in the Surveying and Geomatics Engineering domain at Aristotle University of Thessaloniki (AUTH). The project credits the following contributors:
+LASCA was developed by Rural and Surveying Engineer students at Aristotle University of Thessaloniki (AUTH). The project credits the following contributors:
 
 | Contributor | Profile |
 | --- | --- |
