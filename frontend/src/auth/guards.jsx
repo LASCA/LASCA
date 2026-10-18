@@ -18,9 +18,10 @@ export function FullScreenLoader({ label = 'ΦΟΡΤΩΣΗ...' }) {
 // Με ?signup=1 (π.χ. «Δημιουργία λογαριασμού» από το πρόγραμμα των Windows) πάει στην εγγραφή
 // αντί για τη σύνδεση· και στις δύο περιπτώσεις μετά γυρνάει εδώ.
 export function RequireAuth({ children }) {
-  const { user, loading, emailVerificationRequired } = useAuth();
+  const { user, loading, needsTermsAcceptance, emailVerificationRequired } = useAuth();
   const location = useLocation();
   if (loading) return <FullScreenLoader />;
+  if (needsTermsAcceptance) return <TermsGate />;
   if (!user) {
     const signup = new URLSearchParams(location.search || window.location.search).get('signup') === '1';
     return <Navigate to={signup ? '/signup' : '/login'} replace state={{ from: location.pathname }} />;

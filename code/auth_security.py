@@ -32,9 +32,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, current_app, g, jsonify, request, session
 from flask_login import current_user, login_required, login_user
 
+from clerk_auth import verify_clerk_token
 from security import client_ip
 
 bp = Blueprint('auth_security', __name__)
@@ -1443,8 +1444,6 @@ def resend_verification_public():
 @bp.post('/api/me/accept-terms')
 def accept_terms():
     """Accept Terms of Use. Supports both Flask-Login and Clerk authentication."""
-    from clerk_auth import verify_clerk_token, fetch_clerk_profile
-    from werkzeug.security import generate_password_hash
     
     if body().get('accept') is not True:
         raise AuthError('Πρέπει να αποδεχτείς τους Όρους για να συνεχίσεις.', 400, code='terms_required')
@@ -1453,32 +1452,23 @@ def accept_terms():
     user = None
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
-        token_str = auth_header[7:].strip()
-        claims, error = verify_clerk_token(token_str)
-        if not error:
-            clerk_user_id = claims.get('sub')
-            if clerk_user_id:
-                user = A.User.query.filter_by(clerk_user_id=clerk_user_id).first()
-                if not user:
-                    # Create user from Clerk profile
-                    profile = fetch_clerk_profile(clerk_user_id)
-                    email = (profile or {}).get('email', '')
-                    if email:
-                        user = A.User(
-                            email=email,
-                            clerk_user_id=clerk_user_id,
-                            display_name=(profile.get('display_name') or email.split('@')[0])[:150],
-                            email_verified=bool(profile.get('email_verified')),
-                            has_password=False,
-                            password_hash=generate_password_hash(secrets.token_urlsafe(32)),
-                        )
-                        A.db.session.add(user)
-                        A.db.session.flush()
-    
-    # Fallback to Flask-Login (old auth method)
-    if not user and current_user.is_authenticated:
+        token = auth_header[7:].strip()
+        resolver = getattr(A, '_resolve_clerk_user', None)
+        if callable(resolver):
+            user, _, _ = resolver(token)
+        else:
+            resolution = getattr(g, 'clerk_user_resolution', None)
+            if resolution is not None:
+                user = resolution[0]
+            else:
+                claims, error = verify_clerk_token(token)
+                if not error and claims and claims.get('sub'):
+                    user = A.User.query.filter_by(clerk_id=claims['sub']).first()
+        if not user:
+            raise AuthError('Unauthorized', 401)
+    elif current_user.is_authenticated:
         user = current_user._get_current_object()
-    
+
     if not user:
         raise AuthError('Unauthorized', 401)
     

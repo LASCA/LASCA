@@ -40,9 +40,11 @@ except ImportError:
 from datetime import datetime, timedelta
 import mimetypes
 from project_manager import TopoProject, atomic_write_json, get_safe_workspace_dir, resolve_project_dir
-from flask import Flask, Response, request, jsonify, send_file, send_from_directory, session
+from flask import Flask, Response, request, jsonify, send_file, send_from_directory, session, g
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import synonym
+from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -452,8 +454,9 @@ class User(db.Model, UserMixin):
     terms_version = db.Column(db.String(20), nullable=True)
     school = db.Column(db.String(120), nullable=True)      # προαιρετικό (εγγραφή / Προφίλ)
     company = db.Column(db.String(120), nullable=True)     # προαιρετικό
-    # Clerk user ID for JWT-based authentication
-    clerk_user_id = db.Column(db.String(255), nullable=True, unique=True, index=True)
+    # Clerk ID is the external identity; keep the legacy database column name for existing installs.
+    clerk_id = db.Column('clerk_user_id', db.String(255), nullable=True, unique=True, index=True)
+    clerk_user_id = synonym('clerk_id')
 
     def get_id(self):
         return f"{self.id}:{self.session_version or 0}"
@@ -688,6 +691,13 @@ def load_user_from_bearer_token(req):
     token = header[7:].strip()
     if not token:
         return None
+    resolution = getattr(g, 'clerk_user_resolution', None)
+    if resolution is None:
+        resolution = _resolve_clerk_user(token)
+        g.clerk_user_resolution = resolution
+    if resolution[0] is not None:
+        return resolution[0]
+
     if len(token) <= 200:
         record = DeviceToken.query.filter_by(token_hash=hash_device_token(token)).first()
         if record is not None:
@@ -702,8 +712,7 @@ def load_user_from_bearer_token(req):
                     db.session.commit()
                 return db.session.get(User, record.user_id)
 
-    user, _, _ = _resolve_clerk_user(token)
-    return user
+    return None
 
 
 # Endpoints που επιτρέπονται χωρίς σύνδεση. Όλα τα υπόλοιπα /api/* (υπολογισμοί,
@@ -726,6 +735,13 @@ def authenticate_bearer_request():
     """Resolve Bearer auth before API access checks using Flask-Login's request loader."""
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
+        session.pop('_user_id', None)
+        session.pop('_fresh', None)
+        remember_cookie_name = app.config.get('REMEMBER_COOKIE_NAME', 'remember_token')
+        if remember_cookie_name in request.cookies:
+            session['_remember'] = 'clear'
+        token = auth_header[7:].strip()
+        g.clerk_user_resolution = _resolve_clerk_user(token)
         # Accessing current_user invokes the request loader without creating a persistent session cookie.
         current_user.is_authenticated
 
@@ -1352,36 +1368,24 @@ def _resolve_clerk_user(token, update_last_seen=False):
     if not clerk_user_id:
         return None, 'Invalid token: missing user ID', 401
 
-    user = User.query.filter_by(clerk_user_id=clerk_user_id).first()
+    user = User.query.filter_by(clerk_id=clerk_user_id).first()
     changed = False
     if not user:
         profile = fetch_clerk_profile(clerk_user_id)
-        email = (profile or {}).get('email', '')
-        if not email or not EMAIL_RE.match(email):
+        email = normalize_email((profile or {}).get('email'))
+        if not email or not EMAIL_RE.fullmatch(email):
             return None, 'Could not read email from Clerk', 502
 
         verified = bool(profile.get('email_verified'))
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
-            if existing_user.clerk_user_id and existing_user.clerk_user_id != clerk_user_id:
-                return None, 'Email already linked to another account', 409
-            if not verified:
-                return None, 'Email not verified', 403
-            existing_user.clerk_user_id = clerk_user_id
-            existing_user.email_verified = True
-            user = existing_user
-            changed = True
-        else:
-            user = User(
-                email=email,
-                clerk_user_id=clerk_user_id,
-                display_name=(profile.get('display_name') or email.split('@')[0])[:150],
-                email_verified=verified,
-                has_password=False,
-                password_hash=generate_password_hash(secrets.token_urlsafe(32)),
-            )
-            db.session.add(user)
-            changed = True
+            return None, 'Email already associated with another account', 409
+        if not verified:
+            return None, 'Email not verified', 403
+        user = get_or_create_user(clerk_user_id, email=email)
+        user.display_name = (profile.get('display_name') or email.split('@')[0])[:150]
+        user.email_verified = verified
+        changed = True
 
     if update_last_seen:
         user.last_seen_at = datetime.utcnow()
@@ -1389,6 +1393,42 @@ def _resolve_clerk_user(token, update_last_seen=False):
     if changed:
         db.session.commit()
     return user, None, None
+
+
+def get_or_create_user(clerk_id, email=None):
+    """Return the local record for a Clerk identity, creating it on first use."""
+    if not clerk_id:
+        raise ValueError('A Clerk user ID is required')
+
+    user = User.query.filter_by(clerk_id=clerk_id).first()
+    if user is not None:
+        return user
+
+    if email is None:
+        profile = fetch_clerk_profile(clerk_id)
+        email = (profile or {}).get('email')
+    email = normalize_email(email)
+    if not email or not EMAIL_RE.fullmatch(email):
+        raise ValueError('A valid email is required to create a Clerk user')
+    if User.query.filter_by(email=email).first() is not None:
+        raise ValueError('Email is already associated with another user')
+
+    user = User(
+        email=email,
+        clerk_id=clerk_id,
+        display_name=email.split('@', 1)[0][:150],
+        has_password=False,
+        password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+    )
+    db.session.add(user)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        user = User.query.filter_by(clerk_id=clerk_id).first()
+        if user is None:
+            raise
+    return user
 
 
 @app.route('/api/me', methods=['GET'])
@@ -1403,6 +1443,8 @@ def get_current_user():
     token_str = auth_header[7:].strip()
     user, error, status = _resolve_clerk_user(token_str, update_last_seen=True)
     if error:
+        if current_user.is_authenticated:
+            return jsonify(current_user.to_me_dict()), 200
         return jsonify({'error': error}), status
 
     return jsonify(user.to_me_dict()), 200
@@ -1425,8 +1467,9 @@ def get_auth_config():
 # Λογαριασμοί, projects, κοινοποίηση και ζωντανή συνεργασία: code/collab.py
 # ==========================================
 from collab import init_collab  # noqa: E402
-from auth_security import email_verification_required, init_auth  # noqa: E402
+from auth_security import A as auth_namespace, email_verification_required, init_auth  # noqa: E402
 
+auth_namespace._resolve_clerk_user = _resolve_clerk_user
 init_auth(
     app, db=db, User=User, AuthEvent=AuthEvent, RateHit=RateHit, PasswordReset=PasswordReset, EmailOtp=EmailOtp,
     DeviceToken=DeviceToken, hash_device_token=hash_device_token, normalize_email=normalize_email,

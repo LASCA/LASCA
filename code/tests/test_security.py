@@ -120,14 +120,64 @@ m.fetch_clerk_profile = lambda clerk_user_id: {
 }
 clerk_client = client()
 clerk_headers = {'Authorization': 'Bearer clerk-session-token' + ('x' * 220)}
-ok(clerk_client.get('/api/me', headers=clerk_headers).status_code == 200, 'Clerk token syncs the local user')
 ok(clerk_client.get('/api/me/projects', headers=clerk_headers).status_code == 200,
-   'Clerk token authenticates protected project routes')
+   'first protected project request syncs and authenticates a Clerk user')
 with m.app.app_context():
-    clerk_user_id = m.User.query.filter_by(clerk_user_id='user_clerk_test').first().id
+    clerk_user = m.User.query.filter_by(clerk_id='user_clerk_test').first()
+    ok(clerk_user is not None, 'Clerk ID is persisted using the public clerk_id model attribute')
+    clerk_id_column = m.User.clerk_id.property.columns[0]
+    ok(clerk_id_column.unique and clerk_id_column.index,
+       'Clerk ID is uniquely constrained and indexed')
+    clerk_user_id = clerk_user.id
+ok(clerk_client.get('/api/me', headers=clerk_headers).status_code == 200, 'Clerk token syncs the local user')
 clerk_avatar = clerk_client.get(f'/api/users/{clerk_user_id}/avatar', headers=clerk_headers)
 ok(clerk_avatar.status_code == 200 and clerk_avatar.mimetype == 'image/svg+xml',
    'Clerk-authenticated avatar request receives the fallback image')
+m.verify_clerk_token = lambda token: ({'sub': 'user_clerk_with_session'}, None)
+m.fetch_clerk_profile = lambda clerk_user_id: {
+    'email': 'clerk-session@lasca.test', 'email_verified': True, 'display_name': 'Clerk Session User',
+}
+mixed_auth_client = client()
+mixed_login = mixed_auth_client.post('/api/login', json={'email': 'alice@lasca.test', 'password': PW})
+ok(mixed_login.status_code == 200, 'local session established before Clerk bearer request')
+@m.app.get('/__test/current-user')
+def current_user_for_auth_test():
+    return m.jsonify({'id': m.current_user.id, 'email': m.current_user.email})
+
+mixed_identity = mixed_auth_client.get('/__test/current-user', headers=clerk_headers)
+ok(mixed_identity.status_code == 200 and mixed_identity.json['email'] == 'clerk-session@lasca.test'
+   and mixed_identity.json['id'] != avatar_id,
+   'Clerk bearer identity overrides the pre-existing local session')
+with mixed_auth_client.session_transaction() as local_session:
+    ok('_user_id' not in local_session, 'Bearer request removes the Flask-Login session identity')
+ok(mixed_auth_client.get('/api/projects/list', headers=clerk_headers).status_code == 200,
+   'Clerk bearer request with an existing session remains authenticated')
+with m.app.app_context():
+    ok(m.User.query.filter_by(clerk_id='user_clerk_with_session').first() is not None,
+       'Clerk user is synced even when a local session cookie is present')
+m.verify_clerk_token = lambda token: ({'sub': 'user_clerk_terms_test'}, None)
+m.fetch_clerk_profile = lambda clerk_user_id: {
+    'email': 'clerk-terms@lasca.test', 'email_verified': True, 'display_name': 'Clerk Terms User',
+}
+terms_client = client()
+terms_response = terms_client.post('/api/me/accept-terms', json={'accept': True}, headers=clerk_headers)
+ok(terms_response.status_code == 200 and terms_response.json['terms_current'] is True,
+   'new Clerk user can accept terms')
+m.verify_clerk_token = lambda token: ({'sub': 'user_clerk_terms_fallback'}, None)
+m.fetch_clerk_profile = lambda clerk_user_id: {
+    'email': 'clerk-terms-fallback@lasca.test', 'email_verified': True,
+}
+fallback_client = client()
+clerk_user_resolver = m.auth_namespace._resolve_clerk_user
+del m.auth_namespace._resolve_clerk_user
+try:
+    fallback_response = fallback_client.post(
+        '/api/me/accept-terms', json={'accept': True}, headers=clerk_headers,
+    )
+finally:
+    m.auth_namespace._resolve_clerk_user = clerk_user_resolver
+ok(fallback_response.status_code == 200 and fallback_response.json['terms_current'] is True,
+   'terms acceptance falls back to verified Clerk identity when resolver is unattached')
 m.verify_clerk_token = _verify_clerk_token
 m.fetch_clerk_profile = _fetch_clerk_profile
 

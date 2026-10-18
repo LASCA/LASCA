@@ -18,13 +18,14 @@ function rememberSignedIn(on) {
 }
 
 export function AuthProvider({ children }) {
-  const { isLoaded, isSignedIn, getToken: clerkGetToken } = useClerkAuth();
+  const { isLoaded, isSignedIn, userId, sessionId, getToken: clerkGetToken } = useClerkAuth();
   const { signOut } = useClerk();
   // Το getToken του Clerk αλλάζει ταυτότητα σε κάθε render· το κρατάμε σε ref ώστε να μην ξαναπυροδοτεί effects.
   const getTokenRef = useRef(clerkGetToken);
   useEffect(() => { getTokenRef.current = clerkGetToken; });
   const getToken = useCallback((...args) => getTokenRef.current(...args), []);
   const [user, setUser] = useState(null);
+  const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState({});
 
@@ -33,6 +34,7 @@ export function AuthProvider({ children }) {
       await signOut({ redirectUrl: '/login' });
     } finally {
       setUser(null);
+      setNeedsTermsAcceptance(false);
     }
   }, [signOut]);
 
@@ -42,15 +44,22 @@ export function AuthProvider({ children }) {
       const token = await getToken();
       if (!token) {
         setUser(null);
+        setNeedsTermsAcceptance(false);
         return null;
       }
       const { data } = await axios.get(`${API_BASE_URL}/api/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser(data || null);
+      setNeedsTermsAcceptance(false);
       return data || null;
-    } catch {
+    } catch (error) {
+      if (error.response?.status === 409) {
+        setNeedsTermsAcceptance(true);
+        return null;
+      }
       setUser(null);
+      setNeedsTermsAcceptance(false);
       return null;
     }
   }, [getToken]);
@@ -61,12 +70,13 @@ export function AuthProvider({ children }) {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const { data } = await axios.post(`${API_BASE_URL}/api/me/accept-terms`, { accept: true }, { headers });
     setUser(data);
+    setNeedsTermsAcceptance(false);
     return data;
   }, [getToken]);
 
   useEffect(() => {
-    if (!loading) rememberSignedIn(Boolean(user));
-  }, [user, loading]);
+    if (!loading) rememberSignedIn(Boolean(user) || needsTermsAcceptance);
+  }, [user, loading, needsTermsAcceptance]);
 
   // STRICT state logic: no recursive loops
   useEffect(() => {
@@ -74,32 +84,45 @@ export function AuthProvider({ children }) {
 
     if (!isSignedIn) {
       setUser(null);
+      setNeedsTermsAcceptance(false);
       setLoading(false);
       return;
     }
 
     let alive = true;
+    setLoading(true);
     (async () => {
       try {
         const token = await getTokenRef.current();
         if (!token) {
-          if (alive) setUser(null);
+          if (alive) {
+            setUser(null);
+            setNeedsTermsAcceptance(false);
+          }
           return;
         }
         const { data } = await axios.get(`${API_BASE_URL}/api/me`, {
           headers: { Authorization: 'Bearer ' + token },
         });
-        if (alive) setUser(data || null);
-      } catch {
-        if (alive) setUser(null);
+        if (alive) {
+          setUser(data || null);
+          setNeedsTermsAcceptance(false);
+        }
+      } catch (error) {
+        if (alive && error.response?.status === 409) {
+          setNeedsTermsAcceptance(true);
+        } else if (alive) {
+          setUser(null);
+          setNeedsTermsAcceptance(false);
+        }
       } finally {
         if (alive) setLoading(false);
       }
     })();
 
     return () => { alive = false; };
-    // Μόνο isLoaded/isSignedIn: τα υπόλοιπα (getToken, refresh) δεν πρέπει να ξαναπυροδοτούν το fetch.
-  }, [isLoaded, isSignedIn]);
+    // Avoid refetching when Clerk recreates getToken; only auth/session identity changes trigger this check.
+  }, [isLoaded, isSignedIn, userId, sessionId]);
 
   // Το config φορτώνεται μία φορά στο mount
   useEffect(() => {
@@ -113,6 +136,9 @@ export function AuthProvider({ children }) {
     const id = axios.interceptors.response.use(
       (res) => res,
       (error) => {
+        if (error.response?.status === 403 || error.response?.status === 409) {
+          return Promise.reject(error);
+        }
         const url = error.config?.url || '';
         const isAuthCall = /\/api\/(me|auth\/)/.test(url);
         if (error.response?.status === 401 && !isAuthCall) setUser(null);
@@ -142,6 +168,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     user,
     setUser,
+    needsTermsAcceptance,
     loading,
     logout,
     refresh,
@@ -153,7 +180,7 @@ export function AuthProvider({ children }) {
     passwordRecommended: config.password_recommended || 12,
     minAge: config.min_age || 15,
     emailVerificationRequired: Boolean(config.email_verification_required),
-  }), [user, loading, logout, refresh, acceptTerms, config]);
+  }), [user, needsTermsAcceptance, loading, logout, refresh, acceptTerms, config]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
