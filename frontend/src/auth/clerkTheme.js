@@ -78,17 +78,19 @@ export const clerkAuthAppearance = {
   },
 };
 
+// Τα υποχρεωτικά πεδία με αστερίσκο. Όνομα/Επώνυμο: υποχρεωτικά όταν στο Clerk Dashboard είναι ενεργό το
+// «Require first and last name» (αλλιώς το Clerk γράφει δίπλα «Προαιρετικό»).
 const OVERRIDES = {
-  formFieldLabel__emailAddress: 'Email',
-  formFieldLabel__emailAddress_username: 'Email',
-  formFieldLabel__password: 'Κωδικός',
-  formFieldLabel__confirmPassword: 'Επιβεβαίωση κωδικού',
-  formFieldLabel__firstName: 'Όνομα',
-  formFieldLabel__lastName: 'Επώνυμο',
+  formFieldLabel__emailAddress: 'Email *',
+  formFieldLabel__emailAddress_username: 'Email *',
+  formFieldLabel__password: 'Κωδικός *',
+  formFieldLabel__confirmPassword: 'Επιβεβαίωση κωδικού *',
+  formFieldLabel__firstName: 'Όνομα *',
+  formFieldLabel__lastName: 'Επώνυμο *',
   formFieldInputPlaceholder__firstName: 'π.χ. Κώστας',
   formFieldInputPlaceholder__lastName: 'π.χ. Τ.',
-  formFieldInputPlaceholder__emailAddress: 'onoma@auth.gr',
-  formFieldInputPlaceholder__emailAddress_username: 'onoma@auth.gr',
+  formFieldInputPlaceholder__emailAddress: 'onoma@mail.gr',
+  formFieldInputPlaceholder__emailAddress_username: 'onoma@mail.gr',
   formFieldInputPlaceholder__password: '',
   formFieldAction__forgotPassword: 'Ξέχασες τον κωδικό;',
   formButtonPrimary: 'Συνέχεια',

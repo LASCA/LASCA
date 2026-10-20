@@ -15,6 +15,7 @@ os.environ.update({'SECRET_KEY': 'test-secret-key-0123456789abcdef0123456789', '
 os.environ.pop('LASCA_ENV', None)
 os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 os.environ.pop('CLERK_WEBHOOK_SECRET', None)
+os.environ['CLERK_PUBLISHABLE_KEY'] = 'pk_test_' + __import__('base64').b64encode(b'clerk.lasca.test$').decode().rstrip('=')
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / 'deploy'))
@@ -80,9 +81,14 @@ ok(r.status_code == 200 and r.json['id'] == IDS['ilias@lasca.test'] and r.json['
    'external_id links the imported user and updates the email')
 
 # νέος χρήστης
-CLERK_USERS['user_new'] = {'email': 'new@lasca.test', 'email_verified': True, 'display_name': 'Κώστας Τ.', 'external_id': ''}
+CLERK_USERS['user_new'] = {'email': 'new@lasca.test', 'email_verified': True, 'display_name': 'Κώστας Τ.', 'external_id': '',
+                           'school': '  ΑΤΜ   ΑΠΘ ', 'company': ''}
 r = anon.get('/api/me', headers=H('user_new'))
 ok(r.status_code == 200 and r.json['display_name'] == 'Κώστας Τ.', 'new Clerk user gets a local account')
+ok(r.json['school'] == 'ΑΤΜ ΑΠΘ' and r.json['company'] == '', 'optional signup fields (unsafe_metadata) reach lasca.db')
+
+csp = anon.get('/').headers.get('Content-Security-Policy', '')
+ok('https://clerk.lasca.test' in csp and 'https://img.clerk.com' in csp, 'CSP allows the Clerk Frontend API')
 
 # --- 2. webhook --------------------------------------------------------------------------------
 SECRET = 'whsec_' + base64.b64encode(b'0123456789abcdef0123456789abcdef').decode()
@@ -136,6 +142,16 @@ with m.app.app_context():
     u = m.db.session.get(m.User, IDS['kostas@lasca.test'])
     ok(r.json['status'] == 'linked' and u.clerk_id == 'user_kostas' and u.display_name == 'Κώστας Τ.',
        'user.created links an existing local user')
+meta_user = clerk_user('user_kostas', 'kostas@lasca.test', 'Κώστας', 'Τ.')
+meta_user['unsafe_metadata'] = {'school': 'ΣΑΤΜ ΕΜΠ', 'company': 'Γεωμετρική ΙΚΕ'}
+hook({'type': 'user.updated', 'data': meta_user})
+with m.app.app_context():
+    u = m.db.session.get(m.User, IDS['kostas@lasca.test'])
+    ok(u.school == 'ΣΑΤΜ ΕΜΠ' and u.company == 'Γεωμετρική ΙΚΕ', 'webhook fills empty school/company')
+meta_user['unsafe_metadata'] = {'school': 'Άλλη', 'company': 'Άλλη'}
+hook({'type': 'user.updated', 'data': meta_user})
+with m.app.app_context():
+    ok(m.db.session.get(m.User, IDS['kostas@lasca.test']).school == 'ΣΑΤΜ ΕΜΠ', 'values edited in LASCA are not overwritten')
 r = hook({'type': 'user.created', 'data': clerk_user('user_bot', 'bot@lasca.test', 'Bot', verified=False)})
 with m.app.app_context():
     ok(r.json['status'] == 'ignored' and m.User.query.filter_by(email='bot@lasca.test').first() is None,

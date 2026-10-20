@@ -26,6 +26,7 @@ from types import SimpleNamespace
 from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
+from auth_security import clean_display_name
 from clerk_auth import profile_from_user_payload
 
 bp = Blueprint('clerk_sync', __name__)
@@ -112,11 +113,22 @@ def link_or_create(clerk_id, profile):
     return user, None, None
 
 
+def _fill_optional(user, profile):
+    """Σχολή/εταιρεία από την εγγραφή: μόνο αν είναι κενά στη lasca.db (μετά αλλάζουν από το Προφίλ της LASCA)."""
+    changed = False
+    for field in ('school', 'company'):
+        value = clean_display_name((profile or {}).get(field))[:120]
+        if value and not getattr(user, field, None):
+            setattr(user, field, value)
+            changed = True
+    return changed
+
+
 def sync_profile(user, profile):
     """Όνομα και email από το Clerk → lasca.db (το Clerk είναι η πηγή για την ταυτότητα)."""
     if not profile:
         return False
-    changed = False
+    changed = _fill_optional(user, profile)
     name = ' '.join(str(profile.get('display_name') or '').split())[:150]
     if name and name != user.display_name:
         user.display_name, changed = name, True

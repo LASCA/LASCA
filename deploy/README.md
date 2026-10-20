@@ -147,6 +147,12 @@ crontab -e
 Το Clerk κρατάει μόνο τους λογαριασμούς (email, κωδικός, Google)· projects, συνεργάτες, προφίλ και Όροι μένουν στη `lasca.db`.
 Κάθε χρήστης της `lasca.db` συνδέεται με τον λογαριασμό του στο Clerk (`users.clerk_user_id`, βλ. `code/clerk_sync.py`):
 
+- **Ρυθμίσεις στο Clerk Dashboard:** User & authentication → Email: «Verify at sign-up» · Personal information:
+  «First and last name» ενεργό και υποχρεωτικό (η σελίδα τα δείχνει με αστερίσκο). Σχολή και εταιρεία είναι
+  προαιρετικά πεδία της σελίδας: πηγαίνουν στο Clerk ως `unsafe_metadata` και από εκεί στη `lasca.db`.
+- **CSP:** ο server επιτρέπει αυτόματα το Frontend API του Clerk (από το `CLERK_PUBLISHABLE_KEY`), το `img.clerk.com`
+  και το `*.protect.clerk.com`. Αν αλλάξει το κλειδί, αρκεί restart.
+
 - **Πρώτη είσοδος με Clerk:** με το ίδιο επιβεβαιωμένο email βρίσκει τον παλιό λογαριασμό του, με όλα τα projects.
 - **Webhook:** Clerk Dashboard → Webhooks → Add endpoint `https://lasca.gr/api/clerk/webhook`, events `user.created`,
   `user.updated`, `user.deleted`. Το «Signing secret» μπαίνει στο `code/.env` ως `CLERK_WEBHOOK_SECRET`. Έτσι αλλαγή

@@ -306,12 +306,18 @@ login_manager.login_view = None
 from security import build_csp, init_api_throttle, init_origin_guard, init_security_headers, origin_of  # noqa: E402
 
 _analytics_origin = origin_of(os.getenv('ANALYTICS_ORIGIN', '').strip())
+# Clerk: το Frontend API του (από το CLERK_PUBLISHABLE_KEY, π.χ. clerk.lasca.gr) φορτώνει το script της σύνδεσης
+# και μιλάει με τον browser· *.protect.clerk.com = προστασία από bots. Βλ. οδηγίες CSP του Clerk.
+from clerk_auth import _frontend_api_host  # noqa: E402
+_clerk_fapi = f'https://{_frontend_api_host()}' if _frontend_api_host() else None
 APP_CSP = build_csp({
-    'script-src': ['https://accounts.google.com/gsi/client', 'https://challenges.cloudflare.com', _analytics_origin],
+    'script-src': ['https://accounts.google.com/gsi/client', 'https://challenges.cloudflare.com', _analytics_origin,
+                   _clerk_fapi, 'https://*.protect.clerk.com'],
     'style-src': ['https://accounts.google.com/gsi/style'],
-    'frame-src': ['https://accounts.google.com/gsi/', 'https://challenges.cloudflare.com'],
-    'connect-src': ['https://accounts.google.com/gsi/', _analytics_origin],
-    'img-src': ['https://*.tile.openstreetmap.org', 'https://*.googleusercontent.com'],
+    'frame-src': ['https://accounts.google.com/gsi/', 'https://challenges.cloudflare.com', 'https://*.protect.clerk.com'],
+    'connect-src': ['https://accounts.google.com/gsi/', _analytics_origin, _clerk_fapi,
+                    'https://*.protect.clerk.com:*', 'https://clerk-telemetry.com'],
+    'img-src': ['https://*.tile.openstreetmap.org', 'https://*.googleusercontent.com', 'https://img.clerk.com'],
 }, upgrade_insecure=_cookie_secure)
 # same-origin-allow-popups: χρειάζεται το παράθυρο σύνδεσης του Google
 init_security_headers(app, csp=APP_CSP, hsts=_cookie_secure, coop='same-origin-allow-popups')
