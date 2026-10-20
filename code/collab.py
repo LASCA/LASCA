@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, g, jsonify, request, send_file
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -535,14 +535,27 @@ def logout_everywhere():
 def delete_account():
     data = body()
     user = current_user._get_current_object()
-    if user.has_password and not user.check_password(str(data.get('password') or '')[:1024]):
+    via_clerk = bool(getattr(user, 'clerk_id', None)) and bool(getattr(g, 'clerk_claims', None))
+    if via_clerk or not user.has_password:
+        reauthenticate(user, data)      # Clerk: πρόσφατη είσοδος· Google: 2FA ή πρόσφατη είσοδος
+    elif not user.check_password(str(data.get('password') or '')[:1024]):
         record_auth_event('delete_account_failed', user=user)
         raise ApiError('Ο κωδικός δεν είναι σωστός.', 403)
-    if not user.has_password:
-        reauthenticate(user, data)
     if str(data.get('confirm') or '').strip().upper() != 'ΔΙΑΓΡΑΦΗ':
         raise ApiError('Γράψε ΔΙΑΓΡΑΦΗ για επιβεβαίωση.')
+    clerk_id = getattr(user, 'clerk_id', None)
+    result = purge_account(user)
+    logout_user()
+    if clerk_id:
+        # Ο λογαριασμός σβήνεται και στο Clerk, αλλιώς με την επόμενη σύνδεση θα ξαναδημιουργούνταν κενός.
+        from clerk_sync import delete_clerk_user
+        delete_clerk_user(clerk_id)
+    return jsonify({'status': 'success', **result})
 
+
+def purge_account(user):
+    """Διαγραφή χρήστη από τη lasca.db (Προφίλ ή webhook user.deleted του Clerk): τα κοινά projects περνούν
+    στον πρώτο συνεργάτη, τα υπόλοιπα σβήνονται μαζί με όλα τα στοιχεία του."""
     transferred, deleted = [], []
     for project in C.Project.query.filter_by(owner_id=user.id).all():
         members = C.ProjectMember.query.filter_by(project_id=project.id).order_by(C.ProjectMember.id).all()
@@ -563,8 +576,7 @@ def delete_account():
     _remove_avatar(user)
     C.db.session.delete(user)
     C.db.session.commit()
-    logout_user()
-    return jsonify({'status': 'success', 'transferred': transferred, 'deleted': deleted})
+    return {'transferred': transferred, 'deleted': deleted}
 
 
 @bp.get('/api/me/projects')

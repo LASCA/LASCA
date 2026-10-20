@@ -29,6 +29,13 @@ os.environ.pop('TURNSTILE_SECRET_KEY', None)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main_4_app as m  # noqa: E402
+
+
+# βοηθητικό route για τον έλεγχο Clerk + τοπικής σύνδεσης (πριν από το πρώτο αίτημα)
+@m.app.get('/__test/current-user')
+def current_user_for_auth_test():
+    return m.jsonify({'id': m.current_user.id, 'email': m.current_user.email})
+
 import auth_security as sec  # noqa: E402
 from security import limiter  # noqa: E402
 
@@ -100,7 +107,7 @@ for rule in m.app.url_map.iter_rules():
         continue
     url = re.sub(r'<(?:int:)?[^>]+>', '1', path)
     for method in sorted(rule.methods - {'HEAD', 'OPTIONS'}):
-        if method == 'GET' and re.fullmatch(r'/api/users/\d+/avatar', path):
+        if method == 'GET' and re.fullmatch(r'/api/users/\d+/avatar', url):   # εικόνες προφίλ: δημόσιες
             continue
         resp = anon.open(url, method=method, json={})
         if resp.status_code != 401:
@@ -140,10 +147,6 @@ m.fetch_clerk_profile = lambda clerk_user_id: {
 mixed_auth_client = client()
 mixed_login = mixed_auth_client.post('/api/login', json={'email': 'alice@lasca.test', 'password': PW})
 ok(mixed_login.status_code == 200, 'local session established before Clerk bearer request')
-@m.app.get('/__test/current-user')
-def current_user_for_auth_test():
-    return m.jsonify({'id': m.current_user.id, 'email': m.current_user.email})
-
 mixed_identity = mixed_auth_client.get('/__test/current-user', headers=clerk_headers)
 ok(mixed_identity.status_code == 200 and mixed_identity.json['email'] == 'clerk-session@lasca.test'
    and mixed_identity.json['id'] != avatar_id,

@@ -59,6 +59,23 @@ def verify_clerk_token(token):
     return claims, None
 
 
+def profile_from_user_payload(data):
+    """Τα στοιχεία που χρειάζεται η lasca.db από έναν χρήστη του Clerk (Backend API ή webhook).
+    Επιστρέφει dict ή None αν δεν έχει κύριο email."""
+    if not isinstance(data, dict):
+        return None
+    primary_id = data.get('primary_email_address_id')
+    emails = data.get('email_addresses') or []
+    item = next((e for e in emails if e.get('id') == primary_id), None) or (emails[0] if emails else None)
+    if not item:
+        return None
+    verified = (item.get('verification') or {}).get('status') == 'verified'
+    name = ' '.join(filter(None, [(data.get('first_name') or '').strip(), (data.get('last_name') or '').strip()]))
+    return {'email': (item.get('email_address') or '').strip().lower(), 'email_verified': verified,
+            'display_name': name or (data.get('username') or '').strip(),
+            'external_id': str(data.get('external_id') or '').strip()}
+
+
 def fetch_clerk_profile(clerk_user_id):
     """Τα session tokens δεν έχουν email· το παίρνουμε από το Clerk Backend API. Επιστρέφει dict ή None."""
     import requests
@@ -70,14 +87,6 @@ def fetch_clerk_profile(clerk_user_id):
                             headers={'Authorization': f'Bearer {secret}'}, timeout=8)
         if resp.status_code != 200:
             return None
-        data = resp.json()
+        return profile_from_user_payload(resp.json())
     except Exception:
         return None
-    primary_id = data.get('primary_email_address_id')
-    for item in data.get('email_addresses') or []:
-        if item.get('id') == primary_id:
-            verified = (item.get('verification') or {}).get('status') == 'verified'
-            name = ' '.join(filter(None, [data.get('first_name'), data.get('last_name')])) or data.get('username') or ''
-            return {'email': (item.get('email_address') or '').strip().lower(), 'email_verified': verified,
-                    'display_name': name}
-    return None

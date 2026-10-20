@@ -724,6 +724,7 @@ PUBLIC_API_PATHS = {
     '/api/auth/2fa/verify', '/api/auth/2fa/email', '/api/auth/forgot', '/api/auth/reset',
     '/api/auth/reset/check', '/api/auth/password-check', '/api/auth/verify-email',
     '/api/auth/desktop/start', '/api/desktop-link/poll', '/api/auth/resend-verification',
+    '/api/clerk/webhook',   # υπογραφή Svix (code/clerk_sync.py)
 }
 UNVERIFIED_ALLOWED = {'/api/me/verify-email', '/api/me/accept-terms', '/api/me/security-events'}
 # Η προεπισκόπηση ενός link πρόσκλησης (GET) φαίνεται και χωρίς σύνδεση.
@@ -1356,10 +1357,11 @@ def logout_user_route():
 
 # Clerk JWT authentication endpoints
 from clerk_auth import fetch_clerk_profile, verify_clerk_token  # noqa: E402
+from clerk_sync import init_clerk_sync, link_or_create, sync_profile  # noqa: E402
 
 
 def _resolve_clerk_user(token, update_last_seen=False):
-    """Verify a Clerk token and retrieve or create its matching local user."""
+    """Verify a Clerk token and retrieve or create its matching local user (βλ. clerk_sync.link_or_create)."""
     claims, error = verify_clerk_token(token)
     if error:
         return None, error, 401
@@ -1367,30 +1369,18 @@ def _resolve_clerk_user(token, update_last_seen=False):
     clerk_user_id = claims.get('sub')
     if not clerk_user_id:
         return None, 'Invalid token: missing user ID', 401
+    g.clerk_claims = claims
 
     user = User.query.filter_by(clerk_id=clerk_user_id).first()
-    changed = False
     if not user:
         profile = fetch_clerk_profile(clerk_user_id)
-        email = normalize_email((profile or {}).get('email'))
-        if not email or not EMAIL_RE.fullmatch(email):
-            return None, 'Could not read email from Clerk', 502
-
-        verified = bool(profile.get('email_verified'))
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            return None, 'Email already associated with another account', 409
-        if not verified:
-            return None, 'Email not verified', 403
-        user = get_or_create_user(clerk_user_id, email=email)
-        user.display_name = (profile.get('display_name') or email.split('@')[0])[:150]
-        user.email_verified = verified
-        changed = True
+        user, error, status = link_or_create(clerk_user_id, profile)
+        if error:
+            return None, error, status
+        sync_profile(user, profile)
 
     if update_last_seen:
         user.last_seen_at = datetime.utcnow()
-        changed = True
-    if changed:
         db.session.commit()
     return user, None, None
 
@@ -1489,6 +1479,10 @@ init_collab(
     normalize_email=normalize_email, EMAIL_RE=EMAIL_RE, logger=logger,
     PUBLIC_URL=os.getenv('PUBLIC_URL', '').strip(),
 )
+
+from collab import purge_account  # noqa: E402
+init_clerk_sync(app, db=db, User=User, normalize_email=normalize_email, EMAIL_RE=EMAIL_RE, logger=logger,
+                generate_password_hash=generate_password_hash, purge_account=purge_account)
 
 
 # ==========================================

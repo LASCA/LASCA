@@ -142,6 +142,27 @@ crontab -e
 15 3 * * * bash /srv/lasca/deploy/backup.sh >/dev/null 2>&1
 ```
 
+## Clerk ↔ lasca.db
+
+Το Clerk κρατάει μόνο τους λογαριασμούς (email, κωδικός, Google)· projects, συνεργάτες, προφίλ και Όροι μένουν στη `lasca.db`.
+Κάθε χρήστης της `lasca.db` συνδέεται με τον λογαριασμό του στο Clerk (`users.clerk_user_id`, βλ. `code/clerk_sync.py`):
+
+- **Πρώτη είσοδος με Clerk:** με το ίδιο επιβεβαιωμένο email βρίσκει τον παλιό λογαριασμό του, με όλα τα projects.
+- **Webhook:** Clerk Dashboard → Webhooks → Add endpoint `https://lasca.gr/api/clerk/webhook`, events `user.created`,
+  `user.updated`, `user.deleted`. Το «Signing secret» μπαίνει στο `code/.env` ως `CLERK_WEBHOOK_SECRET`. Έτσι αλλαγή
+  ονόματος/email στο Clerk ενημερώνει τη βάση και διαγραφή στο Clerk σβήνει και τον χρήστη εδώ (τα κοινά projects
+  περνούν στους συνεργάτες). Αντίστροφα, η «Διαγραφή λογαριασμού» στο Προφίλ σβήνει και τον χρήστη στο Clerk.
+- **Οι υπάρχοντες χρήστες στο Clerk με τους ίδιους κωδικούς** (μία φορά, από το `/srv/lasca`):
+
+```
+venv/bin/python deploy/clerk_import.py
+venv/bin/python deploy/clerk_import.py --probe το-email-σου@example.com
+venv/bin/python deploy/clerk_import.py --apply --scrypt-format A
+```
+
+Η πρώτη δείχνει τι θα γίνει, η δεύτερη δοκιμάζει με τον δικό σου λογαριασμό ποια μορφή κωδικού δέχεται το Clerk
+(σου ζητάει τον κωδικό σου) και η τρίτη περνάει όλους τους υπόλοιπους με τη μορφή που βρήκε η δεύτερη.
+
 ## Ενημερώσεις (κάθε φορά που κάνεις push στο `web-pages`)
 
 ```bash

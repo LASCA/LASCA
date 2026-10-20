@@ -1212,6 +1212,16 @@ def reauthenticate(user, data):
     """Ευαίσθητες αλλαγές (2FA, κωδικός, διαγραφή): απόδειξη ότι είναι ο ίδιος ο χρήστης και όχι κάποιος
     με κλεμμένο cookie. Κωδικός· ή (λογαριασμοί Google) κωδικός 2FA· ή σύνδεση τα τελευταία 10 λεπτά."""
     throttle(f'reauth:{user.id}', 10, timedelta(minutes=15))
+    # Σύνδεση μέσω Clerk (ο κωδικός είναι πια στο Clerk): το session token λέει πόσα λεπτά πέρασαν
+    # από την τελευταία είσοδο (fva).
+    claims = getattr(g, 'clerk_claims', None)
+    if claims and getattr(user, 'clerk_id', None) and claims.get('sub') == user.clerk_id:
+        fva = claims.get('fva')
+        if isinstance(fva, (list, tuple)) and fva and isinstance(fva[0], (int, float)) \
+                and 0 <= fva[0] <= FRESH_LOGIN.total_seconds() / 60:
+            return
+        raise AuthError('Για ασφάλεια, αποσυνδέσου, συνδέσου ξανά και δοκίμασε μέσα σε 10 λεπτά.',
+                        403, code='reauth_required')
     if user.has_password:
         if not user.check_password(text_field(data, 'password', 1024)):
             record('reauth_failed', user=user)
