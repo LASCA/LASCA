@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import './styles/fonts.js'
 import './index.css'
 import { AuthProvider } from './auth/AuthContext.jsx'
+import { clerkAppearance, clerkLocalization } from './auth/clerkTheme.js'
 import { FullScreenLoader, GoogleProviderGate, GuestOnly, RequireAuth } from './auth/guards.jsx'
 import Landing from './pages/Landing.jsx'
 import CookieNotice from './components/marketing/CookieNotice.jsx'
@@ -29,7 +30,8 @@ const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ClerkProvider publishableKey={clerkPublishableKey}>
+    <ClerkProvider publishableKey={clerkPublishableKey} appearance={clerkAppearance} localization={clerkLocalization}
+      signInUrl="/login" signUpUrl="/signup">
       <BrowserRouter>
         <AuthProvider>
           <GoogleProviderGate>

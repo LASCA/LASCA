@@ -1,33 +1,24 @@
-﻿import React from 'react'
-import { SignUp } from '@clerk/react'
-import AuthLayout from '../components/auth/AuthLayout.jsx'
-import usePageMeta from '../hooks/usePageMeta.js'
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { SignUp } from '@clerk/react';
+import AuthLayout from '../components/auth/AuthLayout.jsx';
+import { clerkAuthAppearance } from '../auth/clerkTheme';
+import usePageMeta from '../hooks/usePageMeta.js';
 
 export default function Signup() {
-  usePageMeta({ title: 'Δημιουργία λογαριασμού', description: 'Φτιάξε δωρεάν λογαριασμό στη LASCA: τοπογραφικοί υπολογισμοί, αναφορές και κοινά projects.' })
+  usePageMeta({ title: 'Δημιουργία λογαριασμού', description: 'Φτιάξε δωρεάν λογαριασμό στη LASCA: τοπογραφικοί υπολογισμοί, αναφορές και κοινά projects.' });
+  const location = useLocation();
 
   return (
-    <AuthLayout eyebrow="Δωρεάν για φοιτητές" title="" subtitle="">
-      <SignUp 
-        forceRedirectUrl="/app"
-        fallbackRedirectUrl="/app"
-        appearance={{
-          elements: {
-            rootBox: 'w-full',
-            card: 'bg-slate-900 border border-slate-700 rounded-lg shadow-xl',
-            headerTitle: 'text-white text-2xl font-bold',
-            headerSubtitle: 'text-slate-400',
-            formFieldLabel: 'text-slate-300 font-medium',
-            formFieldInput: 'bg-slate-800 border border-slate-700 text-white rounded-md placeholder-slate-500',
-            formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md',
-            footerActionLink: 'text-blue-400 hover:text-blue-300',
-            dividerLine: 'bg-slate-700',
-            dividerText: 'text-slate-400',
-            socialButtonsBlockButton: 'border border-slate-600 text-slate-300 hover:bg-slate-800',
-            alertText: 'text-red-400',
-          },
-        }}
-      />
+    <AuthLayout
+      eyebrow="Δωρεάν για φοιτητές"
+      title="Δημιουργία λογαριασμού"
+      wide
+      dense
+      footer={<>Έχεις ήδη λογαριασμό;{' '}
+        <Link to="/login" state={location.state} className="font-medium text-blue-300 hover:text-blue-200">Σύνδεση</Link></>}
+    >
+      <SignUp forceRedirectUrl="/app" fallbackRedirectUrl="/app" signInUrl="/login" appearance={clerkAuthAppearance} />
     </AuthLayout>
-  )
+  );
 }

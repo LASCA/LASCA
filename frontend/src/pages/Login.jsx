@@ -1,33 +1,25 @@
-﻿import React from 'react'
-import { SignIn } from '@clerk/react'
-import AuthLayout from '../components/auth/AuthLayout.jsx'
-import usePageMeta from '../hooks/usePageMeta.js'
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { SignIn } from '@clerk/react';
+import AuthLayout from '../components/auth/AuthLayout.jsx';
+import { clerkAuthAppearance } from '../auth/clerkTheme';
+import usePageMeta from '../hooks/usePageMeta.js';
 
+// Ίδια σελίδα με το web-pages· τη φόρμα (κωδικός, Google, κωδικοί email, «Ξέχασες τον κωδικό;») τη δίνει το Clerk.
 export default function Login() {
-  usePageMeta({ title: 'Σύνδεση', description: 'Σύνδεση στη LASCA για να συνεχίσεις τα projects σου.' })
+  usePageMeta({ title: 'Σύνδεση', description: 'Σύνδεση στη LASCA για να συνεχίσεις τα projects σου.' });
+  const location = useLocation();
+  const next = location.state?.from || '/app';
 
   return (
-    <AuthLayout eyebrow="Καλώς ήρθες πίσω" title="" subtitle="">
-      <SignIn 
-        forceRedirectUrl="/app"
-        fallbackRedirectUrl="/app"
-        appearance={{
-          elements: {
-            rootBox: 'w-full',
-            card: 'bg-slate-900 border border-slate-700 rounded-lg shadow-xl',
-            headerTitle: 'text-white text-2xl font-bold',
-            headerSubtitle: 'text-slate-400',
-            formFieldLabel: 'text-slate-300 font-medium',
-            formFieldInput: 'bg-slate-800 border border-slate-700 text-white rounded-md placeholder-slate-500',
-            formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md',
-            footerActionLink: 'text-blue-400 hover:text-blue-300',
-            dividerLine: 'bg-slate-700',
-            dividerText: 'text-slate-400',
-            socialButtonsBlockButton: 'border border-slate-600 text-slate-300 hover:bg-slate-800',
-            alertText: 'text-red-400',
-          },
-        }}
-      />
+    <AuthLayout
+      eyebrow="Καλώς ήρθες πίσω"
+      title="Σύνδεση"
+      subtitle="Συνέχισε από εκεί που σταμάτησες."
+      footer={<>Δεν έχεις λογαριασμό;{' '}
+        <Link to="/signup" state={location.state} className="font-medium text-blue-300 hover:text-blue-200">Δημιουργία λογαριασμού</Link></>}
+    >
+      <SignIn forceRedirectUrl={next} fallbackRedirectUrl="/app" signUpUrl="/signup" appearance={clerkAuthAppearance} />
     </AuthLayout>
-  )
+  );
 }

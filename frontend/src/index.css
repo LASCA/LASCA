@@ -1,3 +1,6 @@
+/* Τα στυλ του Clerk (σύνδεση/εγγραφή) σε δικό τους layer, πριν από τα utilities: έτσι ισχύουν οι κλάσεις
+   του src/auth/clerkTheme.js (cssLayerName: 'clerk'). */
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 @import "./styles/lasca-theme.css";
 
