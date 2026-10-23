@@ -74,7 +74,7 @@ def profile_from_user_payload(data):
     # Προαιρετικά πεδία της εγγραφής (σχολή, εταιρεία): η σελίδα τα στέλνει στο Clerk ως unsafe_metadata.
     extra = data.get('unsafe_metadata') if isinstance(data.get('unsafe_metadata'), dict) else {}
     return {'email': (item.get('email_address') or '').strip().lower(), 'email_verified': verified,
-            'display_name': name or (data.get('username') or '').strip(),
+            'display_name': name or str(extra.get('name') or '').strip() or (data.get('username') or '').strip(),
             'external_id': str(data.get('external_id') or '').strip(),
             'school': str(extra.get('school') or ''), 'company': str(extra.get('company') or '')}
 

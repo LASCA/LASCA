@@ -86,6 +86,11 @@ CLERK_USERS['user_new'] = {'email': 'new@lasca.test', 'email_verified': True, 'd
 r = anon.get('/api/me', headers=H('user_new'))
 ok(r.status_code == 200 and r.json['display_name'] == 'Κώστας Τ.', 'new Clerk user gets a local account')
 ok(r.json['school'] == 'ΑΤΜ ΑΠΘ' and r.json['company'] == '', 'optional signup fields (unsafe_metadata) reach lasca.db')
+from clerk_auth import profile_from_user_payload  # noqa: E402
+_p = profile_from_user_payload({'first_name': '', 'last_name': None, 'primary_email_address_id': 'e',
+                                'email_addresses': [{'id': 'e', 'email_address': 'n@x.gr', 'verification': {'status': 'verified'}}],
+                                'unsafe_metadata': {'name': 'Κώστας Τ.', 'school': 'ΑΠΘ'}})
+ok(_p['display_name'] == 'Κώστας Τ.' and _p['school'] == 'ΑΠΘ', 'name from the signup page is used when Clerk has no name')
 
 csp = anon.get('/').headers.get('Content-Security-Policy', '')
 ok('https://clerk.lasca.test' in csp and 'https://img.clerk.com' in csp, 'CSP allows the Clerk Frontend API')

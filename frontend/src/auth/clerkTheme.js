@@ -92,9 +92,10 @@ const OVERRIDES = {
   formFieldInputPlaceholder__emailAddress: 'onoma@mail.gr',
   formFieldInputPlaceholder__emailAddress_username: 'onoma@mail.gr',
   formFieldInputPlaceholder__password: '',
+  formFieldInputPlaceholder__signUpPassword: '',
   formFieldAction__forgotPassword: 'Ξέχασες τον κωδικό;',
   formButtonPrimary: 'Συνέχεια',
-  dividerText: 'ή με email',
+  dividerText: 'ή',
 };
 
 function merge(base, extra) {
@@ -106,3 +107,9 @@ function merge(base, extra) {
 }
 
 export const clerkLocalization = merge(elGR, OVERRIDES);
+
+// Εγγραφή: Google κάτω από τη φόρμα, ώστε η σειρά να είναι Σχολή/Εταιρεία → Όνομα → Email → Κωδικός.
+export const clerkSignUpAppearance = {
+  ...clerkAuthAppearance,
+  options: { ...clerkAuthAppearance.options, socialButtonsPlacement: 'bottom' },
+};
