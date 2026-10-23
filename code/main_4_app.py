@@ -1384,6 +1384,11 @@ def _resolve_clerk_user(token, update_last_seen=False):
         if error:
             return None, error, status
         sync_profile(user, profile)
+    elif not user.email_verified:
+        # Λογαριασμός που πέρασε στο Clerk με το deploy/clerk_import.py: το Clerk κρατά το email ως επιβεβαιωμένο
+        # και δίνει session μόνο σε επιβεβαιωμένους, άρα δεν χρειάζεται δεύτερη επιβεβαίωση εδώ.
+        user.email_verified = True
+        db.session.commit()
 
     if update_last_seen:
         user.last_seen_at = datetime.utcnow()

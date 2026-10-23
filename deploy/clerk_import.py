@@ -149,6 +149,7 @@ def main():
                 existing = find_clerk_user(u.email)
                 if existing:
                     u.clerk_id = existing['id']
+                    u.email_verified = True
                     m.db.session.commit()
                     linked += 1
                     print(f'  ↔ {u.email}: υπήρχε ήδη στο Clerk, συνδέθηκε')
@@ -159,6 +160,7 @@ def main():
                     print(f'  ✗ {u.email}: {error_text(resp)}')
                     continue
                 u.clerk_id = resp.json()['id']
+                u.email_verified = True   # στο Clerk το email δημιουργείται επιβεβαιωμένο
                 m.db.session.commit()
                 created += 1
                 print(f'  ✓ {u.email}')
@@ -197,6 +199,7 @@ def probe(m, email):
         check = api('POST', f'/users/{clerk_id}/verify_password', json={'password': password})
         if check.status_code == 200 and check.json().get('verified'):
             user.clerk_id = clerk_id
+            user.email_verified = True
             m.db.session.commit()
             print(f'\n✓ Μορφή {fmt}: ο ίδιος κωδικός δουλεύει στο Clerk και ο λογαριασμός συνδέθηκε.')
             print(f'  Για όλους τους υπόλοιπους: venv/bin/python deploy/clerk_import.py --apply --scrypt-format {fmt}')

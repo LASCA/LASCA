@@ -245,5 +245,17 @@ with m.app.app_context():
     ok(m.User.query.filter_by(email='unverified@lasca.test').first().clerk_id is None, 'unverified accounts are skipped')
     ok(m.User.query.filter(m.User.clerk_id.is_(None), m.User.email_verified.is_(True)).count() == 0, 'every verified user is linked')
 CALLS.clear(); ok(clerk_import.main() == 0 and not any(c[0] == 'POST' for c in CALLS), 'running again is harmless')
+with m.app.app_context():
+    ok(m.User.query.filter(m.User.clerk_id.isnot(None), m.User.email_verified.is_(False)).count() == 0,
+       'imported users are marked verified (Clerk keeps their email verified)')
+# παλιός λογαριασμός με clerk_user_id αλλά email_verified=False (π.χ. εισαγωγή πριν τη διόρθωση): δουλεύει με Clerk
+os.environ.pop('REQUIRE_EMAIL_VERIFICATION', None)
+with m.app.app_context():
+    u = m.User(email='legacy@lasca.test', display_name='Legacy', email_verified=False, clerk_id='user_legacy')
+    u.set_password(PW); m.db.session.add(u); m.db.session.commit()
+m.verify_clerk_token = lambda token: ({'sub': token[6:], 'fva': [2, -1]}, None)
+ok(anon.get('/api/me/projects', headers=H('user_legacy')).status_code == 200,
+   'Clerk session opens the app even if the local row was unverified')
+os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 
 print('\nALL CLERK-SYNC CHECKS PASS')
