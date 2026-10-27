@@ -569,6 +569,49 @@
   border: 2px solid #0b0f19;
 }
 
+.profile-avatar-edit {
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(2 6 23 / 0.58);
+  color: #fff;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.profile-avatar-edit:hover,
+.profile-avatar-edit:focus-visible {
+  opacity: 1;
+  background: rgb(2 6 23 / 0.7);
+}
+
+.profile-avatar-actions {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.profile-avatar-actions button {
+  color: #93b4ff;
+}
+
+.profile-avatar-actions button:hover {
+  color: #fff;
+}
+
+.profile-avatar-actions button.danger {
+  color: #fca5a5;
+}
+
+.profile-id-value.profile-id-name {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
 .profile-id-fields {
   display: grid;
   min-width: 0;

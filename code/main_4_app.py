@@ -1508,7 +1508,8 @@ init_collab(
 
 from collab import purge_account  # noqa: E402
 init_clerk_sync(app, db=db, User=User, normalize_email=normalize_email, EMAIL_RE=EMAIL_RE, logger=logger,
-                generate_password_hash=generate_password_hash, purge_account=purge_account)
+                generate_password_hash=generate_password_hash, purge_account=purge_account,
+                TERMS_VERSION=TERMS_VERSION)
 
 
 # ==========================================

@@ -16,6 +16,7 @@ import { loadAnalytics } from './utils/analytics.js'
 const App = lazy(() => import('./App.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
+const Welcome = lazy(() => import('./pages/Welcome.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
 const Invite = lazy(() => import('./pages/Invite.jsx'))
 const DesktopLogin = lazy(() => import('./pages/DesktopLogin.jsx'))
@@ -45,7 +46,8 @@ createRoot(document.getElementById('root')).render(
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login/*" element={<GuestOnly><Login /></GuestOnly>} />
-                <Route path="/signup/*" element={<GuestOnly><Signup /></GuestOnly>} />
+                <Route path="/signup/*" element={<GuestOnly signedInTo="/welcome"><Signup /></GuestOnly>} />
+                <Route path="/welcome" element={<RequireAuth><Welcome /></RequireAuth>} />
                 <Route path="/app" element={<RequireAuth><App /></RequireAuth>} />
                 <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
                 <Route path="/invite/:token" element={<Invite />} />

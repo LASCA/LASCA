@@ -13,7 +13,7 @@ export default function Login() {
 
   return (
     <AuthLayout
-      eyebrow="Καλώς ήρθες πίσω"
+      eyebrow="Γεια σου και πάλι..."
       title="Σύνδεση"
       subtitle="Συνέχισε από εκεί που σταμάτησες."
       footer={<>Δεν έχεις λογαριασμό;{' '}

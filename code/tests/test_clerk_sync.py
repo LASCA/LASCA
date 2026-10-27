@@ -271,4 +271,18 @@ codes = [fb.post('/api/feedback', json={'type': 'bug', 'details': f'μήνυμα
 ok(codes == [200, 200, 200, 429], f'feedback limited to 3 per day per user ({codes})')
 ok(fb.post('/api/feedback', json={'type': 'bug', 'details': ''}).status_code == 400, 'invalid feedback is rejected before the limit')
 
+# --- 6. εγγραφή με αποδοχή Όρων (checkbox) και όνομα από το LASCA ----------------------------------
+from clerk_auth import profile_from_user_payload  # noqa: E402
+CLERK_USERS['user_terms'] = {'email': 'terms@lasca.test', 'email_verified': True, 'display_name': 'Νέος',
+                             'external_id': '', 'terms_version': m.TERMS_VERSION}
+me = anon.get('/api/me', headers=H('user_terms')).json
+ok(me.get('terms_current') is True, 'signup checkbox: new Clerk account starts with the current Terms accepted')
+CLERK_USERS['user_noterms'] = {'email': 'noterms@lasca.test', 'email_verified': True, 'display_name': 'Χωρίς',
+                               'external_id': ''}
+ok(anon.get('/api/me', headers=H('user_noterms')).json.get('terms_current') is False,
+   'without the checkbox (e.g. Google from the login page) the Terms are still asked')
+payload = {'primary_email_address_id': 'e1', 'first_name': 'Παλιό', 'last_name': 'Όνομα', 'unsafe_metadata': {'name': 'Κώστας Τ.'},
+           'email_addresses': [{'id': 'e1', 'email_address': 'k@lasca.test', 'verification': {'status': 'verified'}}]}
+ok(profile_from_user_payload(payload)['display_name'] == 'Κώστας Τ.', 'name set in LASCA wins over the Clerk first/last name')
+
 print('\nALL CLERK-SYNC CHECKS PASS')

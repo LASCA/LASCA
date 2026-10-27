@@ -98,20 +98,23 @@ export function VerifyEmailGate() {
 
 /** Νέοι Όροι χρήσης: όσοι είχαν αποδεχτεί παλαιότερη έκδοση τους αποδέχονται ξανά πριν συνεχίσουν. */
 export function TermsGate() {
-  const { acceptTerms, logout } = useAuth();
+  const { acceptTerms, logout, user } = useAuth();
+  // Χωρίς καμία αποδοχή (π.χ. νέος λογαριασμός Google από τη Σύνδεση): «Όροι χρήσης», όχι «Νέοι».
+  const first = !user?.terms_version;
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const accept = async () => {
-    if (!checked) { setError('Τσέκαρε ότι διάβασες και αποδέχεσαι τους νέους Όρους.'); return; }
+    if (!checked) { setError(`Τσέκαρε ότι διάβασες και αποδέχεσαι τους${first ? '' : ' νέους'} Όρους.`); return; }
     setBusy(true); setError('');
     try { await acceptTerms(); } catch (err) { setError(apiErrorMessage(err)); } finally { setBusy(false); }
   };
 
   return (
-    <AuthLayout eyebrow="Ενημέρωση" title="Νέοι Όροι χρήσης" wide
-      subtitle="Ενημερώσαμε τους Όρους χρήσης. Διάβασέ τους και αποδέξου τους για να συνεχίσεις.">
+    <AuthLayout eyebrow={first ? 'Ένα βήμα ακόμα' : 'Ενημέρωση'} title={first ? 'Όροι χρήσης' : 'Νέοι Όροι χρήσης'} wide
+      subtitle={first ? 'Διάβασε και αποδέξου τους Όρους χρήσης για να συνεχίσεις.'
+        : 'Ενημερώσαμε τους Όρους χρήσης. Διάβασέ τους και αποδέξου τους για να συνεχίσεις.'}>
       <div className="space-y-4">
         <ul className="space-y-2 rounded-2xl border border-slate-800 bg-[#0B1221] p-4 text-[13.5px] leading-relaxed text-slate-300 [&>li]:flex [&>li]:gap-2.5">
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
@@ -119,10 +122,10 @@ export function TermsGate() {
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
             <span>Η δωρεάν πρόσβαση <strong className="text-white">δεν είναι εγγυημένη για πάντα</strong>, ούτε για όσους έχουν ήδη λογαριασμό: μπορεί να περιοριστεί ή να σταματήσει, με ειδοποίηση τουλάχιστον 30 ημέρες πριν.</span></li>
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
-            <span>Καμία χρέωση χωρίς τη δική σου ρητή επιλογή, και πάντα θα μπορείς να κατεβάσεις τα projects σου.</span></li>
+            <span>Καμία χρέωση χωρίς τη δική σου ρητή επιλογή, και πριν από κάθε τέτοια αλλαγή θα μπορείς να κατεβάσεις τα projects σου.</span></li>
         </ul>
         <Checkbox id="accept-terms" checked={checked} onChange={setChecked}>
-          Διάβασα και αποδέχομαι τους νέους <Link to="/terms" target="_blank" className="font-medium text-blue-300 hover:text-blue-200">Όρους χρήσης</Link>.
+          Διάβασα και αποδέχομαι τους{first ? ' ' : ' νέους '}<Link to="/terms" target="_blank" className="font-medium text-blue-300 hover:text-blue-200">Όρους χρήσης</Link>.
         </Checkbox>
         <FormError message={error} />
         <button type="button" onClick={accept} disabled={busy} className={PRIMARY_BUTTON}>

@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from './AuthContext';
 import LascaLoader from '../components/animations/LascaLoader';
 import { TermsGate, VerifyEmailGate } from '../components/auth/AccountGates';
+import { welcomeUrl } from './welcome';
 
 export function FullScreenLoader({ label = 'ΦΟΡΤΩΣΗ...' }) {
   return (
@@ -33,11 +34,13 @@ export function RequireAuth({ children }) {
 }
 
 // Σελίδες μόνο για μη συνδεδεμένους (/login, /signup): αν είσαι ήδη μέσα, πας στην εφαρμογή.
-export function GuestOnly({ children }) {
+// Η Εγγραφή (signedInTo="/welcome"): μόλις ολοκληρωθεί, πρώτα η σελίδα καλωσορίσματος.
+export function GuestOnly({ children, signedInTo }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <FullScreenLoader />;
   // π.χ. από σύνδεσμο πρόσκλησης: μετά τη σύνδεση γυρνάμε εκεί
+  if (user && signedInTo === '/welcome') return <Navigate to={welcomeUrl(location.state?.from)} replace />;
   if (user) return <Navigate to={location.state?.from || '/app'} replace />;
   return children;
 }

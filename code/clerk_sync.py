@@ -21,6 +21,7 @@ import json
 import os
 import secrets
 import time
+from datetime import datetime
 from types import SimpleNamespace
 
 from flask import Blueprint, jsonify, request
@@ -121,6 +122,11 @@ def _fill_optional(user, profile):
         if value and not getattr(user, field, None):
             setattr(user, field, value)
             changed = True
+    # Υποχρεωτικό checkbox Όρων στη φόρμα εγγραφής: καταγράφεται εδώ, ώστε να μη ζητηθεί ξανά αποδοχή.
+    current = getattr(S, 'TERMS_VERSION', None)
+    if current and (profile or {}).get('terms_version') == current and user.terms_version != current:
+        user.terms_version, user.terms_accepted_at, user.age_confirmed = current, datetime.utcnow(), True
+        changed = True
     return changed
 
 

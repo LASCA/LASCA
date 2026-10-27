@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useClerk, useUser } from '@clerk/react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowUpRight, ChevronDown, Copy, Download, FolderOpen, KeyRound, Loader2, LockKeyhole,
+  ArrowLeft, ArrowUpRight, Camera, ChevronDown, Copy, Download, FolderOpen, KeyRound, Loader2, LockKeyhole,
   LogOut, MonitorSmartphone, Pencil, ShieldCheck, Trash2, Users, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
@@ -81,12 +81,19 @@ export default function Profile() {
   const { user: clerkUser } = useUser();
   const navigate = useNavigate();
 
+  const [name, setName] = useState(user?.display_name || '');
   const [school, setSchool] = useState(user?.school || '');
   const [company, setCompany] = useState(user?.company || '');
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [openRow, setOpenRow] = useState(null);
+  // Νέα εικόνα προφίλ (προεπισκόπηση μέχρι την «Αποθήκευση») ή αφαίρεση της υπάρχουσας.
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const fileRef = useRef(null);
+  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
 
   const [projects, setProjects] = useState({ owned: [], shared: [] });
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -99,22 +106,64 @@ export default function Profile() {
       .finally(() => setProjectsLoading(false));
   }, []);
 
+  const cleanName = name.trim().replace(/\s+/g, ' ');
   const dirty = useMemo(
-    () => school.trim() !== (user?.school || '') || company.trim() !== (user?.company || ''),
-    [school, company, user]
+    () => cleanName !== (user?.display_name || '') || school.trim() !== (user?.school || '')
+      || company.trim() !== (user?.company || '') || Boolean(avatarFile) || removeAvatar,
+    [cleanName, school, company, user, avatarFile, removeAvatar]
   );
+  const hasAvatar = Boolean(user?.avatar_url || clerkUser?.hasImage);
+  const shownAvatar = avatarPreview || (removeAvatar ? null : (user?.avatar_url || clerkUser?.imageUrl));
+
+  const pickAvatar = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { toast.error('Επιτρέπονται μόνο εικόνες PNG, JPG ή WEBP.'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Η εικόνα πρέπει να είναι μικρότερη από 5MB.'); return; }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setRemoveAvatar(false);
+  };
+
+  const clearAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setRemoveAvatar(true);
+  };
 
   const save = async (e) => {
     e.preventDefault();
+    if (!cleanName) { toast.error('Το όνομα δεν μπορεί να είναι κενό.'); return; }
     setSaving(true);
     try {
+      const nameChanged = cleanName !== (user?.display_name || '');
       const payload = new FormData();
+      payload.append('display_name', cleanName);
       payload.append('school', school.trim());
       payload.append('company', company.trim());
-      const { data } = await axios.put(`${API_BASE_URL}/api/me`, payload);
+      if (avatarFile) payload.append('avatar', avatarFile);
+      let { data } = await axios.put(`${API_BASE_URL}/api/me`, payload);
+      if (removeAvatar && !avatarFile && user?.avatar_url) {
+        ({ data } = await axios.delete(`${API_BASE_URL}/api/me/avatar`));
+      }
+      // Ίδιο όνομα/εικόνα και στον λογαριασμό του Clerk (αλλιώς ένας συγχρονισμός από το Clerk θα έφερνε πίσω τα παλιά).
+      if (clerkUser) {
+        const syncs = [];
+        const later = (fn) => syncs.push(Promise.resolve().then(fn));
+        if (nameChanged) later(() => clerkUser.update({ unsafeMetadata: { ...(clerkUser.unsafeMetadata || {}), name: cleanName } }));
+        if (avatarFile) later(() => clerkUser.setProfileImage({ file: avatarFile }));
+        else if (removeAvatar && clerkUser.hasImage) later(() => clerkUser.setProfileImage({ file: null }));
+        const results = await Promise.allSettled(syncs);
+        if (results.some((r) => r.status === 'rejected')) console.warn('Clerk profile sync failed', results);
+      }
       setUser(data);
+      setName(data.display_name || '');
       setSchool(data.school || '');
       setCompany(data.company || '');
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setRemoveAvatar(false);
       setIsEditing(false);
       toast.success('Το προφίλ αποθηκεύτηκε');
     } catch (err) {
@@ -125,6 +174,10 @@ export default function Profile() {
   };
 
   const cancelEdit = () => {
+    setName(user?.display_name || '');
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setRemoveAvatar(false);
     setSchool(user?.school || '');
     setCompany(user?.company || '');
     setIsEditing(false);
@@ -178,7 +231,7 @@ export default function Profile() {
             <div className="profile-id-topbar">
               <div className="profile-id-title">
                 <span className="profile-id-indicator" aria-hidden="true" />
-                <h2 id="settings-title">ΤΑΥΤΟΤΗΤΑ ΧΡΗΣΤΗ</h2>
+                <h2 id="settings-title">ΧΡΗΣΤΗΣ</h2>
               </div>
               <div className="profile-id-header-actions">
                 {!isEditing ? (
@@ -199,13 +252,37 @@ export default function Profile() {
 
             <div className="profile-id-content">
               <div className="profile-id-avatar-column">
-                <div className="profile-id-avatar rounded-full">
-                  <Avatar url={clerkUser?.imageUrl} name={clerkUser?.fullName || clerkUser?.firstName || user?.display_name} size={86} />
+                <div className="profile-id-avatar relative rounded-full">
+                  <Avatar url={shownAvatar} name={cleanName || user?.display_name} size={86} />
+                  {isEditing && (
+                    <button type="button" onClick={() => fileRef.current?.click()} className="profile-avatar-edit"
+                      aria-label="Αλλαγή εικόνας προφίλ" title="Αλλαγή εικόνας προφίλ">
+                      <Camera size={18} aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pickAvatar} />
+                {isEditing && (
+                  <div className="profile-avatar-actions">
+                    <button type="button" onClick={() => fileRef.current?.click()}>Αλλαγή</button>
+                    {(avatarFile || (hasAvatar && !removeAvatar)) && (
+                      <button type="button" onClick={clearAvatar} className="danger">Αφαίρεση</button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="profile-id-fields">
                 <form onSubmit={save} className="profile-id-edit-form">
+                  <div className="profile-id-field">
+                    <label className="profile-id-label" htmlFor="profile-name">Όνομα</label>
+                    {isEditing ? (
+                      <input id="profile-name" value={name} maxLength={60} required autoComplete="name"
+                        onChange={(e) => setName(e.target.value)} className="l-input profile-id-input" placeholder="π.χ. Κώστας Τ." />
+                    ) : (
+                      <p className="profile-id-value profile-id-name">{user?.display_name || '—'}</p>
+                    )}
+                  </div>
                   <div className="profile-id-field">
                     <span className="profile-id-label">Email</span>
                     <p className="profile-id-value profile-id-email">
@@ -259,7 +336,7 @@ export default function Profile() {
             <div className="profile-id-security">
               <div className={`${CARD} l-card overflow-hidden`}>
                 <Row icon={KeyRound} title="Διαχείριση Λογαριασμού & Ασφάλειας"
-                  subtitle="Αλλαγή κωδικού, φωτογραφίας & ασφάλεια μέσω Clerk"
+                  subtitle="Αλλαγή κωδικού, email & ασφάλεια μέσω Clerk"
                   onClick={() => openUserProfile()} />
                 <Row icon={Trash2} tone="danger" title="Διαγραφή λογαριασμού"
                   subtitle="Οριστική διαγραφή του λογαριασμού σου" onClick={() => setDeleteOpen(true)} />
@@ -271,7 +348,7 @@ export default function Profile() {
             <div className="profile-id-topbar">
               <div className="profile-id-title">
                 <span className="profile-id-indicator" aria-hidden="true" />
-                <h2 id="devices-security-title">ΣΥΣΚΕΥΕΣ &amp; ΕΠΙΠΛΕΟΝ ΑΣΦΑΛΕΙΑ</h2>
+                <h2 id="devices-security-title">ΣΥΣΚΕΥΕΣ &amp; ΣΥΝΔΕΣΕΙΣ</h2>
               </div>
             </div>
             <div className="profile-id-security">

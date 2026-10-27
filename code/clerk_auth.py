@@ -75,8 +75,11 @@ def profile_from_user_payload(data):
     name = ' '.join(filter(None, [(data.get('first_name') or '').strip(), (data.get('last_name') or '').strip()]))
     # Προαιρετικά πεδία της εγγραφής (σχολή, εταιρεία): η σελίδα τα στέλνει στο Clerk ως unsafe_metadata.
     extra = data.get('unsafe_metadata') if isinstance(data.get('unsafe_metadata'), dict) else {}
+    # Το όνομα που έγραψε ο χρήστης στο LASCA (εγγραφή ή Προφίλ) προηγείται του ονόματος του Clerk/Google.
     return {'email': (item.get('email_address') or '').strip().lower(), 'email_verified': verified,
-            'display_name': name or str(extra.get('name') or '').strip() or (data.get('username') or '').strip(),
+            'display_name': str(extra.get('name') or '').strip() or name or (data.get('username') or '').strip(),
+            # Αποδοχή Όρων στη φόρμα εγγραφής (έκδοση των Όρων, βλ. TERMS_VERSION)
+            'terms_version': str(extra.get('terms_version') or '').strip()[:20],
             'external_id': str(data.get('external_id') or '').strip(),
             'school': str(extra.get('school') or ''), 'company': str(extra.get('company') or '')}
 
