@@ -8,6 +8,18 @@ axios.defaults.withCredentials = true;
 
 const AuthContext = createContext(null);
 
+// Αιτήματα προς το δικό μας API (σχετικό /api/... ή ίδιο origin / API_BASE_URL).
+function isLascaApi(url) {
+  if (!url) return false;
+  try {
+    const target = new URL(url, window.location.origin);
+    const base = new URL(API_BASE_URL || window.location.origin, window.location.origin);
+    return target.origin === base.origin && target.pathname.startsWith('/api/');
+  } catch {
+    return false;
+  }
+}
+
 // Hint in localStorage (browser-only) that user was previously signed in
 const SIGNED_IN_HINT = 'lasca_signed_in';
 export function wasSignedIn() {
@@ -148,11 +160,12 @@ export function AuthProvider({ children }) {
     return () => axios.interceptors.response.eject(id);
   }, []);
 
-  // Set up axios interceptor to attach Clerk token to all requests
+  // Το token του Clerk μπαίνει σε ΚΑΘΕ αίτημα προς το API του LASCA: axios και fetch (πολλά εργαλεία,
+  // π.χ. φόρτωση/αποθήκευση project και υπολογισμοί, χρησιμοποιούν fetch). Ποτέ σε άλλους servers.
   useEffect(() => {
     const id = axios.interceptors.request.use(
       async (config) => {
-        if (isSignedIn) {
+        if (isSignedIn && isLascaApi(config.url)) {
           const token = await getToken();
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -163,6 +176,23 @@ export function AuthProvider({ children }) {
       (error) => Promise.reject(error)
     );
     return () => axios.interceptors.request.eject(id);
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isSignedIn || typeof window === 'undefined') return undefined;
+    const originalFetch = window.fetch;
+    const withToken = async (input, init = {}) => {
+      const url = typeof input === 'string' ? input : input?.url;
+      if (!isLascaApi(url)) return originalFetch(input, init);
+      const headers = new Headers(init.headers || (typeof input === 'object' ? input.headers : undefined));
+      if (!headers.has('Authorization')) {
+        const token = await getToken().catch(() => null);
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+      }
+      return originalFetch(input, { ...init, headers });
+    };
+    window.fetch = withToken;
+    return () => { if (window.fetch === withToken) window.fetch = originalFetch; };
   }, [isSignedIn, getToken]);
 
   const value = useMemo(() => ({

@@ -52,6 +52,9 @@ function App() {
   const [isShareProjectOpen, setIsShareProjectOpen] = useState(false);
   const [shareMembers, setShareMembers] = useState([]);   // ποιοι άλλοι έχουν πρόσβαση στο ανοιχτό project
   const [globalSettings, setGlobalSettings] = useState({});
+  const [projectLoadError, setProjectLoadError] = useState('');
+  const [projectLoadAttempt, setProjectLoadAttempt] = useState(0);
+  const projectLoadGenerationRef = useRef(0);
 
   // --- ΚΟΙΝΑ PROJECTS / ΖΩΝΤΑΝΗ ΣΥΝΕΡΓΑΣΙΑ ---
   // projectMeta: { public_id, role: owner|editor|viewer, version, ... } από τον server
@@ -200,61 +203,48 @@ function App() {
   // --- 0. ΑΡΧΙΚΗ ΦΟΡΤΩΣΗ ΤΟΥ PROJECT (ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ) ---
   useEffect(() => {
     if (currentProject) {
-      console.log(`⏳ Αρχική φόρτωση του project "${currentProject}"...`);
-      
       setIsDataLoaded(false);
       resetAllData();
-      
-      // ΑΛΛΑΓΗ: Χρησιμοποιούμε το API_BASE_URL αντί για hardcoded localhost
+      setProjectLoadError('');
+      // Αγνοούμε απαντήσεις που έρχονται αφού άλλαξε το project (π.χ. γρήγορη εναλλαγή).
+      const loadGeneration = ++projectLoadGenerationRef.current;
+
       fetch(`${API_BASE_URL}/api/projects/load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_name: currentProject })
       })
-      .then(res => res.json())
-      .then(backendData => {
-        if (backendData && backendData.error) {
-          // π.χ. σε αφαίρεσαν από το project ή διαγράφηκε
-          toast.error(backendData.error);
-          closeProject();
+      .then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => null) }))
+      .then(({ ok, status, data: backendData }) => {
+        if (loadGeneration !== projectLoadGenerationRef.current) return;
+        if (!ok || !backendData || backendData.error) {
+          if (status === 403 || status === 404) {
+            // π.χ. σε αφαίρεσαν από το project ή διαγράφηκε
+            toast.error(backendData?.error || 'Το project δεν είναι πια διαθέσιμο.');
+            closeProject();
+            setIsDataLoaded(true);
+            return;
+          }
+          throw new Error(backendData?.error || `HTTP ${status}`);
         }
-        if (backendData && !backendData.error) {
-          applyMeta(backendData._meta);
-          setGlobalSettings(backendData.settings || {});
-          setObservations(backendData.observations || []);
-          setAdjMetrics(backendData.adjMetrics || {});      
-          setTraverseData(backendData.traverse_data || []);
-          setTraverseMetrics(backendData.metrics || {});
-          setTachymetryData(backendData.tachymetryData || { measurements: [], stations: [], results: [] });
-          
-          setStakeoutData(backendData.stakeoutData || {
-            station: { name: 'St1', x: '', y: '' },
-            backsight: { name: 'BS1', x: '', y: '' },
-            azimuthBs: '---',
-            points: [{ id: 1, name: 'P1', x: '', y: '', hz_stake: '', dist_stake: '' }]
-          });
-
-          setGoniometryData(backendData.goniometryData || []);
-          setLevelingObservations(backendData.levelingObservations || []);
-          setLevelingStations(backendData.levelingStations || []);
-          setLevelingForward(backendData.levelingForward || []);
-          setLevelingBackward(backendData.levelingBackward || []);
-          setLevelingMetrics(backendData.levelingMetrics || {});
-          setTrigHeightData(backendData.trigHeightData || []);
-
-          console.log("✅ Τα δεδομένα φορτώθηκαν επιτυχώς!");
-        }
+        applyMeta(backendData._meta);
+        applyProjectState(backendData);
         setIsDataLoaded(true);
       })
       .catch(err => {
-        console.error("❌ Αποτυχία σύνδεσης με τον server:", err);
-        setIsDataLoaded(true);
+        if (loadGeneration !== projectLoadGenerationRef.current) return;
+        console.error("❌ Αποτυχία φόρτωσης project:", err);
+        // Η αυτόματη αποθήκευση μένει κλειστή: δεν γράφουμε ποτέ κενά δεδομένα πάνω στο project.
+        setProjectLoadError('Δεν φορτώθηκε το project. Τα δεδομένα του δεν άλλαξαν.');
       });
-    } else {
-      resetAllData();
-      setIsDataLoaded(true);
+      return () => {
+        if (loadGeneration === projectLoadGenerationRef.current) projectLoadGenerationRef.current += 1;
+      };
     }
-  }, [currentProject]);
+    resetAllData();
+    setIsDataLoaded(true);
+    return undefined;
+  }, [currentProject, projectLoadAttempt]);
 
   // --- 1. AUTO-SAVE ΜΗΧΑΝΙΣΜΟΣ ---
   useEffect(() => {
@@ -475,6 +465,8 @@ function App() {
   
   // --- 3. ΔΗΜΙΟΥΡΓΙΑ / ΕΝΑΛΛΑΓΗ PROJECT (ΕΔΩ ΕΜΦΑΝΙΖΕΤΑΙ ΤΟ LASCA LOADER) ---
   const handleProjectLoaded = (projectData) => {
+    if (!projectData || projectData.error) return false;   // το παράθυρο δείχνει το σφάλμα
+    setProjectLoadError('');
     setIsProjectSwitching(true);
     setIsDataLoaded(false); 
     resetAllData();
@@ -533,6 +525,16 @@ function App() {
           <p className="mt-6 text-emerald-400 font-mono text-sm tracking-widest animate-pulse">
             ΦΟΡΤΩΣΗ PROJECT...
           </p>
+        </div>
+      )}
+
+      {projectLoadError && (
+        <div role="alert" className="absolute top-4 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-4 rounded-xl border border-red-500/40 bg-slate-900 px-4 py-3 text-sm text-red-200 shadow-xl">
+          <span>{projectLoadError}</span>
+          <button type="button" className="rounded-lg bg-red-500/20 px-3 py-1 font-semibold text-red-100 hover:bg-red-500/30"
+            onClick={() => setProjectLoadAttempt((attempt) => attempt + 1)}>
+            Επανάληψη
+          </button>
         </div>
       )}
 
