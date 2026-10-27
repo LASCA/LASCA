@@ -54,4 +54,23 @@ ok(old.get('/api/me/projects', headers=H).status_code == 200, 'stale cookies + C
 # Χωρίς token του Clerk, τα παλιά cookies ΔΕΝ ανοίγουν τίποτα.
 ok(old.post('/api/adjustment', json=BODY).status_code == 401, 'stale cookies alone are rejected')
 
+# Επικοινωνία: browser με ΕΓΚΥΡΟ παλιό cookie του λογαριασμού Α, συνδεδεμένος τώρα στο Clerk ως Β.
+# Το μήνυμα πρέπει να φεύγει ως Β (όχι πάντα ως Α).
+os.environ.update({'RESEND_API_KEY': 're_test', 'NOTIFICATION_EMAIL': 'team@lasca.test'})
+SENT = []
+m.resend.Emails.send = staticmethod(lambda params: SENT.append(params) or {'id': 'x'})
+with m.app.app_context():
+    for email, sub in (('anna@lasca.test', 'user_anna'), ('bob@lasca.test', 'user_bob')):
+        u = m.User(email=email, display_name=email[:4], email_verified=True, clerk_id=sub)
+        u.set_password(PW); m.db.session.add(u)
+    m.db.session.commit()
+shared = m.app.test_client(); shared.environ_base['HTTP_ORIGIN'] = 'http://localhost'
+ok(shared.post('/api/login', json={'email': 'anna@lasca.test', 'password': PW, 'remember': True}).status_code == 200,
+   'legacy session cookie for account A')
+r = shared.post('/api/feedback', json={'type': 'bug', 'details': 'από τον Β'}, headers={'Authorization': 'Bearer clerk:user_bob'})
+ok(r.status_code == 200 and SENT and 'bob@lasca.test' in SENT[-1]['subject'] and SENT[-1].get('reply_to') == 'bob@lasca.test',
+   f'feedback is sent as the Clerk account, not the old cookie ({r.status_code}, {SENT[-1]["subject"] if SENT else "-"})')
+r = shared.post('/api/feedback', json={'type': 'bug', 'details': 'από την Α'}, headers={'Authorization': 'Bearer clerk:user_anna'})
+ok(r.status_code == 200 and 'anna@lasca.test' in SENT[-1]['subject'], 'switching account changes the sender')
+
 print('\nALL STALE-COOKIE CHECKS PASS')

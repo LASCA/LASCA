@@ -52,6 +52,9 @@ export function AuthProvider({ children }) {
   const refreshRef = useRef(null);
 
   const logout = useCallback(async () => {
+    // Σβήνει και τα παλιά cookies σύνδεσης του server (από πριν το Clerk), ώστε να μη μείνει κανένα ίχνος
+    // του προηγούμενου λογαριασμού στον browser όταν μπει άλλος.
+    await axios.post(`${API_BASE_URL}/api/logout`).catch(() => {});
     try {
       await signOut({ redirectUrl: '/login' });
     } finally {
