@@ -1102,6 +1102,7 @@ def internal_error(e):
 
 
 FEEDBACK_MESSAGE_MAX = 5000
+FEEDBACK_DAILY_LIMIT = int(os.getenv('FEEDBACK_DAILY_LIMIT', '3'))   # μηνύματα ανά χρήστη ανά 24 ώρες
 FEEDBACK_IMAGE_MAX = 5 * 1024 * 1024
 
 
@@ -1232,6 +1233,14 @@ def submit_feedback():
 
         if len(message) > FEEDBACK_MESSAGE_MAX:
             return _feedback_error(f'Το μήνυμα πρέπει να έχει έως {FEEDBACK_MESSAGE_MAX} χαρακτήρες', 400)
+
+        # Όριο ανά λογαριασμό (σελίδα και exe): προστατεύει τα δωρεάν email του Resend (100 την ημέρα).
+        # Ελέγχεται πριν αποθηκευτεί οποιαδήποτε εικόνα, ώστε ο δίσκος να μη γεμίζει από επαναλήψεις.
+        from auth_security import db_hit
+        if db_hit(f'feedback:{current_user.id}', FEEDBACK_DAILY_LIMIT, timedelta(days=1)):
+            return _feedback_error(f'Έχεις στείλει ήδη {FEEDBACK_DAILY_LIMIT} μηνύματα σήμερα. Δοκίμασε ξανά αύριο.', 429)
+
+
 
         screenshot_content = None
         screenshot_filename = 'screenshot.webp'

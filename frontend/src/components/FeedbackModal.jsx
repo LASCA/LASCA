@@ -198,8 +198,10 @@ const FeedbackModal = ({ isOpen, onClose }) => {
               />
             </div>
 
-            {submitError && (
+            {submitError ? (
               <p className="text-xs text-red-400" role="alert">{submitError}</p>
+            ) : (
+              <p className="-mt-2 text-right text-[11px] text-slate-500">Έως 3 μηνύματα την ημέρα</p>
             )}
 
             {/* Icon-only Toolbar */}

@@ -263,4 +263,12 @@ ok(anon.get('/api/me/projects', headers=H('user_legacy')).status_code == 200,
    'Clerk session opens the app even if the local row was unverified')
 os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 
+# --- 5. όριο μηνυμάτων επικοινωνίας: 3 την ημέρα ανά λογαριασμό (Resend: 100 δωρεάν) -------------
+os.environ.update({'RESEND_API_KEY': 're_test', 'NOTIFICATION_EMAIL': 'team@lasca.test'})
+m.resend.Emails.send = staticmethod(lambda params: {'id': 'x'})
+fb = client('alex@lasca.test')
+codes = [fb.post('/api/feedback', json={'type': 'bug', 'details': f'μήνυμα {k}'}).status_code for k in range(4)]
+ok(codes == [200, 200, 200, 429], f'feedback limited to 3 per day per user ({codes})')
+ok(fb.post('/api/feedback', json={'type': 'bug', 'details': ''}).status_code == 400, 'invalid feedback is rejected before the limit')
+
 print('\nALL CLERK-SYNC CHECKS PASS')
