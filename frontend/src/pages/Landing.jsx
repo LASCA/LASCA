@@ -50,6 +50,26 @@ const STEPS = [
 const COORDS = [['Σ1', '412 305.21', '4 497 118.40'], ['Σ2', '412 431.77', '4 497 182.05'], ['Σ3', '412 569.30', '4 497 146.93'], ['Σ4', '412 688.12', '4 497 251.66']];
 const EXPORTS = ['Αναφορά PDF', 'Σχέδιο DXF', 'Excel', 'GeoJSON / KML'];
 
+// Συχνές ερωτήσεις (κάτω κάτω στην αρχική). Οι απαντήσεις συμφωνούν με τους Όρους και την Πολιτική απορρήτου.
+const FAQS = [
+  ['Είναι δωρεάν το LASCA;',
+    'Ναι. Στη σημερινή του φάση το LASCA είναι δωρεάν, χωρίς συνδρομές και χωρίς κάρτα. Αν κάποτε προστεθούν πληρωμένα πακέτα, θα ενημερωθείς τουλάχιστον 30 ημέρες πριν και δεν θα χρεωθείς ποτέ χωρίς τη δική σου επιλογή.'],
+  ['Χρειάζομαι λογαριασμό;',
+    'Για την ιστοσελίδα ναι: ο λογαριασμός κρατά τα projects σου στο cloud και σου επιτρέπει να δουλεύεις με την ομάδα σου. Το πρόγραμμα για Windows δουλεύει και χωρίς λογαριασμό, εντελώς offline.'],
+  ['Πού αποθηκεύονται τα δεδομένα μου;',
+    `Τα projects σου βρίσκονται στον server του LASCA σε ${SITE.hosting}. Η σύνδεση στον λογαριασμό γίνεται μέσω του Clerk. Δεν πουλάμε δεδομένα και δεν έχουμε διαφημίσεις.`],
+  ['Μπορώ να δουλεύω με την ομάδα μου στο ίδιο project;',
+    'Ναι. Κάλεσε τους συνεργάτες σου με σύνδεσμο ή email, όρισε ποιος επεξεργάζεται και ποιος μόνο βλέπει, και δες στο «Ιστορικό αλλαγών» ποιος άλλαξε τι.'],
+  ['Σε ποιες μορφές βγάζω τα αποτελέσματα;',
+    'Αναφορές PDF, σχέδια DXF, πίνακες Excel και, για την όδευση, GeoJSON και KML. Τα δεδομένα μετρήσεων μπορείς να τα φέρεις από Excel με έτοιμο πρότυπο.'],
+  ['Υπάρχει πρόγραμμα για Windows;',
+    'Ναι. Συνδέεται στον ίδιο λογαριασμό, δουλεύει και χωρίς internet και ανεβάζει αυτόματα τις αλλαγές σου όταν επανέλθει η σύνδεση.'],
+  ['Μπορώ να βασιστώ στα αποτελέσματα;',
+    'Οι υπολογισμοί γίνονται με προσοχή, αλλά το LASCA παρέχεται «ως έχει»: έλεγξε πάντα τα αποτελέσματα πριν τα χρησιμοποιήσεις σε εργασία, μελέτη ή στο πεδίο.'],
+  ['Πώς αναφέρω ένα πρόβλημα ή στέλνω μια ιδέα;',
+    'Από το «Επικοινωνία» μέσα στην εφαρμογή (έως 3 μηνύματα την ημέρα). Η απάντηση έρχεται στο email του λογαριασμού σου.'],
+];
+
 // Σκηνή εργαλείων: πόσο scroll (σε % του ύψους) κρατάει το grid και πόσο κάθε εργαλείο στο carousel.
 const HOLD_VH = 40;
 const BACK_VH = 30;   // υστέρηση: δεν «τρεμοπαίζει» grid/carousel κοντά στο όριο
@@ -81,7 +101,9 @@ function HeroTitle() {
 // Η αρχική για επισκέπτες. Όποιος έχει μείνει συνδεδεμένος («Να με θυμάσαι») πάει κατευθείαν στην εφαρμογή.
 export default function Landing() {
   const { user, loading } = useAuth();
-  if (user) return <Navigate to="/app" replace />;
+  // Από την εφαρμογή (λογότυπο πάνω αριστερά) ερχόμαστε με ?site: δείχνουμε την αρχική ακόμα κι αν είσαι συνδεδεμένος.
+  const stay = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('site');
+  if (user && !stay) return <Navigate to="/app" replace />;
   if (loading && wasSignedIn()) return <FullScreenLoader />;
   return <LandingPage />;
 }
@@ -315,7 +337,7 @@ function LandingPage() {
     const q = (s) => app.querySelector(s);
     const canvasEl = q('.app-canvas'); const badge = q('.badge'); const hist = q('.hist'); const panel = q('.panel');
     const cursor = q('.cursor'); const avNew = q('[data-joins]'); const newCount = q('.panel-head span'); const st3 = q('[data-moves]');
-    const act1 = q('[data-act="1"]'); const act2 = q('[data-act="2"]'); const lines = [...app.querySelectorAll('[data-act="1"] li')];
+    const act0 = q('[data-act="0"]'); const act1 = q('[data-act="1"]'); const act2 = q('[data-act="2"]'); const st5 = q('[data-moves5]'); const lines = [...app.querySelectorAll('[data-act="1"] li')];
     let timers = []; let playing = false;
     const at = (ms, fn) => timers.push(setTimeout(fn, ms));
     const moveCursor = (el, dx = 0.5, dy = 0.6) => {
@@ -326,28 +348,34 @@ function LandingPage() {
       timers.forEach(clearTimeout); timers = [];
       canvasEl.classList.remove('drawn'); panel.classList.remove('open'); hist.classList.remove('unread', 'pressed');
       badge.classList.remove('show', 'bump'); avNew.classList.add('hide'); newCount.classList.remove('show');
-      [act1, act2].forEach((x) => x.classList.remove('in')); lines.forEach((l) => l.classList.remove('in'));
+      [act0, act1, act2].forEach((x) => x.classList.remove('in')); act1.classList.remove('compact'); lines.forEach((l) => l.classList.remove('in'));
+      st5.classList.remove('moved');
       cursor.classList.remove('show', 'click'); cursor.style.left = '62%'; cursor.style.top = '78%';
     };
+    // Χρόνοι σε ms: οι αλλαγές των άλλων → κλικ στο «Ιστορικό αλλαγών» → ο Σάββας κάνει δική του αλλαγή,
+    // που εμφανίζεται πάνω από όλες.
     const play = () => {
       reset();
-      at(200, () => canvasEl.classList.add('drawn'));
-      at(2400, () => { st3.classList.remove('moved'); st3.getBBox(); st3.classList.add('moved'); });
-      at(2900, () => { badge.textContent = '1'; badge.classList.add('show'); hist.classList.add('unread'); });
-      at(3900, () => avNew.classList.remove('hide'));
-      at(4400, () => { badge.textContent = '2'; badge.classList.remove('bump'); void badge.offsetWidth; badge.classList.add('bump'); });
-      at(5000, () => { cursor.classList.add('show'); moveCursor(hist); });
-      at(6200, () => { cursor.classList.add('click'); hist.classList.add('pressed'); });
-      at(6400, () => { hist.classList.remove('pressed'); panel.classList.add('open'); newCount.classList.add('show'); badge.classList.remove('show'); hist.classList.remove('unread'); });
-      at(6700, () => act2.classList.add('in'));
-      at(7000, () => act1.classList.add('in'));
-      lines.forEach((l, k) => at(7500 + k * 350, () => l.classList.add('in')));
-      at(7600, () => { cursor.classList.remove('click'); moveCursor(act1, 0.8, 0.9); });
-      at(13500, () => { panel.classList.remove('open'); cursor.classList.remove('show'); });
-      at(14600, play);
+      at(150, () => canvasEl.classList.add('drawn'));
+      at(1300, () => { st3.classList.remove('moved'); st3.getBBox(); st3.classList.add('moved'); });
+      at(1600, () => { badge.textContent = '1'; badge.classList.add('show'); hist.classList.add('unread'); });
+      at(2100, () => avNew.classList.remove('hide'));
+      at(2400, () => { badge.textContent = '2'; badge.classList.remove('bump'); void badge.offsetWidth; badge.classList.add('bump'); });
+      at(2600, () => { cursor.classList.add('show'); moveCursor(hist); });
+      at(3400, () => { cursor.classList.add('click'); hist.classList.add('pressed'); });
+      at(3600, () => { hist.classList.remove('pressed'); panel.classList.add('open'); newCount.classList.add('show'); badge.classList.remove('show'); hist.classList.remove('unread'); });
+      at(3800, () => act2.classList.add('in'));
+      at(4000, () => act1.classList.add('in'));
+      lines.forEach((l, k) => at(4300 + k * 250, () => l.classList.add('in')));
+      at(4500, () => { cursor.classList.remove('click'); moveCursor(act1, 0.8, 0.9); });
+      at(6600, () => moveCursor(st5, 0.5, 0.5));
+      at(7700, () => { cursor.classList.add('click'); st5.classList.remove('moved'); st5.getBBox(); st5.classList.add('moved'); });
+      at(8200, () => { cursor.classList.remove('click'); act1.classList.add('compact'); act0.classList.add('in'); });
+      at(12200, () => { panel.classList.remove('open'); cursor.classList.remove('show'); });
+      at(13200, play);
     };
     if (reduceMotion()) {
-      canvasEl.classList.add('drawn'); panel.classList.add('open'); [act1, act2].forEach((x) => x.classList.add('in')); lines.forEach((l) => l.classList.add('in'));
+      canvasEl.classList.add('drawn'); panel.classList.add('open'); [act0, act1, act2].forEach((x) => x.classList.add('in')); act1.classList.add('compact'); lines.forEach((l) => l.classList.add('in'));
       return undefined;
     }
     const io = new IntersectionObserver(([e]) => {
@@ -372,6 +400,7 @@ function LandingPage() {
           <nav className="nav-links" aria-label="Κύρια">
             <a href="#tools">Εργαλεία</a>
             <a href="#workflow">Πώς δουλεύει</a>
+            <a href="#faq">Συχνές ερωτήσεις</a>
           </nav>
           <div className="nav-cta">
             {!user && <Link className="btn btn-ghost btn-sm" to="/login">Σύνδεση</Link>}
@@ -401,7 +430,7 @@ function LandingPage() {
                   <div className="window-inner">
                     <div className="chrome"><i /><i /><i /><span className="url">lasca.gr/app</span></div>
                     <video className="shot" autoPlay muted loop playsInline preload="auto"
-                      aria-label="Η LASCA σε λειτουργία: όδευση με πίνακα στάσεων και διάγραμμα">
+                      aria-label="Το LASCA σε λειτουργία: όδευση με πίνακα στάσεων και διάγραμμα">
                       <source src="/landing/traverse.webm" type='video/webm; codecs="vp9"' />
                       <source src="/landing/traverse.mp4" type="video/mp4" />
                     </video>
@@ -478,7 +507,7 @@ function LandingPage() {
                         <div className="window-inner">
                           <div className="chrome"><i /><i /><i /><span className="url">lasca.gr/app · {cur.title}</span></div>
                           <div className="media-box" ref={mediaRef}>
-                            <video ref={videoA} muted loop playsInline autoPlay preload="auto" aria-label={`${cur.title}: η LASCA σε λειτουργία`} />
+                            <video ref={videoA} muted loop playsInline autoPlay preload="auto" aria-label={`${cur.title}: το LASCA σε λειτουργία`} />
                             <video ref={videoB} muted loop playsInline autoPlay preload="auto" aria-hidden="true" />
                             <span className="media-spin" aria-hidden="true" />
                             <span className="media-tag">{cur.title}</span>
@@ -510,10 +539,11 @@ function LandingPage() {
               <h2 className="display" data-reveal="" style={{ '--d': '.08s' }}>Από το πεδίο στην αναφορά</h2>
               <p data-reveal="" style={{ '--d': '.16s' }}>Τέσσερα βήματα, χωρίς χαμένα αρχεία και χωρίς λάθη αντιγραφής.</p>
             </div>
+            {/* «φωτισμένο» βήμα ως data-lit (όχι κλάση): η κλάση «in» της εμφάνισης στο scroll δεν πρέπει να χάνεται */}
             <ol className="steps" ref={stepsRef}>
               <span className="rail" aria-hidden="true"><i /><b /></span>
               {STEPS.map(({ Icon, title, text }, k) => (
-                <li key={title} className={`step ${k < litSteps ? 'lit' : ''}`} data-reveal="" style={{ '--d': `${k * 0.1}s` }}>
+                <li key={title} className="step" data-lit={k < litSteps ? '' : undefined} data-reveal="" style={{ '--d': `${k * 0.1}s` }}>
                   <div className="ic"><Icon className="i" aria-hidden="true" /></div>
                   <p className="n">0{k + 1}</p><h3>{title}</h3><p>{text}</p>
                 </li>
@@ -558,7 +588,7 @@ function LandingPage() {
                         <g stroke="rgb(148 163 184 / .07)"><path d="M0 50H480M0 100H480M0 150H480M0 200H480M0 250H480M60 0V300M120 0V300M180 0V300M240 0V300M300 0V300M360 0V300M420 0V300" /></g>
                         <polyline className="trav" stroke="url(#lpTravGrad)" points="60,240 140,140 230,190 300,90 385,130 420,60" />
                         <g>
-                          <circle className="st" cx="60" cy="240" r="6" /><circle className="st" cx="140" cy="140" r="6" /><circle className="st" data-moves="" cx="230" cy="190" r="6" />
+                          <circle className="st" cx="60" cy="240" r="6" /><circle className="st" data-moves5="" cx="140" cy="140" r="6" /><circle className="st" data-moves="" cx="230" cy="190" r="6" />
                           <circle className="st" cx="300" cy="90" r="6" /><circle className="st" cx="385" cy="130" r="6" /><circle className="st" cx="420" cy="60" r="6" />
                         </g>
                         <text x="48" y="262">Σ1</text><text x="128" y="128">Σ2</text><text x="236" y="210">Σ3</text><text x="288" y="78">Σ4</text><text x="392" y="150">Σ5</text><text x="426" y="52">Σ6</text>
@@ -566,6 +596,13 @@ function LandingPage() {
                     </div>
                     <div className="panel">
                       <div className="panel-head"><p>Ιστορικό αλλαγών</p><span>2 νέες</span></div>
+                      <div className="act mine" data-act="0">
+                        <span className="av" style={{ background: '#e0424a' }}>ΣΤ</span>
+                        <div className="body">
+                          <p className="t"><b>Σάββας Τ.</b> άλλαξε: Οριζοντιογραφία (X,Y)</p>
+                          <p className="meta">μόλις τώρα · Σ2 · Y: 512.40 → 512.85</p>
+                        </div>
+                      </div>
                       <div className="act new" data-act="1">
                         <span className="av" style={{ background: '#6366f1' }}>ΗΣ</span>
                         <div className="body">
@@ -612,6 +649,23 @@ function LandingPage() {
             </div>
           </section>
         )}
+        {/* ======================= ΣΥΧΝΕΣ ΕΡΩΤΗΣΕΙΣ ======================= */}
+        <section className="section faq" id="faq" aria-labelledby="faq-title">
+          <div className="wrap">
+            <div className="head">
+              <p className="eyebrow lines" data-reveal="">FAQ</p>
+              <h2 className="display" id="faq-title" data-reveal="" style={{ '--d': '.08s' }}>Συχνές ερωτήσεις</h2>
+            </div>
+            <div className="faq-list" data-reveal="" style={{ '--d': '.16s' }}>
+              {FAQS.map(([q, a]) => (
+                <details key={q} className="faq-item">
+                  <summary><span>{q}</span><i aria-hidden="true" /></summary>
+                  <p>{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* ======================= FOOTER ======================= */}
