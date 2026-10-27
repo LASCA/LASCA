@@ -125,7 +125,7 @@ def _fill_optional(user, profile):
     # Υποχρεωτικό checkbox Όρων στη φόρμα εγγραφής: καταγράφεται εδώ, ώστε να μη ζητηθεί ξανά αποδοχή.
     current = getattr(S, 'TERMS_VERSION', None)
     if current and (profile or {}).get('terms_version') == current and user.terms_version != current:
-        user.terms_version, user.terms_accepted_at, user.age_confirmed = current, datetime.utcnow(), True
+        user.terms_version, user.terms_accepted_at = current, datetime.utcnow()
         changed = True
     return changed
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { useAuth as useClerkAuth } from '@clerk/react';
 import { useAuth } from './AuthContext';
 import LascaLoader from '../components/animations/LascaLoader';
 import { TermsGate, VerifyEmailGate } from '../components/auth/AccountGates';
@@ -34,13 +35,15 @@ export function RequireAuth({ children }) {
 }
 
 // Σελίδες μόνο για μη συνδεδεμένους (/login, /signup): αν είσαι ήδη μέσα, πας στην εφαρμογή.
-// Η Εγγραφή (signedInTo="/welcome"): μόλις ολοκληρωθεί, πρώτα η σελίδα καλωσορίσματος.
+// Η Εγγραφή (signedInTo="/welcome"): μόλις το Clerk ενεργοποιήσει τον νέο λογαριασμό, κατευθείαν η σελίδα
+// καλωσορίσματος, χωρίς να περιμένουμε τον server (το /api/me συνεχίζει στο παρασκήνιο).
 export function GuestOnly({ children, signedInTo }) {
   const { user, loading } = useAuth();
+  const { isSignedIn } = useClerkAuth();
   const location = useLocation();
+  if (signedInTo === '/welcome' && isSignedIn) return <Navigate to={welcomeUrl(location.state?.from)} replace />;
   if (loading) return <FullScreenLoader />;
   // π.χ. από σύνδεσμο πρόσκλησης: μετά τη σύνδεση γυρνάμε εκεί
-  if (user && signedInTo === '/welcome') return <Navigate to={welcomeUrl(location.state?.from)} replace />;
   if (user) return <Navigate to={location.state?.from || '/app'} replace />;
   return children;
 }

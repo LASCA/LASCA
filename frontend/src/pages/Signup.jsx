@@ -122,7 +122,7 @@ export default function Signup() {
   const terms = (
     <div className="space-y-1.5">
       <Checkbox id="accept-terms" checked={accepted} onChange={(value) => { setAccepted(value); if (value) setTermsError(''); }}>
-        Είμαι τουλάχιστον {SITE.minAge} ετών και αποδέχομαι τους{' '}
+        Αποδέχομαι τους{' '}
         <Link to="/terms" target="_blank" className="font-medium text-blue-300 hover:text-blue-200">Όρους χρήσης</Link> και την{' '}
         <Link to="/privacy" target="_blank" className="font-medium text-blue-300 hover:text-blue-200">Πολιτική απορρήτου</Link>. *
       </Checkbox>
