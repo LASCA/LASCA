@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 
-// Η άδεια χρήσης της LASCA: το αρχείο LICENSE του repo, αυτούσιο (ο server το δίνει στο /license.txt).
+// Η άδεια χρήσης του LASCA: το αρχείο LICENSE του repo, αυτούσιο (ο server το δίνει στο /license.txt).
 // Μικρός μετατροπέας Markdown μόνο για ό,τι χρησιμοποιεί το LICENSE (τίτλοι, λίστες, έντονα, παράθεμα).
 function renderMarkdown(src) {
   const blocks = [];

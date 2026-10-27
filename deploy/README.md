@@ -1,4 +1,4 @@
-# Ανέβασμα της LASCA στο Oracle Cloud
+# Ανέβασμα του LASCA στο Oracle Cloud
 
 Οδηγός βήμα-βήμα για Ubuntu 24.04 σε Ampere A1 (Always Free). Όπου βλέπεις `lasca.example.com`
 βάλε το δικό σου domain και όπου `IP` τη δημόσια IP του server.
@@ -121,7 +121,7 @@ curl -I http://127.0.0.1:8000/  # πρέπει να δώσει HTTP/1.1 200
 sudo certbot certonly --nginx -d lasca.example.com -d www.lasca.example.com \
      --deploy-hook "systemctl reload nginx"
 
-# 2) Ρυθμίσεις της LASCA
+# 2) Ρυθμίσεις του LASCA
 cd /srv/lasca
 sed -i 's/lasca.example.com/ΤΟ-DOMAIN-ΣΟΥ/g' deploy/nginx-lasca.conf
 sudo cp deploy/lasca-proxy.conf /etc/nginx/snippets/lasca-proxy.conf

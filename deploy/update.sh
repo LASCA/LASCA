@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ενημέρωση της LASCA στον server μετά από push στο GitHub:
+# Ενημέρωση του LASCA στον server μετά από push στο GitHub:
 #   bash /srv/lasca/deploy/update.sh
 # Κάνει: αντίγραφο ασφαλείας της βάσης → git pull → πακέτα Python → build σελίδας → restart.
 set -euo pipefail

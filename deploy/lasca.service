@@ -1,4 +1,4 @@
-# systemd service: κρατάει τη LASCA να τρέχει πάντα και την ξεκινάει μόνη της μετά από restart.
+# systemd service: κρατάει το LASCA να τρέχει πάντα και το ξεκινάει μόνο του μετά από restart.
 # Αντιγραφή:  sudo cp deploy/lasca.service /etc/systemd/system/lasca.service
 [Unit]
 Description=LASCA web (gunicorn)

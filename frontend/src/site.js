@@ -2,7 +2,7 @@
 // Το email επικοινωνίας ορίζεται στο frontend/.env.production: VITE_CONTACT_EMAIL=...
 export const SITE = {
   name: 'LASCA',
-  fullName: 'LASCA · Land Surveying Computations Application',
+  fullName: 'LASCA',
   description:
     'Δωρεάν εφαρμογή τοπογραφικών υπολογισμών για φοιτητές Αγρονόμων Τοπογράφων Μηχανικών: όδευση, ' +
     'χωροστάθμηση, ταχυμετρία, χάραξη, συνόρθωση, με αναφορές PDF, DXF, Excel και κοινά projects.',

@@ -1,4 +1,4 @@
-// Εμφάνιση των παραθύρων του Clerk στο ύφος της LASCA (ίδιο με τις φόρμες του web-pages:
+// Εμφάνιση των παραθύρων του Clerk στο ύφος του LASCA (ίδιο με τις φόρμες του web-pages:
 // σκούρα πεδία, κεφαλαίες ετικέτες, μπλε κουμπί) και ελληνικά κείμενα.
 import { GHOST_BUTTON, INPUT_CLASS, PRIMARY_BUTTON } from '../components/auth/FormParts';
 import { elGR } from './clerk-el-GR';

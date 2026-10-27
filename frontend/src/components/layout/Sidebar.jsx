@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import coffeeSymbol from '../../assets/coffee-symbol.png';
 // 1. Κρατάμε τα UI εικονίδια από το lucide-react (Προσθήκη MessageSquare)
 import { 
-  Crosshair,
   ChevronRight, 
   ChevronLeft, 
   ChevronDown, 
-  Settings,
   Info,
-  MessageSquare 
+  MessageSquare
 } from 'lucide-react';
 
 // 2. Custom εικονίδια
@@ -93,7 +92,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         </button>
 
         {/* Header Sidebar */}
-        <div className={`h-[72px] flex items-center ${isOpen ? 'px-4 gap-2.5' : 'px-0 justify-center'} border-b border-slate-800/80 overflow-hidden shrink-0`}>
+        <a href="/?site" title="Στην αρχική σελίδα του LASCA" aria-label="Στην αρχική σελίδα του LASCA"
+          className={`h-[72px] flex items-center ${isOpen ? 'px-4 gap-2.5' : 'px-0 justify-center'} border-b border-slate-800/80 overflow-hidden shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400/70`}>
           <img 
             src="/LASCA-logo-128.webp" 
             alt="LASCA Logo" 
@@ -106,7 +106,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
               </h1>
             </div>
           )}
-        </div>
+        </a>
 
         {/* Navigation Menu */}
         <nav className="flex-1 px-3 py-4 space-y-1 mt-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
@@ -183,21 +183,22 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
         {/* Footer Sidebar */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-900/50 backdrop-blur-sm overflow-hidden shrink-0 space-y-1 relative">
 
-          {/* Κουμπί Σχετικά */}
-          <button 
-            onClick={() => setIsAboutOpen(true)}
-            className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
-          >
-            <Info size={20} className="shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:text-blue-400" />
-            {isOpen && <span className="font-medium text-sm whitespace-nowrap">Σχετικά</span>}
-            
-            {!isOpen && (
-              <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
-                Σχετικά
-                <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
-              </div>
-            )}
-          </button>
+       <a
+          href="https://ko-fi.com/lasca"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
+        >
+          <img src={coffeeSymbol} alt="Ko-fi" className="w-5 h-5 flex-shrink-0 object-contain transition-transform duration-200 group-hover:scale-110" />
+          {isOpen && <span className="font-medium text-sm whitespace-nowrap">Στήριξε μας</span>}
+
+          {!isOpen && (
+            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
+              Στήριξε μας
+              <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
+            </div>
+          )}
+      </a>
 
           {/* Κουμπί Feedback / Contact Us */}
           <button 
@@ -215,6 +216,21 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
             )}
           </button>
 
+          {/* Κουμπί Σχετικά */}
+          <button 
+            onClick={() => setIsAboutOpen(true)}
+            className={`w-full flex items-center ${isOpen ? 'px-4 gap-3' : 'justify-center'} py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all duration-200 group relative`}
+          >
+            <Info size={20} className="shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:text-blue-400" />
+            {isOpen && <span className="font-medium text-sm whitespace-nowrap">Σχετικά</span>}
+
+            {!isOpen && (
+              <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl border border-slate-700 whitespace-nowrap z-50">
+                Σχετικά
+                <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-slate-800"></div>
+              </div>
+            )}
+          </button>
         </div>
       </aside>
 

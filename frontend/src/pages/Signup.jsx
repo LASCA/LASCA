@@ -22,7 +22,7 @@ function useClerkStep() {
 const clip = (value) => value.trim().replace(/\s+/g, ' ').slice(0, 120);
 
 export default function Signup() {
-  usePageMeta({ title: 'Δημιουργία λογαριασμού', description: 'Φτιάξε δωρεάν λογαριασμό στη LASCA: τοπογραφικοί υπολογισμοί, αναφορές και κοινά projects.' });
+  usePageMeta({ title: 'Δημιουργία λογαριασμού', description: 'Φτιάξε δωρεάν λογαριασμό στο LASCA: τοπογραφικοί υπολογισμοί, αναφορές και κοινά projects.' });
   const location = useLocation();
   const step = useClerkStep();
   const [school, setSchool] = useState('');

@@ -1,5 +1,5 @@
 """
-Σύνδεση, εγγραφή και ασφάλεια λογαριασμών της LASCA (web server).
+Σύνδεση, εγγραφή και ασφάλεια λογαριασμών του LASCA (web server).
 
   * Εγγραφή: έλεγχος κωδικού (12+ χαρακτήρες, κεφαλαία/πεζά/αριθμός/σύμβολο, όχι από τους
     10.000 πιο συνηθισμένους, όχι διαρρευμένος κατά το haveibeenpwned), αποδοχή όρων και
@@ -696,7 +696,7 @@ def _email_layout(title, body_html):
         f'<p style="font-family:monospace;letter-spacing:.1em;color:#9da7ba;font-size:12px;margin:0 0 12px">LASCA</p>'
         f'<h1 style="font-size:20px;color:#d8ecf8;margin:0 0 16px">{escape(title)}</h1>{body_html}'
         '<p style="color:#6f7890;font-size:12px;margin-top:28px">Αν δεν το ζήτησες εσύ, αγνόησε αυτό το μήνυμα. '
-        'Η ομάδα της LASCA δεν θα σου ζητήσει ποτέ τον κωδικό σου.</p></div></div>'
+        'Η ομάδα του LASCA δεν θα σου ζητήσει ποτέ τον κωδικό σου.</p></div></div>'
     )
 
 
@@ -724,7 +724,7 @@ def begin_login(user, remember, via):
         record('2fa_challenge', user=user, detail={'via': via})
         method = user.twofa_method or 'totp'
         if method == 'email':
-            issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στη LASCA:')
+            issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στο LASCA:')
         return jsonify({'status': '2fa_required', 'requires_2fa': True, 'method': method,
                         'methods': [method, 'backup'], 'email_hint': mask_email(user.email)}), 200
     return start_session(user, remember, via)
@@ -788,7 +788,7 @@ def register_user():
         raise AuthError('Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου.', 400,
                         code='terms_required')
     if data.get('age_confirmed') is not True:
-        raise AuthError(f'Η LASCA είναι μόνο για άτομα {A.MIN_AGE} ετών και άνω.', 400, code='age_required')
+        raise AuthError(f'Το LASCA είναι μόνο για άτομα {A.MIN_AGE} ετών και άνω.', 400, code='age_required')
     require_captcha(data)
     throttle(f'signup:{client_ip()}', SIGNUP_IP_LIMIT, timedelta(hours=1),
              'Πάρα πολλές εγγραφές από αυτό το δίκτυο. Δοκίμασε ξανά αργότερα.')
@@ -936,7 +936,7 @@ def send_2fa_email():
     user, _ = pending_user()
     if (user.twofa_method or 'totp') != 'email':
         raise AuthError('Ο λογαριασμός σου χρησιμοποιεί εφαρμογή authenticator.', 400, code='wrong_method')
-    sent = issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στη LASCA:')
+    sent = issue_email_code(user, 'login', 'Κωδικός σύνδεσης', 'Ο κωδικός για να ολοκληρώσεις τη σύνδεση στο LASCA:')
     record('2fa_email_sent', user=user, detail={'sent': sent})
     if not sent and not A.dev:
         raise AuthError('Δεν ήταν δυνατή η αποστολή email. Χρησιμοποίησε έναν εφεδρικό κωδικό.', 503,
@@ -970,7 +970,7 @@ def forgot_password():
     # Το token στο #: δεν στέλνεται ποτέ στον server ούτε σε τρίτους μέσω Referer/logs.
     link = f'{public_base()}/reset-password#token={token}'
     html = _email_layout('Επαναφορά κωδικού', (
-        '<p>Ζήτησες να ορίσεις νέο κωδικό για τη LASCA. Ο σύνδεσμος ισχύει για 30 λεπτά και μία φορά.</p>'
+        '<p>Ζήτησες να ορίσεις νέο κωδικό για το LASCA. Ο σύνδεσμος ισχύει για 30 λεπτά και μία φορά.</p>'
         f'<p><a href="{escape(link)}" style="display:inline-block;background:#663af3;color:#fff;'
         'padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600">Ορισμός νέου κωδικού</a></p>'))
     send_email(user.email, 'Επαναφορά κωδικού LASCA', html, dev_hint=link)
@@ -1413,7 +1413,7 @@ def send_verification(user, wait=False):
     A.db.session.commit()
     link = f'{public_base()}/verify-email#token={token}'
     html = _email_layout('Επιβεβαίωσε το email σου', (
-        '<p>Καλώς ήρθες στη LASCA! Πάτα το κουμπί για να επιβεβαιώσεις ότι αυτό το email είναι δικό σου.</p>'
+        '<p>Καλώς ήρθες στο LASCA! Πάτα το κουμπί για να επιβεβαιώσεις ότι αυτό το email είναι δικό σου.</p>'
         f'<p><a href="{escape(link)}" style="display:inline-block;background:#2563eb;color:#fff;'
         'padding:12px 22px;border-radius:12px;text-decoration:none;font-weight:600">Επιβεβαίωση email</a></p>'
         '<p>Ο σύνδεσμος ισχύει 48 ώρες.</p>'))

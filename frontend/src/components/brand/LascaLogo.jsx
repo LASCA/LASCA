@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 // Γραμματοσειρά Archivo για τη λέξη LASCA (τοπικά, χωρίς κλήση στους servers της Google).
 import '@fontsource/archivo/800.css';
 
-// Το λογότυπο της LASCA με τη λέξη LASCA σε Archivo. Ένα σημείο για όλες τις σελίδες.
+// Το λογότυπο του LASCA με τη λέξη LASCA σε Archivo. Ένα σημείο για όλες τις σελίδες.
 // Η εικόνα είναι συμπιεσμένη (WEBP, ~1.5KB αντί για 48KB PNG).
 export default function LascaLogo({ height = 30, withText = true, textClass = 'text-xl', to = '/' }) {
   return (

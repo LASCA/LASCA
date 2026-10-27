@@ -9,7 +9,7 @@
      όποιος αποδεικνύει ότι έχει το email θα μπορούσε ούτως ή άλλως να κάνει «Ξέχασα τον κωδικό»).
   2. με webhook (POST /api/clerk/webhook, υπογραφή Svix): αλλαγή ονόματος/email στο Clerk ενημερώνει τη
      lasca.db, διαγραφή στο Clerk διαγράφει και τον χρήστη εδώ (τα κοινά projects περνούν στους συνεργάτες).
-  3. αντίστροφα: «Διαγραφή λογαριασμού» από το Προφίλ της LASCA σβήνει και τον χρήστη στο Clerk.
+  3. αντίστροφα: «Διαγραφή λογαριασμού» από το Προφίλ του LASCA σβήνει και τον χρήστη στο Clerk.
 
 Ρυθμίσεις (code/.env): CLERK_SECRET_KEY (Backend API), CLERK_WEBHOOK_SECRET (whsec_..., από το Clerk Dashboard
 → Webhooks → Endpoint https://lasca.gr/api/clerk/webhook με τα events user.created, user.updated, user.deleted).
@@ -114,7 +114,7 @@ def link_or_create(clerk_id, profile):
 
 
 def _fill_optional(user, profile):
-    """Σχολή/εταιρεία από την εγγραφή: μόνο αν είναι κενά στη lasca.db (μετά αλλάζουν από το Προφίλ της LASCA)."""
+    """Σχολή/εταιρεία από την εγγραφή: μόνο αν είναι κενά στη lasca.db (μετά αλλάζουν από το Προφίλ του LASCA)."""
     changed = False
     for field in ('school', 'company'):
         value = clean_display_name((profile or {}).get(field))[:120]
@@ -146,7 +146,7 @@ def sync_profile(user, profile):
 
 
 def delete_clerk_user(clerk_id):
-    """«Διαγραφή λογαριασμού» από τη LASCA: σβήνει και τον λογαριασμό στο Clerk (best effort)."""
+    """«Διαγραφή λογαριασμού» από το LASCA: σβήνει και τον λογαριασμό στο Clerk (best effort)."""
     if not clerk_id or not os.getenv('CLERK_SECRET_KEY', '').strip():
         return False
     try:

@@ -4,7 +4,7 @@
     cd /srv/lasca && venv/bin/python deploy/check_email.py το-email-σου@example.com
 
 Δείχνει αν υπάρχουν οι ρυθμίσεις στο code/.env και στέλνει ένα δοκιμαστικό email με τον ίδιο αποστολέα
-που χρησιμοποιεί η LASCA (επιβεβαίωση λογαριασμού, κωδικοί, φόρμα επικοινωνίας). Αν το Resend το απορρίψει,
+που χρησιμοποιεί το LASCA (επιβεβαίωση λογαριασμού, κωδικοί, φόρμα επικοινωνίας). Αν το Resend το απορρίψει,
 τυπώνει την αιτία (π.χ. «domain is not verified», «API key is invalid»).
 """
 import os
@@ -62,7 +62,7 @@ resend.api_key = key
 print(f'\nΑποστολή δοκιμαστικού email από «{sender}» προς {to} …')
 try:
     result = resend.Emails.send({'from': sender, 'to': [to], 'subject': 'LASCA · δοκιμή email',
-                                 'html': '<p>Το email της LASCA δουλεύει.</p>'})
+                                 'html': '<p>Το email του LASCA δουλεύει.</p>'})
 except Exception as exc:  # noqa: BLE001 (θέλουμε να δείξουμε ό,τι απαντήσει το Resend)
     sys.exit(f'✗ Το Resend απέρριψε το email: {type(exc).__name__}: {exc}')
 print(f'✓ Στάλθηκε (id: {result.get("id") if isinstance(result, dict) else result}). Δες τα εισερχόμενα και τα «Ανεπιθύμητα».')

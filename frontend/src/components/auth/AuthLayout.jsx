@@ -5,7 +5,7 @@ import LascaLogo from '../brand/LascaLogo';
 import SurveyNetwork from '../marketing/SurveyNetwork';
 
 // Κοινό πλαίσιο για Σύνδεση / Εγγραφή / Επαναφορά κωδικού / Επιβεβαίωση email, στο ύφος της αρχικής:
-// αριστερά (σε μεγάλες οθόνες) η LASCA σε λειτουργία πάνω στο «ζωντανό» δίκτυο, δεξιά η φόρμα.
+// αριστερά (σε μεγάλες οθόνες) το LASCA σε λειτουργία πάνω στο «ζωντανό» δίκτυο, δεξιά η φόρμα.
 export default function AuthLayout({ title, subtitle, eyebrow, children, footer, wide = false, dense = false }) {
   return (
     // Το χρώμα δράσης του παλιού θέματος (violet) γίνεται εδώ το μπλε της αρχικής, ώστε και οι σελίδες που

@@ -7,7 +7,7 @@ import usePageMeta from '../hooks/usePageMeta.js';
 
 // Ίδια σελίδα με το web-pages· τη φόρμα (κωδικός, Google, κωδικοί email, «Ξέχασες τον κωδικό;») τη δίνει το Clerk.
 export default function Login() {
-  usePageMeta({ title: 'Σύνδεση', description: 'Σύνδεση στη LASCA για να συνεχίσεις τα projects σου.' });
+  usePageMeta({ title: 'Σύνδεση', description: 'Σύνδεση στο LASCA για να συνεχίσεις τα projects σου.' });
   const location = useLocation();
   const next = location.state?.from || '/app';
 

@@ -77,7 +77,7 @@ export function VerifyEmailGate() {
 
   return (
     <AuthLayout eyebrow="Ένα βήμα ακόμα" title="Επιβεβαίωσε το email σου"
-      subtitle="Για να προστατεύουμε τη LASCA από ψεύτικους λογαριασμούς, κάθε λογαριασμός ενεργοποιείται από το email του.">
+      subtitle="Για να προστατεύουμε το LASCA από ψεύτικους λογαριασμούς, κάθε λογαριασμός ενεργοποιείται από το email του.">
       <div className="space-y-3">
         <div className="flex gap-3.5 rounded-2xl border border-blue-500/25 bg-blue-500/[0.07] p-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600/20 text-blue-300"><MailCheck size={19} /></span>
@@ -115,7 +115,7 @@ export function TermsGate() {
       <div className="space-y-4">
         <ul className="space-y-2 rounded-2xl border border-slate-800 bg-[#0B1221] p-4 text-[13.5px] leading-relaxed text-slate-300 [&>li]:flex [&>li]:gap-2.5">
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
-            <span>Η LASCA είναι <strong className="text-white">δωρεάν στη σημερινή της φάση</strong>. Στο μέλλον μπορεί να αποκτήσει συνδρομητικά πακέτα.</span></li>
+            <span>Το LASCA είναι <strong className="text-white">δωρεάν στη σημερινή του φάση</strong>. Στο μέλλον μπορεί να αποκτήσει συνδρομητικά πακέτα.</span></li>
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
             <span>Η δωρεάν πρόσβαση <strong className="text-white">δεν είναι εγγυημένη για πάντα</strong>, ούτε για όσους έχουν ήδη λογαριασμό: μπορεί να περιοριστεί ή να σταματήσει, με ειδοποίηση τουλάχιστον 30 ημέρες πριν.</span></li>
           <li><FileText size={15} className="mt-0.5 shrink-0 text-blue-300" />
