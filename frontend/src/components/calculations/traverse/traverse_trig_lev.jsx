@@ -40,14 +40,22 @@ const TraverseTrigLevel = ({
   };
 
   useEffect(() => {
+    let cancelled = false;
     if (!observations || observations.length === 0) {
       if (localObs.length === 0) {
         const initialRows = Array.from({ length: 3 }).map((_, index) => ({
           id: Date.now() + index, 
           from: "", to: "", s: "", z: "", hi: "", ht: ""
         }));
-        setLocalObs(initialRows);
-        if (setObservations) setObservations(initialRows);
+        const initialize = window.setTimeout(() => {
+          if (cancelled) return;
+          setLocalObs(initialRows);
+          if (setObservations) setObservations(initialRows);
+        }, 0);
+        return () => {
+          cancelled = true;
+          window.clearTimeout(initialize);
+        };
       }
       return;
     }
@@ -83,13 +91,17 @@ const TraverseTrigLevel = ({
       return updatedObs;
     });
 
-    if (hasChanges) {
-      setLocalObs(formattedObservations);
-      if (setObservations) setObservations(formattedObservations);
-    } else {
-      setLocalObs(observations);
-    }
-  }, [observations, setObservations]);
+    const synchronizedObservations = hasChanges ? formattedObservations : observations;
+    const synchronize = window.setTimeout(() => {
+      if (cancelled) return;
+      setLocalObs(synchronizedObservations);
+      if (hasChanges && setObservations) setObservations(synchronizedObservations);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(synchronize);
+    };
+  }, [observations, setObservations, localObs.length]);
 
   const updateObsData = (newData) => {
     const finalData = typeof newData === 'function' ? newData(localObs) : newData;

@@ -22,7 +22,7 @@
  * To use as a real ES module, replace the last line with:
  *   export default LascaLoader;
  */
-import React from 'react';
+import { useEffect, useId } from 'react';
 const LASCA_PATH =
   'M353 115.7L488 193.2Q498 199 498 210.6L498 598Q498 613 511.2 605.8L602.1 556.4Q612 551 621.7 556.6L756 634.2Q766 640 766 651.5L766 708.4Q766 720 756 725.8L438 909.2Q428 915 418 909.2L282 830.8Q272 825 272 813.4L272 162.5Q272 151 282 145.2L333 115.8Q343 110 353 115.7Z';
 
@@ -54,8 +54,6 @@ const LASCA_KEYFRAMES = `
 }
 `;
 
-let lascaUidSeq = 0;
-
 function LascaLoader(props) {
   const p = props || {};
   const flag = (v, dflt) => (v === undefined || v === null || v === '' ? dflt : v !== false && v !== 'false' && v !== 0 && v !== '0');
@@ -69,12 +67,9 @@ function LascaLoader(props) {
   const shine = flag(p.shine, true);
   const glow = flag(p.glow, true);
 
-  const reactUid = typeof React.useId === 'function' ? React.useId() : null;
-  const fallbackUid = React.useRef(null);
-  if (!reactUid && fallbackUid.current === null) fallbackUid.current = 'l' + ++lascaUidSeq;
-  const uid = (reactUid || fallbackUid.current).replace(/[^a-zA-Z0-9]/g, '');
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof document === 'undefined' || document.getElementById('lasca-loader-kf')) return;
     const el = document.createElement('style');
     el.id = 'lasca-loader-kf';

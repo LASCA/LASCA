@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import axios from 'axios';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -91,21 +91,20 @@ const Tachymetry = ({
   const [scaleMode, setScaleMode] = useState("Χωρίς");
   const [scaleFactor, setScaleFactor] = useState("1.000000");
 
-  const measurements = tachymetryData.measurements || [];
-  const stationsData = tachymetryData.stations || [];
+  const measurements = useMemo(() => tachymetryData.measurements || [], [tachymetryData.measurements]);
+  const stationsData = useMemo(() => tachymetryData.stations || [], [tachymetryData.stations]);
   const computedResults = tachymetryData.results || [];
 
   // 1. ΓΕΜΙΣΜΑ ΜΕΤΡΗΣΕΩΝ (FILL DOWN)
   const filledMeasurements = useMemo(() => {
-    let lastSt = "";
-    let lastOr = "";
-    return measurements.map(row => {
+    return measurements.reduce((filled, row) => {
+      const previous = filled[filled.length - 1] || {};
       const st = row.Station || row.From || row.station || row.Station_Name;
       const or = row.Orientation || row.O || row.backsight;
-      if (st) lastSt = String(st).trim();
-      if (or) lastOr = String(or).trim();
-      return { ...row, _filledStation: lastSt, _filledOrientation: lastOr };
-    });
+      const station = st ? String(st).trim() : previous._filledStation || '';
+      const orientation = or ? String(or).trim() : previous._filledOrientation || '';
+      return [...filled, { ...row, _filledStation: station, _filledOrientation: orientation }];
+    }, []);
   }, [measurements]);
 
   // Λίστα μοναδικών στάσεων
@@ -143,6 +142,10 @@ const Tachymetry = ({
 
   // ΕΛΕΓΧΟΣ ΚΑΙ ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ Η' ΕΠΑΝΑΦΟΡΑ ΤΟΥ m_ij
   useEffect(() => {
+    let cancelled = false;
+    const updateScaleFactor = (value) => {
+      if (!cancelled) setScaleFactor(value);
+    };
     if (scaleMode === "Υπολογισμός") {
       const stObj = stationsData.find(s => String(s.name || s.Station || s.station || s.Point_ID || s.id || '').toUpperCase() === activeStation.toUpperCase())
         || traverseData.find(s => String(s.name || s.Station || '').toUpperCase() === activeStation.toUpperCase());
@@ -150,18 +153,19 @@ const Tachymetry = ({
       const xVal = stObj?.x || stObj?.X || stObj?.E;
       
       if (xVal && !isNaN(parseFloat(xVal))) {
-        setScaleFactor(calculateScaleFactor(xVal));
+        updateScaleFactor(calculateScaleFactor(xVal));
       } else {
         const firstWithX = traverseData.find(r => r.x && !isNaN(parseFloat(r.x))) || stationsData.find(r => (r.x || r.X) && !isNaN(parseFloat(r.x || r.X)));
         if (firstWithX) {
-          setScaleFactor(calculateScaleFactor(firstWithX.x || firstWithX.X));
+          updateScaleFactor(calculateScaleFactor(firstWithX.x || firstWithX.X));
         } else {
-          setScaleFactor("1.000000");
+          updateScaleFactor("1.000000");
         }
       }
     } else if (scaleMode === "Χωρίς") {
-      setScaleFactor("1.000000");
+      updateScaleFactor("1.000000");
     }
+    return () => { cancelled = true; };
   }, [scaleMode, activeStation, stationsData, traverseData]);
 
   const stationOpts = stations.length === 0 

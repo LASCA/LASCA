@@ -24,11 +24,21 @@ export default function useProjectLive({
   const [lastSeen, setLastSeen] = useState(0);
   const lastActivityRef = useRef(0);
   const cbRef = useRef({});
-  cbRef.current = { sync, markSeen, getVersion, onRemoteState, onProject, onLostAccess, onStatus, tool, client };
+  useEffect(() => {
+    cbRef.current = { sync, markSeen, getVersion, onRemoteState, onProject, onLostAccess, onStatus, tool, client };
+  }, [sync, markSeen, getVersion, onRemoteState, onProject, onLostAccess, onStatus, tool, client]);
 
   useEffect(() => {
-    setPresence([]); setActivity([]); setUnread(0); setLastSeen(0); lastActivityRef.current = 0;
-    if (!enabled) return undefined;
+    let resetCancelled = false;
+    queueMicrotask(() => {
+      if (resetCancelled) return;
+      setPresence([]);
+      setActivity([]);
+      setUnread(0);
+      setLastSeen(0);
+    });
+    lastActivityRef.current = 0;
+    if (!enabled) return () => { resetCancelled = true; };
     let stopped = false;
     let timer = null;
 
@@ -69,7 +79,12 @@ export default function useProjectLive({
     tick();
     const onVisible = () => { if (document.visibilityState === 'visible') { clearTimeout(timer); tick(); } };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible); };
+    return () => {
+      stopped = true;
+      resetCancelled = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [enabled, interval]);
 
   // Ο χρήστης άνοιξε το ιστορικό: ό,τι υπάρχει ως τώρα μετράει ως «διαβασμένο».

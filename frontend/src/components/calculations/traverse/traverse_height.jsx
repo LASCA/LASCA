@@ -17,6 +17,7 @@ const TraverseHeight = ({
 
   // --- ΕΞΥΠΝΟ FORMATTING ---
   useEffect(() => {
+    let cancelled = false;
     if (stations && stations.length > 0) {
       let hasChanges = false;
       const activeId = typeof document !== 'undefined' ? document.activeElement?.id : null;
@@ -37,21 +38,42 @@ const TraverseHeight = ({
       });
 
       if (hasChanges) {
-        setLocalStations(formattedStations);
-        if (setStations) setStations(formattedStations);
+        const synchronize = window.setTimeout(() => {
+          if (cancelled) return;
+          setLocalStations(formattedStations);
+          if (setStations) setStations(formattedStations);
+        }, 0);
+        return () => {
+          cancelled = true;
+          window.clearTimeout(synchronize);
+        };
       } else {
         // Διατηρούμε το state συγχρονισμένο χωρίς να ενοχλούμε την πληκτρολόγηση
-        setLocalStations(stations);
+        const synchronize = window.setTimeout(() => {
+          if (!cancelled) setLocalStations(stations);
+        }, 0);
+        return () => {
+          cancelled = true;
+          window.clearTimeout(synchronize);
+        };
       }
     } else if (localStations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
         id: Date.now() + 1000 + index, 
         name: "", h: ""
       }));
-      setLocalStations(initialRows);
-      if (setStations) setStations(initialRows);
+      const initialize = window.setTimeout(() => {
+        if (cancelled) return;
+        setLocalStations(initialRows);
+        if (setStations) setStations(initialRows);
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(initialize);
+      };
     }
-  }, [stations, setStations]);
+    return undefined;
+  }, [stations, setStations, localStations.length]);
 
   const updateStationsData = (newData) => {
     const finalData = typeof newData === 'function' ? newData(localStations) : newData;
@@ -63,7 +85,7 @@ const TraverseHeight = ({
   const handleStationBlur = (id, field, value) => { if (field === 'h') handleStationChange(id, field, to3(value)); };
   
   const addStationRowAt = (index) => {
-    const newRow = { id: Date.now(), name: "", h: "" };
+    const newRow = { id: Math.max(0, ...localStations.map((station) => Number(station.id) || 0)) + 1, name: "", h: "" };
     const updated = [...localStations];
     updated.splice(index + 1, 0, newRow);
     updateStationsData(updated);

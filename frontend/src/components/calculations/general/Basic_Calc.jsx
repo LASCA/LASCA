@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../../config';
 
 import { 
-  Calculator, MapPin, Target, Navigation, Repeat, 
-  Play, RotateCcw, Trash2, Plus, Minus,
-  Compass, Crosshair, SlidersHorizontal, FileText
+  Repeat, Play, RotateCcw, Trash2, Plus, Minus, FileText
 } from 'lucide-react';
 
 import {
@@ -22,37 +20,8 @@ import {
 
 import { toast } from 'react-hot-toast';
 import InputField from '../../InputField';
-
-// Helper για την ασφαλή αποθήκευση/κατέβασμα αρχείων PDF
-const saveBlobFile = async (blob, defaultFileName) => {
-  try {
-    if (window.showSaveFilePicker) {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: defaultFileName,
-        types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }]
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return;
-    }
-  } catch (error) {
-    if (error?.name !== 'AbortError') {
-      console.warn('showSaveFilePicker failed, falling back to browser download:', error);
-    } else {
-      return;
-    }
-  }
-
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = defaultFileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
+import { saveBlobFile } from '../../../utils/save_blob_file';
+import { stripControlCharacters } from '../../../utils/strip_control_characters';
 
 // ------------------------------------------------------------------
 // ΥΠΟ-COMPONENT: SVG Διάγραμμα Αλληλοτομιών
@@ -527,7 +496,7 @@ const BasicCalculations = ({ projectInfo }) => {
       });
 
       const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
-      const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
+      const sanitizedProjectName = projectName ? stripControlCharacters(projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*]/g, '')) : '';
       const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Intersection_Report.pdf` : 'Intersection_Report.pdf';
 
       await saveBlobFile(response.data, fileName);
@@ -598,7 +567,7 @@ const BasicCalculations = ({ projectInfo }) => {
       });
 
       const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
-      const sanitizedProjectName = projectName ? projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '') : '';
+      const sanitizedProjectName = projectName ? stripControlCharacters(projectName.replace(/\s+/g, '_').replace(/[<>:"/\\|?*]/g, '')) : '';
       const fileName = sanitizedProjectName ? `${sanitizedProjectName}_Resection_Report.pdf` : 'Resection_Report.pdf';
 
       await saveBlobFile(response.data, fileName);

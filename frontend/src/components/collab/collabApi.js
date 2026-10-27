@@ -1,7 +1,9 @@
 // Κλήσεις για κοινοποίηση / μέλη / προσκλήσεις / ζωντανή συνεργασία.
 // Το ίδιο αρχείο υπάρχει και στο πρόγραμμα των Windows: εκεί το prefix είναι '/api/cloud'
-// (ο τοπικός server τα προωθεί στον online server της LASCA), εδώ είναι '/api'.
+// (ο τοπικός server τα προωθεί στον online server του LASCA), εδώ είναι '/api'.
 import axios from 'axios';
+
+const TIMEOUT_MESSAGE = 'Η σύνδεση έληξε. Παρακαλώ ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.';
 
 export const ROLE_LABEL = { owner: 'Ιδιοκτήτης', editor: 'Επεξεργαστής', viewer: 'Αναγνώστης' };
 export const ROLE_HINT = {
@@ -10,6 +12,7 @@ export const ROLE_HINT = {
 };
 
 export function apiError(error, fallback = 'Κάτι πήγε στραβά. Δοκίμασε ξανά.') {
+  if (error?.code === 'ECONNABORTED') return TIMEOUT_MESSAGE;
   if (!error?.response) return 'Δεν υπάρχει σύνδεση με τον server.';
   return error.response.data?.error || error.response.data?.message || fallback;
 }
@@ -18,23 +21,32 @@ export function createCollabApi(prefix = '/api') {
   const u = (path) => `${prefix}${path}`;
   const enc = encodeURIComponent;
   const data = (promise) => promise.then((r) => r.data);
+  // Το κοινό axios (όχι axios.create): στη σελίδα έχει τον interceptor που βάζει το token του Clerk.
+  const withTimeout = (config) => ({ timeout: 15000, ...config });
+  const client = {
+    get: (url, config) => axios.get(url, withTimeout(config)),
+    post: (url, body, config) => axios.post(url, body, withTimeout(config)),
+    patch: (url, body, config) => axios.patch(url, body, withTimeout(config)),
+    delete: (url, config) => axios.delete(url, withTimeout(config)),
+  };
+
   return {
     prefix,
     // Οι εικόνες προφίλ έρχονται ως '/api/users/..': στο exe περνάνε από τον τοπικό server.
     asset: (url) => (url && prefix !== '/api' ? url.replace(/^\/api/, prefix) : url),
-    members: (pid) => data(axios.get(u(`/projects/${enc(pid)}/members`))),
-    addMember: (pid, email, role) => data(axios.post(u(`/projects/${enc(pid)}/members`), { email, role })),
-    changeRole: (pid, uid, role) => data(axios.patch(u(`/projects/${enc(pid)}/members/${uid}`), { role })),
-    removeMember: (pid, uid) => data(axios.delete(u(`/projects/${enc(pid)}/members/${uid}`))),
-    leave: (pid) => data(axios.post(u(`/projects/${enc(pid)}/leave`))),
-    transfer: (pid, userId) => data(axios.post(u(`/projects/${enc(pid)}/transfer`), { user_id: userId })),
-    invites: (pid) => data(axios.get(u(`/projects/${enc(pid)}/invites`))),
-    createInvite: (pid, body) => data(axios.post(u(`/projects/${enc(pid)}/invites`), body)),
-    revokeInvite: (pid, iid) => data(axios.delete(u(`/projects/${enc(pid)}/invites/${iid}`))),
-    activity: (pid) => data(axios.get(u(`/projects/${enc(pid)}/activity`))),
-    markSeen: (pid, lastId) => data(axios.post(u(`/projects/${enc(pid)}/activity/seen`), { last_id: lastId })),
-    lookup: (q) => data(axios.get(u('/users/lookup'), { params: { q } })),
-    sync: (pid, body) => data(axios.post(u(`/projects/${enc(pid)}/sync`), body)),
+    members: (pid) => data(client.get(u(`/projects/${enc(pid)}/members`))),
+    addMember: (pid, email, role) => data(client.post(u(`/projects/${enc(pid)}/members`), { email, role })),
+    changeRole: (pid, uid, role) => data(client.patch(u(`/projects/${enc(pid)}/members/${uid}`), { role })),
+    removeMember: (pid, uid) => data(client.delete(u(`/projects/${enc(pid)}/members/${uid}`))),
+    leave: (pid) => data(client.post(u(`/projects/${enc(pid)}/leave`))),
+    transfer: (pid, userId) => data(client.post(u(`/projects/${enc(pid)}/transfer`), { user_id: userId })),
+    invites: (pid) => data(client.get(u(`/projects/${enc(pid)}/invites`))),
+    createInvite: (pid, body) => data(client.post(u(`/projects/${enc(pid)}/invites`), body)),
+    revokeInvite: (pid, iid) => data(client.delete(u(`/projects/${enc(pid)}/invites/${iid}`))),
+    activity: (pid) => data(client.get(u(`/projects/${enc(pid)}/activity`))),
+    markSeen: (pid, lastId) => data(client.post(u(`/projects/${enc(pid)}/activity/seen`), { last_id: lastId })),
+    lookup: (q) => data(client.get(u('/users/lookup'), { params: { q } })),
+    sync: (pid, body) => data(client.post(u(`/projects/${enc(pid)}/sync`), body)),
   };
 }
 

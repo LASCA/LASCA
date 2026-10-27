@@ -1,15 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from 'react-hot-toast';
+import { saveBlobFile, saveImageFile } from '../../../utils/save_blob_file';
+import { stripControlCharacters } from '../../../utils/strip_control_characters';
 import { 
   Map as MapIcon, Info, Database, Activity, Target, Ruler,
   Play, Cpu, Image as ImageIcon, Maximize2, Download, X, ChevronDown, FileDown, FileText,
   Layers, Globe
 } from 'lucide-react';
-import { saveImageFile } from '../../../utils/save_blob_file';
 
 // --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ label, value, onChange, options }) => {
@@ -88,11 +89,14 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
   const [scaleFactor, setScaleFactor] = useState(metrics.scaleFactor || "1.000000");
 
   useEffect(() => {
-    if (metrics.klass) setKlass(metrics.klass);
-    if (metrics.terrain) setTerrain(metrics.terrain);
-    if (metrics.scale) setScale(metrics.scale);
-    if (metrics.scaleFactor) setScaleFactor(metrics.scaleFactor);
-    if (metrics.scaleMode) setScaleMode(metrics.scaleMode);
+    const refresh = window.setTimeout(() => {
+      if (metrics.klass) setKlass(metrics.klass);
+      if (metrics.terrain) setTerrain(metrics.terrain);
+      if (metrics.scale) setScale(metrics.scale);
+      if (metrics.scaleFactor) setScaleFactor(metrics.scaleFactor);
+      if (metrics.scaleMode) setScaleMode(metrics.scaleMode);
+    }, 0);
+    return () => window.clearTimeout(refresh);
   }, [metrics]);
 
   const plotImage = metrics.plotImage || null;
@@ -112,16 +116,21 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
 
   // ΕΛΕΓΧΟΣ ΚΑΙ ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ Η' ΕΠΑΝΑΦΟΡΑ ΤΟΥ m_ij
   useEffect(() => {
+    let cancelled = false;
+    const updateScaleFactor = (value) => {
+      if (!cancelled) setScaleFactor(value);
+    };
     if (scaleMode === "Υπολογισμός") {
       const firstRowWithX = data.find(row => row.x !== undefined && row.x !== "" && !isNaN(parseFloat(row.x)));
       if (firstRowWithX) {
-        setScaleFactor(calculateScaleFactor(firstRowWithX.x));
+        updateScaleFactor(calculateScaleFactor(firstRowWithX.x));
       } else {
-        setScaleFactor("1.000000");
+        updateScaleFactor("1.000000");
       }
     } else if (scaleMode === "Χωρίς") {
-      setScaleFactor("1.000000");
+      updateScaleFactor("1.000000");
     }
+    return () => { cancelled = true; };
   }, [data, scaleMode]);
 
   const handleInputChange = (index, field, value) => {
@@ -410,9 +419,10 @@ const Traverse = ({ data = [], setData, metrics = {}, setMetrics, projectSetting
       const projectName = String((projectInfo || projectSettings)?.name || '').trim();
       const sanitizedProjectName = projectName
         .replace(/\s+/g, '_')
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+        .replace(/[<>:"/\\|?*]/g, '');
+      const safeProjectName = stripControlCharacters(sanitizedProjectName);
       const fileName = sanitizedProjectName
-        ? `${sanitizedProjectName}_Traverse_Report.pdf`
+        ? `${safeProjectName}_Traverse_Report.pdf`
         : 'Traverse_Report.pdf';
 
       await saveBlobFile(blob, fileName);

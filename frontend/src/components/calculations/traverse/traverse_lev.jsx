@@ -129,9 +129,12 @@ const TraverseLeveling = ({
   }, []);
 
   useEffect(() => {
-    if (forwardData && forwardData.length > 0) setLocalForward(forwardData);
-    if (backwardData && backwardData.length > 0) setLocalBackward(backwardData);
-    if (metrics && Object.keys(metrics).length > 0) setLocalMetrics(metrics);
+    const synchronize = window.setTimeout(() => {
+      if (forwardData && forwardData.length > 0) setLocalForward(forwardData);
+      if (backwardData && backwardData.length > 0) setLocalBackward(backwardData);
+      if (metrics && Object.keys(metrics).length > 0) setLocalMetrics(metrics);
+    }, 0);
+    return () => window.clearTimeout(synchronize);
   }, [forwardData, backwardData, metrics]);
 
   const formatVal = (val, decimals = 3) => {

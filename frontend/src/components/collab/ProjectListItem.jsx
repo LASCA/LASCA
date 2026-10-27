@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ChevronRight, CloudAlert, CloudCheck, CloudDownload, CloudOff, CloudUpload, HardDrive, Loader2, Trash2,
 } from 'lucide-react';
@@ -6,7 +5,7 @@ import CollabAvatar from './CollabAvatar';
 import { ROLE_LABEL, timeAgo } from './collabApi';
 
 // Ένδειξη «πού είναι» το project. Ίδιο component στη σελίδα και στο exe.
-export const SYNC_STATUS = {
+const SYNC_STATUS = {
   synced: { icon: CloudCheck, label: 'Στο cloud', hint: 'Έχει ανέβει στο cloud και είναι συγχρονισμένο', cls: 'text-[#5fd3bf] border-[#269684]/40 bg-[#269684]/10' },
   pending: { icon: CloudUpload, label: 'Αναμονή ανεβάσματος', hint: 'Οι αλλαγές θα ανέβουν αυτόματα μόλις υπάρξει σύνδεση στο internet', cls: 'text-amber-300 border-amber-500/30 bg-amber-500/10' },
   uploading: { icon: Loader2, spin: true, label: 'Ανεβαίνει…', hint: 'Ανεβαίνει τώρα στο cloud', cls: 'text-blueprint border-[#b6d9fc]/30 bg-[#b6d9fc]/10' },

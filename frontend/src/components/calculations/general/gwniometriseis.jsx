@@ -21,9 +21,11 @@ const Goniometry = ({ rows = [], setRows, projectInfo }) => {
         ZfaceI: "", 
         ZfaceII: ""
       }));
-      setRows(initialRows);
+      const initialize = window.setTimeout(() => setRows(initialRows), 0);
+      return () => window.clearTimeout(initialize);
     }
-  }, []);
+    return undefined;
+  }, [rows, setRows]);
 
   const formatDecimals = (val, decimals = 4) => {
     if (val === "" || val === null || val === undefined) return "";

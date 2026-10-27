@@ -4,10 +4,11 @@ import { Target, Navigation, Trash2, Map, Download, X, PlusCircle, Maximize2, Cp
 import { toast } from 'react-hot-toast';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import InputField from '../../InputField';
-import { saveImageFile } from '../../../utils/save_blob_file';
+import { saveBlobFile, saveImageFile } from '../../../utils/save_blob_file';
+import { stripControlCharacters } from '../../../utils/strip_control_characters';
 
 const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
-  const { station, backsight, points, mij } = stakeoutData;
+  const { station, backsight, points } = stakeoutData;
   const [loading, setLoading] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -18,7 +19,8 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   const [isCalculated, setIsCalculated] = useState(!!stakeoutData.plot);
 
   useEffect(() => {
-    setIsCalculated(!!stakeoutData.plot);
+    const refresh = window.setTimeout(() => setIsCalculated(!!stakeoutData.plot), 0);
+    return () => window.clearTimeout(refresh);
   }, [stakeoutData.plot]);
 
   const calculateScaleFactor = (xValue) => {
@@ -34,15 +36,20 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const updateScaleFactor = (value) => {
+      if (!cancelled) setScaleFactor(value);
+    };
     if (scaleMode === "Υπολογισμός") {
       if (station?.x && !isNaN(parseFloat(station.x))) {
-        setScaleFactor(calculateScaleFactor(station.x));
+        updateScaleFactor(calculateScaleFactor(station.x));
       } else {
-        setScaleFactor("1.000000");
+        updateScaleFactor("1.000000");
       }
     } else if (scaleMode === "Χωρίς") {
-      setScaleFactor("1.000000");
+      updateScaleFactor("1.000000");
     }
+    return () => { cancelled = true; };
   }, [station?.x, scaleMode]);
 
   const formatVal = (val, decimals = 3) => {
@@ -121,7 +128,7 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
         setIsCalculated(true);
         toast.success("Τα στοιχεία χάραξης υπολογίστηκαν επιτυχώς!");
       }
-    } catch (err) {
+    } catch {
       toast.error("Αποτυχία σύνδεσης με το backend.");
     } finally {
       setLoading(false);
@@ -186,9 +193,10 @@ const Charaxi = ({ stakeoutData, setStakeoutData, projectInfo }) => {
       const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
       const sanitizedProjectName = projectName
         .replace(/\s+/g, '_')
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+        .replace(/[<>:"/\\|?*]/g, '');
+      const safeProjectName = stripControlCharacters(sanitizedProjectName);
       const fileName = sanitizedProjectName
-        ? `${sanitizedProjectName}_charaxi_report.pdf`
+        ? `${safeProjectName}_charaxi_report.pdf`
         : 'charaxi_report.pdf';
 
       await saveBlobFile(blob, fileName);

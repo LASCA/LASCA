@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../../../config';
 import { Trash2, PlusCircle, Activity, Target, Cpu, Play, Maximize2, Download, X, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
 import { saveImageFile } from '../../../utils/save_blob_file';
+import { stripControlCharacters } from '../../../utils/strip_control_characters';
 
 const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetrics, projectInfo }) => {
   
@@ -13,8 +14,11 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   const [isFullscreen, setIsFullscreen] = useState(false); 
 
   useEffect(() => {
-    setIsAdjusted(adjMetrics.isAdjusted || false);
-    setPlotImage(adjMetrics.plotImage || null);
+    const refresh = window.setTimeout(() => {
+      setIsAdjusted(adjMetrics.isAdjusted || false);
+      setPlotImage(adjMetrics.plotImage || null);
+    }, 0);
+    return () => window.clearTimeout(refresh);
   }, [adjMetrics]);
 
   // Helper functions για δεκαδικά
@@ -44,12 +48,14 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
   useEffect(() => {
     if (observations && observations.length === 0) {
       const initialRows = Array.from({ length: 3 }).map((_, index) => ({
-        id: Date.now() + index, 
+        id: Date.now() + index,
         station: "", target: "", Period: "", Face_I: "", Face_II: "", adj_hz: "", std_dev: ""
       }));
-      setObservations(initialRows);
+      const initialize = window.setTimeout(() => setObservations(initialRows), 0);
+      return () => window.clearTimeout(initialize);
     }
-  }, []);
+    return undefined;
+  }, [observations, setObservations]);
 
   // ΕΞΥΠΝΟ FORMATTING: Εφαρμόζει 4 δεκαδικά παντού, ΕΚΤΟΣ από το κελί που κάνουμε edit
   useEffect(() => {
@@ -261,9 +267,10 @@ const Adjustment = ({ observations, setObservations, adjMetrics = {}, setAdjMetr
       const projectName = String(projectInfo?.projectName || projectInfo?.name || '').trim();
       const sanitizedProjectName = projectName
         .replace(/\s+/g, '_')
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '');
+        .replace(/[<>:"/\\|?*]/g, '');
+      const safeProjectName = stripControlCharacters(sanitizedProjectName);
       const fileName = sanitizedProjectName
-        ? `${sanitizedProjectName}_Adjustment_Report.pdf`
+        ? `${safeProjectName}_Adjustment_Report.pdf`
         : 'Adjustment_Report.pdf';
 
       await saveBlobFile(response.data, fileName);

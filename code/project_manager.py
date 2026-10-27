@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-def get_safe_workspace_dir(app_folder="Topo_Workspace"):
+def get_safe_workspace_dir(app_folder="Topo_Workspace", *, base_dir=None):
     """
     Επιστρέφει τον φάκελο του χρήστη για αποθήκευση δεδομένων.
     """
-    workspace_path = Path.home() / app_folder
+    workspace_path = (Path(base_dir) if base_dir else Path.home()) / app_folder
     workspace_path.mkdir(parents=True, exist_ok=True)
     return workspace_path
 

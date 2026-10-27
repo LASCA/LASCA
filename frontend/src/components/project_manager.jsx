@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import axios from 'axios';
 import { 
@@ -31,14 +31,8 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
   // Κατάσταση για το project προς διαγραφή
   const [projectToDelete, setProjectToDelete] = useState(null);
 
-  useEffect(() => {
-    if (activeTab === 'open' && isOpen) {
-      fetchExistingProjects();
-    }
-  }, [activeTab, isOpen]);
-
-  const fetchExistingProjects = async () => {
-    setIsLoadingList(true);
+  const fetchExistingProjects = useCallback(async (quiet = false) => {
+    if (!quiet) setIsLoadingList(true);
     setError('');
     try {
       // Στη σελίδα όλα τα projects είναι ήδη στο cloud: δείχνουμε ρόλο, μέλη και νέες αλλαγές.
@@ -58,7 +52,16 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
     } finally {
       setIsLoadingList(false);
     }
-  };
+  }, [currentProject]);
+
+  useEffect(() => {
+    if (activeTab === 'open' && isOpen) {
+      const refresh = window.setTimeout(() => { void fetchExistingProjects(); }, 0);
+      return () => window.clearTimeout(refresh);
+    }
+    return undefined;
+  }, [activeTab, isOpen, fetchExistingProjects]);
+
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
@@ -82,7 +85,10 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
         }
       });
 
-      onProjectLoaded(response.data);
+      if (onProjectLoaded(response.data, sanitizedName) === false) {
+        setError(response.data?.error || "Αποτυχία δημιουργίας project.");
+        return;
+      }
       onClose();
     } catch (err) {
       console.error("Σφάλμα κατά τη δημιουργία του project:", err);
@@ -99,7 +105,10 @@ const ProjectModal = ({ isOpen, onClose, onProjectLoaded, currentProject }) => {
       const response = await axios.post(`${API_BASE_URL}/api/projects/load`, {
         project_name: name
       });
-      onProjectLoaded(response.data);
+      if (onProjectLoaded(response.data, name) === false) {
+        setError(response.data?.error || "Αποτυχία ανοίγματος του επιλεγμένου project.");
+        return;
+      }
       onClose();
     } catch (err) {
       console.error("Σφάλμα κατά το άνοιγμα του project:", err);

@@ -88,7 +88,14 @@ def plot_std_dev_lollipop_df(results_df: pd.DataFrame) -> str:
     # --- Η ΛΥΣΗ ΓΙΑ ΤΟ WEB ---
     # Αντί για plt.show(), το σώζουμε σε buffer
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', transparent=True)
+    plt.savefig(
+        buf,
+        format='png',
+        bbox_inches='tight',
+        facecolor=fig.get_facecolor(),
+        edgecolor='none',
+        transparent=False
+    )
     buf.seek(0)
     
     # Μετατροπή σε Base64 string

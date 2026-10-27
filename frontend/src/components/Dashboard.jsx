@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import proj4 from 'proj4';
 import { toast } from 'react-hot-toast';
@@ -6,8 +6,9 @@ import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { 
   Plus, FolderOpen, Upload, 
-  FileSpreadsheet, LayoutGrid,
-  Database, MapPin, Target, CheckCircle2, AlertCircle, Map, User
+  FileSpreadsheet,
+  Database, MapPin, Target, Map, User,
+  RefreshCw
 } from 'lucide-react';
 import { 
   ResponsiveContainer, ScatterChart, Scatter, 
@@ -64,7 +65,6 @@ const Dashboard = ({
   traverseMetrics,
   tachymetryData = { measurements: [], stations: [] },
   stakeoutData = { points: [] },
-  levelingMetrics = null
 }) => {
 
   const [isMapView, setIsMapView] = useState(false);

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Activity } from 'lucide-react'; // Κρατάμε μόνο αυτό για το default case
 
 // Κάνουμε import τα custom εικονίδια

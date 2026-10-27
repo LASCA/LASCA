@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
@@ -142,43 +142,55 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
   const [copiedId, setCopiedId] = useState(null);
   const [confirm, setConfirm] = useState(null); // { kind: 'transfer'|'remove'|'leave', member }
   const lookupTimer = useRef(null);
+  const loadGenerationRef = useRef(0);
   // Το callback κρατιέται σε ref: αν ήταν εξάρτηση του load, κάθε νέα απόδοση του γονέα θα
   // ξαναφόρτωνε τα μέλη → ατελείωτος κύκλος (το παράθυρο «αναβόσβηνε»).
   const onRoleChangedRef = useRef(onRoleChanged);
-  onRoleChangedRef.current = onRoleChanged;
   const onMembersChangedRef = useRef(onMembersChanged);
-  onMembersChangedRef.current = onMembersChanged;
+  useEffect(() => { onRoleChangedRef.current = onRoleChanged; }, [onRoleChanged]);
+  useEffect(() => { onMembersChangedRef.current = onMembersChanged; }, [onMembersChanged]);
   // Το κουμπί «Κοινοποίηση» της μπάρας δείχνει ποιοι έχουν πρόσβαση: το ενημερώνουμε σε κάθε αλλαγή.
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { if (isOpen && loaded) onMembersChangedRef.current?.(members); }, [members, isOpen, loaded]);
-  useEffect(() => { if (!isOpen) setLoaded(false); }, [isOpen]);
-
   const isOwner = myRole === 'owner';
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (generation) => {
     if (!projectId) return;
     setLoading(true);
+    setLoaded(false);
     try {
       const data = await api.members(projectId);
+      if (generation !== loadGenerationRef.current) return;
       setMembers(data.members || []);
       setLoaded(true);
       setMyRole(data.project?.role || null);
       onRoleChangedRef.current?.(data.project?.role || null);
       if (data.project?.role === 'owner') {
         const inv = await api.invites(projectId);
+        if (generation !== loadGenerationRef.current) return;
         setInvites(inv.invites || []);
       } else {
         setInvites([]);
       }
     } catch (error) {
+      if (generation !== loadGenerationRef.current) return;
       toast.error(apiError(error, 'Αποτυχία φόρτωσης μελών'));
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) setLoading(false);
     }
   }, [api, projectId]);
 
   useEffect(() => {
-    if (isOpen) { load(); setConfirm(null); }
+    if (!isOpen) return undefined;
+    const generation = ++loadGenerationRef.current;
+    queueMicrotask(() => {
+      if (generation !== loadGenerationRef.current) return;
+      setConfirm(null);
+      void load(generation);
+    });
+    return () => {
+      if (generation === loadGenerationRef.current) loadGenerationRef.current += 1;
+    };
   }, [isOpen, load]);
 
   useEffect(() => {
@@ -192,15 +204,28 @@ export default function ShareDialog({ isOpen, onClose, api, projectId, projectNa
   useEffect(() => {
     clearTimeout(lookupTimer.current);
     const q = email.trim();
-    if (!isOpen || !isOwner || q.length < 2) { setSuggestions([]); return undefined; }
+    let cancelled = false;
+    if (!isOpen || !isOwner || q.length < 2) {
+      const clearSuggestions = window.setTimeout(() => setSuggestions([]), 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(clearSuggestions);
+      };
+    }
     lookupTimer.current = setTimeout(async () => {
       try {
         const data = await api.lookup(q);
+        if (cancelled) return;
         const existing = new Set(members.map((m) => m.email));
         setSuggestions((data.users || []).filter((u) => !existing.has(u.email)).slice(0, 5));
-      } catch { setSuggestions([]); }
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
     }, 250);
-    return () => clearTimeout(lookupTimer.current);
+    return () => {
+      cancelled = true;
+      clearTimeout(lookupTimer.current);
+    };
   }, [email, isOpen, isOwner, api, members]);
 
   const addMember = async (e) => {

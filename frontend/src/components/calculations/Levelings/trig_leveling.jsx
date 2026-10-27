@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { Calculator, PlusCircle, Trash2, Play, Cpu, Table, ArrowLeft, FileText } from 'lucide-react';
 import axios from 'axios';
+import { saveBlobFile } from '../../../utils/save_blob_file';
+import { stripControlCharacters } from '../../../utils/strip_control_characters';
 
 const TrigonometricHeight = ({ 
   data = [], 
@@ -58,18 +60,30 @@ const TrigonometricHeight = ({
 
   // --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΔΕΔΟΜΕΝΩΝ ---
   useEffect(() => {
+    let cancelled = false;
+    let initialRows = null;
     if (data && data.length > 0) {
       // Δεν εφαρμόζουμε to3/to4 εδώ ώστε να μην εμποδίζεται η πληκτρολόγηση δεκαδικών
-      setLocalData(data);
+      initialRows = data;
     } else if (localData.length === 0) {
-      const initialRows = Array.from({ length: 5 }).map((_, index) => ({
+      initialRows = Array.from({ length: 5 }).map((_, index) => ({
         id: Date.now() + index, 
         from: "", to: "", s: "", z: "", hi: "", ht: "", dh: "", dh_avg: ""
       }));
-      setLocalData(initialRows);
-      if (setData) setData(initialRows);
     }
-  }, [data]);
+    if (initialRows) {
+      const syncData = window.setTimeout(() => {
+        if (cancelled) return;
+        setLocalData(initialRows);
+        if (!data?.length && setData) setData(initialRows);
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(syncData);
+      };
+    }
+    return undefined;
+  }, [data, localData.length, setData]);
 
   // --- ΕΝΗΜΕΡΩΣΗ STATE ---
   const updateData = (newData) => {
@@ -208,8 +222,9 @@ const TrigonometricHeight = ({
       const sanitizedProjectName = projectName
         .replace(/\s+/g, '_')
         .replace(/[<>:"/\\|?*]/g, '');
+      const safeFileName = stripControlCharacters(sanitizedProjectName);
       const fileName = sanitizedProjectName
-        ? `${sanitizedProjectName}_Trig_Leveling_Report.pdf`
+        ? `${safeFileName}_trig_leveling_report.pdf`
         : 'Trig_Leveling_Report.pdf';
 
       await saveBlobFile(response.data, fileName);
