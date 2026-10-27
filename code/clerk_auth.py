@@ -47,7 +47,9 @@ def verify_clerk_token(token):
             signing_key.key,
             algorithms=['RS256'],
             options={'require': ['exp', 'iat', 'sub']},
-            leeway=10,
+            # Το session token του Clerk ζει ~60″· ένα αίτημα μπορεί να περιμένει πίσω από αργό υπολογισμό
+            # (1 worker στον server). Μικρή ανοχή στη λήξη, ώστε να μη βγαίνει ο χρήστης έξω.
+            leeway=60,
         )
     except jwt.ExpiredSignatureError:
         return None, 'Token has expired'

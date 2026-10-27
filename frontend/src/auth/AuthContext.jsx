@@ -8,6 +8,15 @@ axios.defaults.withCredentials = true;
 
 const AuthContext = createContext(null);
 
+// Καινούργιο token από το Clerk (όχι το αποθηκευμένο), για επανάληψη μετά από 401.
+async function freshToken(getToken) {
+  try {
+    return await getToken({ skipCache: true });
+  } catch {
+    return null;
+  }
+}
+
 // Αιτήματα προς το δικό μας API (σχετικό /api/... ή ίδιο origin / API_BASE_URL).
 function isLascaApi(url) {
   if (!url) return false;
@@ -40,6 +49,7 @@ export function AuthProvider({ children }) {
   const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState({});
+  const refreshRef = useRef(null);
 
   const logout = useCallback(async () => {
     try {
@@ -66,15 +76,22 @@ export function AuthProvider({ children }) {
       setNeedsTermsAcceptance(false);
       return data || null;
     } catch (error) {
-      if (error.response?.status === 409) {
+      const status = error.response?.status;
+      if (status === 409) {
         setNeedsTermsAcceptance(true);
         return null;
       }
-      setUser(null);
-      setNeedsTermsAcceptance(false);
+      // Μόνο αν ο server πει ρητά «δεν είσαι συνδεδεμένος». Ένα προσωρινό σφάλμα (δίκτυο, 5xx, αργός server)
+      // δεν βγάζει τον χρήστη από την εφαρμογή.
+      if (status === 401 || status === 403) {
+        setUser(null);
+        setNeedsTermsAcceptance(false);
+      }
       return null;
     }
   }, [getToken]);
+
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
 
   // Accept Terms of Use
   const acceptTerms = useCallback(async () => {
@@ -121,11 +138,16 @@ export function AuthProvider({ children }) {
           setNeedsTermsAcceptance(false);
         }
       } catch (error) {
-        if (alive && error.response?.status === 409) {
+        const status = error.response?.status;
+        if (alive && status === 409) {
           setNeedsTermsAcceptance(true);
-        } else if (alive) {
+        } else if (alive && (status === 401 || status === 403)) {
           setUser(null);
           setNeedsTermsAcceptance(false);
+        } else if (alive) {
+          // Προσωρινό σφάλμα (δίκτυο / server): μία ακόμα προσπάθεια πριν δείξουμε τη σύνδεση.
+          await new Promise((resolve) => { setTimeout(resolve, 1500); });
+          if (alive) await refreshRef.current?.();
         }
       } finally {
         if (alive) setLoading(false);
@@ -143,22 +165,30 @@ export function AuthProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  // Handle 401 responses from API
+  // 401 από το API: το token του Clerk ζει ~60″ και μπορεί να λήξει ενώ το αίτημα περιμένει (π.χ. αργός
+  // υπολογισμός). Ξαναδοκιμάζουμε ΜΙΑ φορά με καινούργιο token· αποσύνδεση μόνο αν το /api/me το επιβεβαιώσει.
   useEffect(() => {
     const id = axios.interceptors.response.use(
       (res) => res,
-      (error) => {
-        if (error.response?.status === 403 || error.response?.status === 409) {
-          return Promise.reject(error);
-        }
-        const url = error.config?.url || '';
+      async (error) => {
+        const config = error.config || {};
+        const url = config.url || '';
         const isAuthCall = /\/api\/(me|auth\/)/.test(url);
-        if (error.response?.status === 401 && !isAuthCall) setUser(null);
+        if (error.response?.status !== 401 || isAuthCall || !isLascaApi(url)) return Promise.reject(error);
+        if (isSignedIn && !config.__lascaRetried) {
+          const token = await freshToken(getTokenRef.current);
+          if (token) {
+            config.__lascaRetried = true;
+            config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` };
+            return axios.request(config);
+          }
+        }
+        refreshRef.current?.();
         return Promise.reject(error);
       }
     );
     return () => axios.interceptors.response.eject(id);
-  }, []);
+  }, [isSignedIn]);
 
   // Το token του Clerk μπαίνει σε ΚΑΘΕ αίτημα προς το API του LASCA: axios και fetch (πολλά εργαλεία,
   // π.χ. φόρτωση/αποθήκευση project και υπολογισμοί, χρησιμοποιούν fetch). Ποτέ σε άλλους servers.
@@ -185,10 +215,18 @@ export function AuthProvider({ children }) {
       const url = typeof input === 'string' ? input : input?.url;
       if (!isLascaApi(url)) return originalFetch(input, init);
       const headers = new Headers(init.headers || (typeof input === 'object' ? input.headers : undefined));
-      if (!headers.has('Authorization')) {
-        const token = await getToken().catch(() => null);
-        if (token) headers.set('Authorization', `Bearer ${token}`);
-      }
+      if (headers.has('Authorization')) return originalFetch(input, { ...init, headers });
+      const token = await getToken().catch(() => null);
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const res = await originalFetch(input, { ...init, headers });
+      // Το token έληξε στον δρόμο: μία ακόμα προσπάθεια με καινούργιο (μόνο όταν το σώμα ξαναστέλνεται).
+      const body = init.body;
+      const resendable = body == null || typeof body === 'string' || body instanceof FormData || body instanceof Blob
+        || body instanceof URLSearchParams;
+      if (res.status !== 401 || !resendable) return res;
+      const fresh = await freshToken(getToken);
+      if (!fresh) return res;
+      headers.set('Authorization', `Bearer ${fresh}`);
       return originalFetch(input, { ...init, headers });
     };
     window.fetch = withToken;
