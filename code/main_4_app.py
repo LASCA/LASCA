@@ -737,7 +737,6 @@ UNVERIFIED_ALLOWED = {'/api/me/verify-email', '/api/me/accept-terms', '/api/me/s
 PUBLIC_API_PREFIXES_GET = ('/api/invites/',)
 
 
-@app.before_request
 def authenticate_bearer_request():
     """Resolve Bearer auth before API access checks using Flask-Login's request loader."""
     auth_header = request.headers.get('Authorization', '')
@@ -751,6 +750,13 @@ def authenticate_bearer_request():
         g.clerk_user_resolution = _resolve_clerk_user(token)
         # Accessing current_user invokes the request loader without creating a persistent session cookie.
         current_user.is_authenticated
+
+
+# ΠΡΩΤΟ απ' όλους τους ελέγχους: το όριο αιτημάτων (init_api_throttle) και η «πόρτα» διαβάζουν το current_user.
+# Αν το διάβαζαν πριν από εδώ, ένα παλιό cookie «να με θυμάσαι» (από τη σύνδεση πριν το Clerk) έκανε το
+# Flask-Login να μην κοιτάξει καθόλου το token του Clerk· ο χρήστης έμενε «ανώνυμος» για όλο το αίτημα και οι
+# υπολογισμοί (POST) έπαιρναν 401, οπότε η σελίδα τον έβγαζε έξω. Η ανώνυμη περιήγηση (χωρίς cookies) δούλευε.
+app.before_request_funcs.setdefault(None, []).insert(0, authenticate_bearer_request)
 
 
 @app.before_request
