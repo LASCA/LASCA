@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowRight, CodeXml, Menu, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CodeXml, Menu, X } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import LascaLogo from '../brand/LascaLogo';
 import LicenseDialog from './LicenseDialog';
@@ -96,6 +96,11 @@ export function PublicFooter() {
             <li>
               <a href={SITE.github} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-mist hover:text-white">
                 <CodeXml size={14} aria-hidden="true" /> Κώδικας στο GitHub<span className="sr-only"> (ανοίγει σε νέα καρτέλα)</span>
+              </a>
+            </li>
+            <li>
+              <a href={SITE.manual} download="LASCA_Manual_v1.0.pdf" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-mist hover:text-white">
+                <BookOpen size={14} aria-hidden="true" /> Εγχειρίδιο χρήσης (PDF)
               </a>
             </li>
           </ul>
