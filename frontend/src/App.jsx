@@ -521,7 +521,7 @@ function App() {
       {/* --- LascaLoader Overlay --- */}
       {isProjectSwitching && (
         <div className="absolute inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300">
-          <LascaLoader variant="cycle" size={160} glow={true} breathe={true} />
+          <LascaLoader variant="redBlue" size={160} glow={true} breathe={true} />
           <p className="mt-6 text-emerald-400 font-mono text-sm tracking-widest animate-pulse">
             ΦΟΡΤΩΣΗ PROJECT...
           </p>
