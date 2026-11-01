@@ -76,4 +76,22 @@ ok(r.status_code == 200 and SENT and 'bob@lasca.test' in SENT[-1]['subject'] and
 r = shared.post('/api/feedback', json={'type': 'bug', 'details': 'από την Α'}, headers={'Authorization': 'Bearer clerk:user_anna'})
 ok(r.status_code == 200 and 'anna@lasca.test' in SENT[-1]['subject'], 'switching account changes the sender')
 
+# Επικοινωνία με EMAIL_FROM από domain που δεν έχει επιβεβαιωθεί στο Resend: φεύγει με τον αποστολέα δοκιμών.
+os.environ['EMAIL_FROM'] = 'LASCA <noreply@lasca.test>'
+TRIED = []
+def _send(params):
+    TRIED.append(params['from'])
+    if 'lasca.test' in params['from']:
+        raise Exception('The lasca.test domain is not verified. Please, add and verify your domain on https://resend.com/domains')
+    return {'id': 'x'}
+m.resend.Emails.send = staticmethod(_send)
+r = shared.post('/api/feedback', json={'type': 'bug', 'details': 'unverified domain'}, headers={'Authorization': 'Bearer clerk:user_bob'})
+ok(r.status_code == 200 and TRIED == ['LASCA <noreply@lasca.test>', 'LASCA <onboarding@resend.dev>'],
+   f'feedback falls back to the Resend test sender when EMAIL_FROM is unverified ({r.status_code}, {TRIED})')
+# Άλλο σφάλμα του Resend (π.χ. λάθος κλειδί): δεν κρύβεται, η αποστολή αποτυγχάνει καθαρά.
+m.resend.Emails.send = staticmethod(lambda params: (_ for _ in ()).throw(Exception('API key is invalid')))
+r = shared.post('/api/feedback', json={'type': 'bug', 'details': 'bad key'}, headers={'Authorization': 'Bearer clerk:user_anna'})
+ok(r.status_code == 500, f'other Resend errors still fail clearly ({r.status_code})')
+os.environ.pop('EMAIL_FROM', None)
+
 print('\nALL STALE-COOKIE CHECKS PASS')

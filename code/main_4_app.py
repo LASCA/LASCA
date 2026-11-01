@@ -1280,6 +1280,15 @@ def _write_feedback_log(feedback: dict[str, str]) -> None:
         log_file.write(json.dumps(feedback, ensure_ascii=False) + '\n')
 
 
+RESEND_TEST_SENDER = 'LASCA <onboarding@resend.dev>'
+
+
+def _resend_domain_unverified(exc):
+    """Το Resend απέρριψε τον αποστολέα επειδή το domain του δεν είναι επιβεβαιωμένο (Resend → Domains)."""
+    text = str(exc).lower()
+    return 'domain' in text and ('not verified' in text or 'verify' in text)
+
+
 def _send_feedback_email(
     feedback: dict[str, str],
     screenshot_content: bytes | None = None,
@@ -1313,7 +1322,7 @@ def _send_feedback_email(
         )
         # Ίδιος αποστολέας με τα email λογαριασμού (EMAIL_FROM, από επιβεβαιωμένο domain στο Resend).
         email_data = {
-            'from': os.getenv('EMAIL_FROM', '').strip() or 'LASCA <onboarding@resend.dev>',
+            'from': os.getenv('EMAIL_FROM', '').strip() or RESEND_TEST_SENDER,
             'to': [receiver_email],
             'subject': subject,
             'html': html_body,
@@ -1326,7 +1335,17 @@ def _send_feedback_email(
                 'filename': screenshot_filename,
                 'content': base64.b64encode(screenshot_content).decode('ascii'),
             }]
-        resend.Emails.send(email_data)
+        try:
+            resend.Emails.send(email_data)
+        except Exception as exc:
+            # Το domain του EMAIL_FROM δεν έχει επιβεβαιωθεί (ακόμα) στο Resend: το μήνυμα προς την ομάδα φεύγει με
+            # τον αποστολέα δοκιμών του Resend, ώστε η «Επικοινωνία» να μη σταματά (φτάνει στον κάτοχο του λογαριασμού
+            # Resend, που είναι το NOTIFICATION_EMAIL). Μόλις επιβεβαιωθεί το domain, χρησιμοποιείται κανονικά.
+            if not _resend_domain_unverified(exc) or email_data['from'] == RESEND_TEST_SENDER:
+                raise
+            logger.warning('Feedback email: EMAIL_FROM domain is not verified in Resend, sending with %s instead',
+                           RESEND_TEST_SENDER)
+            resend.Emails.send({**email_data, 'from': RESEND_TEST_SENDER})
     except Exception as exc:
         # Το μήνυμα του Resend λέει την αιτία (π.χ. «domain is not verified», «API key is invalid»).
         logger.error('Feedback email failed: %s: %s', type(exc).__name__, str(exc)[:300].replace('\n', ' '))
