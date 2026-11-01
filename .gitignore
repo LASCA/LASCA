@@ -41,3 +41,24 @@ code/.env
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+
+# Ποτέ στο git: μυστικά, κλειδιά, αντίγραφα βάσεων και δεδομένα χρηστών (έλεγχος ασφαλείας 10/2026)
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.bak
+*.dump
+*.sql
+feedback.jsonl
+feedback_uploads/
+lasca-backups/

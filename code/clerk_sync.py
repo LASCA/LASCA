@@ -28,7 +28,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from auth_security import clean_display_name
-from clerk_auth import profile_from_user_payload
+from clerk_auth import CLERK_SESSION_ID_RE, profile_from_user_payload, valid_clerk_user_id
 
 bp = Blueprint('clerk_sync', __name__)
 S = SimpleNamespace()   # μοντέλα/βοηθητικά του main_4_app (γεμίζει στην init_clerk_sync)
@@ -151,9 +151,38 @@ def sync_profile(user, profile):
     return changed
 
 
+def revoke_clerk_sessions(clerk_id, keep_session_id=None):
+    """«Αποσύνδεση από όλες τις συσκευές»: ακυρώνει στο Clerk όλα τα ενεργά sessions του χρήστη, εκτός από
+    αυτό της τρέχουσας σελίδας (keep_session_id = claim sid). Χωρίς αυτό, ένας browser που ξέχασες
+    συνδεδεμένο θα συνέχιζε να παίρνει νέα tokens από το Clerk. Επιστρέφει πόσα ακυρώθηκαν ή None (σφάλμα)."""
+    if not valid_clerk_user_id(clerk_id) or not os.getenv('CLERK_SECRET_KEY', '').strip():
+        return None
+    revoked = 0
+    try:
+        resp = clerk_api('GET', '/sessions', params={'user_id': clerk_id, 'status': 'active', 'limit': 100})
+        if resp.status_code != 200:
+            S.logger.error('Clerk sessions list failed: HTTP %s', resp.status_code)
+            return None
+        data = resp.json()
+        sessions = data.get('data') if isinstance(data, dict) else data
+        for item in sessions or []:
+            sid = str((item or {}).get('id') or '')
+            if not CLERK_SESSION_ID_RE.fullmatch(sid) or sid == keep_session_id:
+                continue
+            r = clerk_api('POST', f'/sessions/{sid}/revoke')
+            if r.status_code in (200, 404):
+                revoked += 1
+            else:
+                S.logger.error('Clerk session revoke failed: HTTP %s', r.status_code)
+    except Exception as exc:  # noqa: BLE001
+        S.logger.error('Clerk session revoke failed: %s', type(exc).__name__)
+        return None
+    return revoked
+
+
 def delete_clerk_user(clerk_id):
     """«Διαγραφή λογαριασμού» από το LASCA: σβήνει και τον λογαριασμό στο Clerk (best effort)."""
-    if not clerk_id or not os.getenv('CLERK_SECRET_KEY', '').strip():
+    if not valid_clerk_user_id(clerk_id) or not os.getenv('CLERK_SECRET_KEY', '').strip():
         return False
     try:
         resp = clerk_api('DELETE', f'/users/{clerk_id}')

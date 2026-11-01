@@ -16,6 +16,9 @@ os.environ.pop('LASCA_ENV', None)
 os.environ['REQUIRE_EMAIL_VERIFICATION'] = '0'
 os.environ.pop('CLERK_WEBHOOK_SECRET', None)
 os.environ['CLERK_PUBLISHABLE_KEY'] = 'pk_test_' + __import__('base64').b64encode(b'clerk.lasca.test$').decode().rstrip('=')
+# Δοκιμάζει τη συνύπαρξη παλιάς σύνδεσης + Clerk (μετάβαση). Στην παραγωγή η παλιά σύνδεση είναι κλειστή:
+# βλ. code/tests/test_production_hardening.py.
+os.environ['LEGACY_AUTH'] = '1'
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / 'deploy'))

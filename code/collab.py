@@ -13,6 +13,7 @@
 
 Τα μοντέλα της βάσης ορίζονται στο main_4_app.py και περνάνε εδώ με την init_collab().
 """
+import hmac
 import io
 import json
 import os
@@ -483,7 +484,10 @@ def get_avatar(user_id):
     user = C.db.session.get(C.User, user_id)
     if user is not None and user.avatar_path:
         path = Path(user.avatar_path)
-        if path.is_file():
+        # Μόνο με την υπογεγραμμένη διεύθυνση της τρέχουσας εικόνας (βλ. User.avatar_url).
+        expected = (user.avatar_url or '').partition('?')[2]
+        given = f"v={request.args.get('v', '')}&s={request.args.get('s', '')}"
+        if expected and hmac.compare_digest(given, expected) and path.is_file():
             mime = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}.get(
                 path.suffix.lower(), 'application/octet-stream')
             return send_file(path, mimetype=mime, max_age=3600)
@@ -526,8 +530,17 @@ def logout_everywhere():
     C.DesktopLogin.query.filter_by(user_id=user.id).delete()
     C.db.session.commit()
     _relogin_current(user)
-    record_auth_event('logout_all', user=user)
-    return jsonify({'status': 'success'})
+    # Οι συνδέσεις της σελίδας ζουν στο Clerk: ακυρώνονται κι εκεί (εκτός από αυτόν τον browser).
+    revoked = None
+    if getattr(user, 'clerk_id', None):
+        from clerk_sync import revoke_clerk_sessions
+        claims = getattr(g, 'clerk_claims', None) or {}
+        revoked = revoke_clerk_sessions(user.clerk_id, keep_session_id=claims.get('sid'))
+    record_auth_event('logout_all', user=user, detail={'clerk_sessions_revoked': revoked})
+    if getattr(user, 'clerk_id', None) and revoked is None:
+        return jsonify({'status': 'partial', 'error': 'Αποσυνδέθηκαν οι συσκευές του προγράμματος, αλλά όχι οι '
+                        'browsers. Δοκίμασε ξανά σε λίγο.'}), 502
+    return jsonify({'status': 'success', 'revoked': revoked})
 
 
 @bp.delete('/api/me')

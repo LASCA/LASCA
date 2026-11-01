@@ -25,8 +25,15 @@ jobs:
       # Τρέχουμε κατευθείαν το δωρεάν gitleaks CLI (ίδιος έλεγχος, χωρίς άδεια).
       - name: gitleaks
         run: |
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tgz="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "$base/$tgz"
+          curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          # Έλεγχος ακεραιότητας πριν τρέξει οποιοδήποτε κατεβασμένο εκτελέσιμο.
+          grep " $tgz\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$tgz" gitleaks
+          cd "$GITHUB_WORKSPACE"
           st=0
           "$RUNNER_TEMP/gitleaks" git --redact --no-banner \
             --report-format json --report-path gitleaks.json . || st=$?
@@ -62,6 +69,9 @@ jobs:
       - run: python code/tests/test_collab.py
       - run: python code/tests/test_history.py
       - run: python code/tests/test_team_gate.py
+      - run: python code/tests/test_clerk_sync.py
+      - run: python code/tests/test_clerk_stale_cookies.py
+      - run: python code/tests/test_production_hardening.py
   frontend:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }

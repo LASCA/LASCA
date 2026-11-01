@@ -33,8 +33,15 @@ def _token(secret, password):
 
 def _too_many(ip):
     now = time.time()
+    if len(_fails) > 10_000:
+        # Πολλές διαφορετικές IP (π.χ. botnet): σβήνουμε τις παλιές, ώστε η μνήμη να μη μεγαλώνει χωρίς όριο.
+        for key in [k for k, v in _fails.items() if not v or now - v[-1] >= 900]:
+            _fails.pop(key, None)
     hits = [t for t in _fails.get(ip, []) if now - t < 900]
-    _fails[ip] = hits
+    if hits:
+        _fails[ip] = hits
+    else:
+        _fails.pop(ip, None)
     return len(hits) >= 10
 
 

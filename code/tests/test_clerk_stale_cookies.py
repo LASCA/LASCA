@@ -15,6 +15,9 @@ os.environ.update({'SECRET_KEY': 'test-secret-key-0123456789abcdef0123456789', '
 os.environ.pop('LASCA_ENV', None)
 os.environ.pop('TEAM_GATE_PASSWORD', None)
 os.environ['CLERK_PUBLISHABLE_KEY'] = 'pk_test_' + __import__('base64').b64encode(b'clerk.lasca.test$').decode().rstrip('=')
+# Δοκιμάζει τη συνύπαρξη παλιάς σύνδεσης + Clerk (μετάβαση). Στην παραγωγή η παλιά σύνδεση είναι κλειστή:
+# βλ. code/tests/test_production_hardening.py.
+os.environ['LEGACY_AUTH'] = '1'
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 

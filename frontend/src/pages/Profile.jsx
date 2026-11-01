@@ -5,8 +5,8 @@ import { useClerk, useUser } from '@clerk/react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowUpRight, Camera, ChevronDown, Copy, Download, FolderOpen, KeyRound, Loader2, LockKeyhole,
-  LogOut, MonitorSmartphone, Pencil, ShieldCheck, Trash2, Users, X,
+  ArrowLeft, ArrowUpRight, Camera, ChevronDown, FolderOpen, KeyRound, Loader2, LockKeyhole,
+  LogOut, MonitorSmartphone, Pencil, Trash2, Users, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiErrorMessage, useAuth } from '../auth/AuthContext';
@@ -19,7 +19,6 @@ const ROLE_LABEL = { owner: 'Ιδιοκτήτης', editor: 'Επεξεργασ�
 // Ίδιο λεξιλόγιο με την εφαρμογή (Dashboard): σκούρες κάρτες, μικροί τίτλοι ενοτήτων, μπλε κουμπί.
 const CARD = 'bg-[#0B1221] border border-slate-800/80 rounded-2xl shadow-sm';
 const BTN = 'inline-flex items-center justify-center gap-2 h-9 px-4 rounded-xl text-[12px] font-bold tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed';
-const BTN_PRIMARY = `${BTN} bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.2)]`;
 const BTN_GHOST = `${BTN} border border-slate-800 bg-transparent text-slate-200 hover:bg-slate-800 hover:border-slate-700`;
 const BTN_DANGER = `${BTN} bg-red-600 text-white hover:bg-red-500`;
 const INPUT = 'w-full h-10 rounded-xl border border-slate-800 bg-slate-900/70 px-3 text-[13px] text-slate-100 placeholder:text-slate-500 '
@@ -353,8 +352,6 @@ export default function Profile() {
             </div>
             <div className="profile-id-security">
               <div className={`${CARD} l-card overflow-hidden`}>
-                <TwoFactorRow user={user} setUser={setUser}
-                  open={openRow === '2fa'} onToggle={() => toggleRow('2fa')} />
                 <Row icon={MonitorSmartphone} title="Πρόσφατες συνδέσεις"
                   subtitle="Συνδέσεις και αλλαγές ασφαλείας" open={openRow === 'log'}
                   onClick={() => toggleRow('log')}>
@@ -439,253 +436,6 @@ export default function Profile() {
       <DeleteAccountDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} user={user}
         onDeleted={() => { setUser(null); navigate('/', { replace: true }); }} />
     </div>
-  );
-}
-
-function TwoFactorRow({ user, setUser, open, onToggle }) {
-  const [status, setStatus] = useState(null);
-  const [mode, setMode] = useState(null);
-  const [setup, setSetup] = useState(null);
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [backupCodes, setBackupCodes] = useState(null);
-  const [manage, setManage] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const hasPassword = user?.has_password !== false;
-
-  useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/me/2fa`)
-      .then(({ data }) => setStatus(data))
-      .catch((err) => {
-        toast.error(apiErrorMessage(err, 'Αποτυχία φόρτωσης ρυθμίσεων δύο βημάτων'));
-        setStatus({ enabled: false });
-      });
-  }, []);
-
-  const reset = () => {
-    setMode(null);
-    setSetup(null);
-    setPassword('');
-    setCode('');
-    setManage(null);
-  };
-
-  const run = async (operation) => {
-    setBusy(true);
-    try {
-      await operation();
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const startSetup = (event) => {
-    event.preventDefault();
-    run(async () => {
-      if (mode === 'totp') {
-        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/setup`, { password });
-        setSetup(data);
-      } else {
-        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/email/setup`, { password });
-        setSetup({ email: data.email_hint });
-        toast.success(`Στείλαμε κωδικό στο ${data.email_hint}`);
-      }
-      setCode('');
-    });
-  };
-
-  const enable = (event) => {
-    event.preventDefault();
-    run(async () => {
-      const path = mode === 'totp' ? '/api/me/2fa/enable' : '/api/me/2fa/email/enable';
-      const { data } = await axios.post(`${API_BASE_URL}${path}`, { code });
-      setBackupCodes(data.backup_codes);
-      setStatus(data);
-      reset();
-      setUser({ ...user, two_factor_enabled: true });
-      toast.success('Ο έλεγχος δύο βημάτων ενεργοποιήθηκε.');
-    });
-  };
-
-  const sendManageCode = () => run(async () => {
-    const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/send-code`);
-    toast.success(`Στείλαμε κωδικό στο ${data.email_hint}`);
-  });
-
-  const submitManage = (event) => {
-    event.preventDefault();
-    run(async () => {
-      if (manage === 'disable') {
-        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/disable`, { password, code });
-        setStatus(data);
-        setUser({ ...user, two_factor_enabled: false });
-        toast.success('Ο έλεγχος δύο βημάτων απενεργοποιήθηκε');
-      } else {
-        const { data } = await axios.post(`${API_BASE_URL}/api/me/2fa/backup-codes`, { code });
-        setBackupCodes(data.backup_codes);
-        setStatus(data);
-      }
-      reset();
-    });
-  };
-
-  const copyCodes = async () => {
-    try {
-      await navigator.clipboard.writeText(backupCodes.join('\n'));
-      toast.success('Αντιγράφηκαν');
-    } catch {
-      toast.error('Η αντιγραφή απέτυχε');
-    }
-  };
-
-  const downloadCodes = () => {
-    const blob = new Blob([`Εφεδρικοί κωδικοί LASCA (${user.email})\n\n${backupCodes.join('\n')}\n`], {
-      type: 'text/plain;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'lasca-backup-codes.txt';
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const emailMethod = status?.method === 'email';
-  const codeInput = (
-    <input value={code} onChange={(event) => setCode(event.target.value)}
-      placeholder={emailMethod || mode === 'email' ? 'Κωδικός από το email' : 'Κωδικός εφαρμογής'}
-      autoComplete="one-time-code" className={INPUT} required aria-label="Κωδικός δύο βημάτων" maxLength={11} />
-  );
-  const badge = (
-    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold ${status?.enabled
-      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-      : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
-      {status === null ? '…' : status.enabled ? 'Ενεργός' : 'Ανενεργός'}
-    </span>
-  );
-  const optionClass = 'w-full rounded-xl border border-slate-800 p-3 text-left transition-colors hover:bg-slate-800 hover:border-slate-700 disabled:opacity-50';
-
-  return (
-    <Row icon={ShieldCheck} title="Έλεγχος δύο βημάτων" subtitle="Δεύτερος κωδικός σε κάθε σύνδεση"
-      right={badge} open={open || Boolean(backupCodes)} onClick={onToggle}>
-      {backupCodes ? (
-        <div className="space-y-3">
-          <p className="rounded-xl border border-blue-500/25 bg-blue-500/[0.07] px-3 py-2 text-[12px] leading-relaxed text-blue-100">
-            Αποθήκευσε αυτούς τους κωδικούς σε ασφαλές σημείο. Δεν θα εμφανιστούν ξανά.
-          </p>
-          <ul className="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 font-mono text-[13px] text-slate-100">
-            {backupCodes.map((backupCode) => <li key={backupCode}>{backupCode}</li>)}
-          </ul>
-          <div className="flex gap-2">
-            <button type="button" onClick={copyCodes} className={`${BTN_GHOST} flex-1`}><Copy size={14} /> Αντιγραφή</button>
-            <button type="button" onClick={downloadCodes} className={`${BTN_GHOST} flex-1`}><Download size={14} /> Λήψη .txt</button>
-          </div>
-          <button type="button" onClick={() => setBackupCodes(null)} className={`${BTN_PRIMARY} w-full`}>Τους αποθήκευσα</button>
-        </div>
-      ) : status === null ? (
-        <Loader2 size={15} className="animate-spin text-slate-500" />
-      ) : status.enabled ? (
-        <div className="space-y-3">
-          <p className="text-[12px] text-emerald-300">
-            {emailMethod ? 'Κωδικός στο email' : 'Εφαρμογή authenticator'} · {status.backup_codes_left} εφεδρικοί κωδικοί
-          </p>
-          {!manage ? (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setManage('regenerate')} className={`${BTN_GHOST} flex-1`}>Νέοι εφεδρικοί</button>
-              <button type="button" onClick={() => setManage('disable')} className={`${BTN_GHOST} flex-1 hover:!text-red-300`}>Απενεργοποίηση</button>
-            </div>
-          ) : (
-            <form onSubmit={submitManage} className="space-y-2.5">
-              {manage === 'disable' && hasPassword && (
-                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Ο κωδικός του λογαριασμού" autoComplete="current-password" className={INPUT} required
-                  aria-label="Ο κωδικός του λογαριασμού" />
-              )}
-              {codeInput}
-              {emailMethod && (
-                <button type="button" onClick={sendManageCode} disabled={busy}
-                  className="text-[11px] font-bold text-slate-400 hover:text-white">Αποστολή κωδικού στο email</button>
-              )}
-              <div className="flex gap-2">
-                <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-                <button type="submit" disabled={busy} className={`${BTN_DANGER} flex-1`}>
-                  {busy && <Loader2 size={14} className="animate-spin" />}
-                  {manage === 'disable' ? 'Απενεργοποίηση' : 'Δημιουργία'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      ) : !mode ? (
-        <div className="space-y-3">
-          <p className="text-[12px] leading-relaxed text-slate-400">
-            Ενεργοποίησε δεύτερο κωδικό για επιπλέον προστασία του λογαριασμού.
-          </p>
-          <button type="button" onClick={() => setMode('choose')} className={`${BTN_PRIMARY} w-full`}>Ενεργοποίηση</button>
-        </div>
-      ) : mode === 'choose' ? (
-        <div className="space-y-2">
-          <button type="button" onClick={() => setMode('totp')} className={optionClass}>
-            <p className="text-[12px] font-bold text-slate-200">Εφαρμογή authenticator</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">Google / Microsoft Authenticator, Authy, 1Password.</p>
-          </button>
-          <button type="button" onClick={() => setMode('email')} disabled={!status.email_available || !user?.email_verified}
-            className={optionClass}>
-            <p className="text-[12px] font-bold text-slate-200">Κωδικός στο email</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">
-              {user?.email_verified ? 'Κωδικός 6 ψηφίων σε κάθε σύνδεση.' : 'Επιβεβαίωσε πρώτα το email σου.'}
-            </p>
-          </button>
-          <button type="button" onClick={reset} className="w-full py-1 text-[11px] font-bold text-slate-500 hover:text-white">Άκυρο</button>
-        </div>
-      ) : !setup ? (
-        <form onSubmit={startSetup} className="space-y-2.5">
-          <p className="text-[12px] text-slate-400">
-            {hasPassword ? 'Για ασφάλεια, γράψε τον κωδικό του λογαριασμού σου.' : 'Επιβεβαίωσε ότι είσαι εσύ για να συνεχίσεις.'}
-          </p>
-          {hasPassword && (
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)}
-              placeholder="Κωδικός λογαριασμού" autoComplete="current-password" className={INPUT}
-              required aria-label="Κωδικός λογαριασμού" />
-          )}
-          <div className="flex gap-2">
-            <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-            <button type="submit" disabled={busy} className={`${BTN_PRIMARY} flex-1`}>
-              {busy && <Loader2 size={14} className="animate-spin" />} Συνέχεια
-            </button>
-          </div>
-        </form>
-      ) : (
-        <form onSubmit={enable} className="space-y-3">
-          {mode === 'totp' ? (
-            <>
-              <ol className="space-y-1.5 text-[12px] text-slate-400 [&>li]:ml-4 [&>li]:list-decimal">
-                <li>Άνοιξε εφαρμογή authenticator.</li>
-                <li>Σκάναρε το QR ή εισήγαγε το κλειδί.</li>
-                <li>Γράψε τον κωδικό που εμφανίζεται.</li>
-              </ol>
-              {setup.qr && <img src={setup.qr} alt="Κωδικός QR για την εφαρμογή authenticator" className="mx-auto h-40 w-40 rounded-xl bg-white p-2" />}
-              <p className="break-all rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-center font-mono text-[12px] tracking-wider text-slate-200">
-                {setup.secret.match(/.{1,4}/g).join(' ')}
-              </p>
-            </>
-          ) : (
-            <p className="text-[12px] text-slate-400">Γράψε τον κωδικό που στείλαμε στο {setup.email}.</p>
-          )}
-          <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
-            inputMode="numeric" maxLength={6} autoComplete="one-time-code" placeholder="000000"
-            className={`${INPUT} text-center font-mono text-lg tracking-[0.4em]`} aria-label="Κωδικός 6 ψηφίων" required />
-          <div className="flex gap-2">
-            <button type="button" onClick={reset} className={`${BTN_GHOST} flex-1`}>Άκυρο</button>
-            <button type="submit" disabled={busy || code.length !== 6} className={`${BTN_PRIMARY} flex-1`}>
-              {busy && <Loader2 size={14} className="animate-spin" />} Ενεργοποίηση
-            </button>
-          </div>
-        </form>
-      )}
-    </Row>
   );
 }
 

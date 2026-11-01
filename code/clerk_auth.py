@@ -1,6 +1,7 @@
 """Επαλήθευση Clerk session tokens (RS256) με τα δημόσια κλειδιά JWKS του Clerk."""
 import base64
 import os
+import re
 from functools import lru_cache
 
 import jwt
@@ -27,16 +28,29 @@ def _jwks_url():
     return f'https://{host}/.well-known/jwks.json' if host else ''
 
 
+# Μορφή των ids του Clerk (user_..., sess_...). Ελέγχεται πριν μπει σε URL του Backend API.
+CLERK_USER_ID_RE = re.compile(r'user_[A-Za-z0-9]{8,64}')
+CLERK_SESSION_ID_RE = re.compile(r'sess_[A-Za-z0-9]{8,64}')
+
+
+def valid_clerk_user_id(value):
+    return isinstance(value, str) and bool(CLERK_USER_ID_RE.fullmatch(value))
+
+
 @lru_cache(maxsize=1)
 def _jwk_client(url):
     # Το PyJWKClient κρατάει cache των κλειδιών.
     return PyJWKClient(url, cache_keys=True, lifespan=3600, timeout=5)
 
 
-def verify_clerk_token(token):
-    """Επιστρέφει (claims, error)."""
+def verify_clerk_token(token, allowed_origins=None):
+    """Επιστρέφει (claims, error). allowed_origins: set από 'https://domain' από όπου επιτρέπεται να
+    προέρχεται το token (claim azp του Clerk). Έτσι ένα token που εκδόθηκε για άλλη σελίδα του ίδιου
+    Clerk instance (π.χ. δοκιμαστικό site) δεν γίνεται δεκτό εδώ."""
     if not token:
         return None, 'No token provided'
+    if len(token) > 8192 or token.count('.') != 2:
+        return None, 'Invalid token'
     url = _jwks_url()
     if not url:
         return None, 'Clerk is not configured (set CLERK_PUBLISHABLE_KEY or CLERK_JWKS_URL)'
@@ -56,9 +70,16 @@ def verify_clerk_token(token):
     except Exception:
         return None, 'Invalid token'
     issuer = f'https://{_frontend_api_host()}'  # iss = Frontend API URL
-    if os.getenv('CLERK_JWKS_URL', '').strip() == '' and claims.get('iss') != issuer:
+    expected_issuer = os.getenv('CLERK_ISSUER', '').strip() or (issuer if not os.getenv('CLERK_JWKS_URL', '').strip() else '')
+    if expected_issuer and claims.get('iss') != expected_issuer:
         return None, 'Invalid token issuer'
+    if not valid_clerk_user_id(claims.get('sub')):
+        return None, 'Invalid token subject'
+    azp = claims.get('azp')
+    if allowed_origins is not None and azp and str(azp).rstrip('/').lower() not in allowed_origins:
+        return None, 'Invalid token origin'
     return claims, None
+
 
 
 def profile_from_user_payload(data):
@@ -88,7 +109,7 @@ def fetch_clerk_profile(clerk_user_id):
     """Τα session tokens δεν έχουν email· το παίρνουμε από το Clerk Backend API. Επιστρέφει dict ή None."""
     import requests
     secret = os.getenv('CLERK_SECRET_KEY', '').strip()
-    if not secret:
+    if not secret or not valid_clerk_user_id(clerk_user_id):
         return None
     try:
         resp = requests.get(f'https://api.clerk.com/v1/users/{clerk_user_id}',

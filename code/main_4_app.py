@@ -64,6 +64,37 @@ from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from functools import partial 
 from reportlab.platypus import  Image as RLImage
 from reportlab.graphics.shapes import Drawing, Line, Polygon, Circle, Rect, String
+from reportlab import rl_config
+from reportlab.platypus import Paragraph as _RLParagraph
+
+# Ασφάλεια αναφορών PDF: το Paragraph του reportlab διαβάζει markup (<img src=...>, <font>, <a>, <link>).
+# Ονόματα σημείων, έργων κ.λπ. έρχονται από τον χρήστη: χωρίς escape, ένα «όνομα σημείου»
+# <img src="/srv/..."> θα έκανε τον server να ανοίξει τοπικά αρχεία ή URLs (π.χ. 169.254.169.254).
+# Επιτρέπονται μόνο οι ακίνδυνες ετικέτες μορφοποίησης που χρησιμοποιούν οι επικεφαλίδες (υ<sub>ji</sub> κ.λπ.).
+rl_config.trustedSchemes = ['file', 'data']          # ποτέ http/https/ftp από μέσα σε PDF
+_SAFE_PDF_TAG = re.compile(r'&lt;(/?)(b|i|u|sub|sup)&gt;|&lt;br\s*/?&gt;')
+
+
+_PDF_TAG_PAIR = re.compile(r'<(/?)(b|i|u|sub|sup)>')
+
+
+def _safe_pdf_markup(text):
+    escaped = escape('' if text is None else str(text), quote=False)
+    restored = _SAFE_PDF_TAG.sub(lambda m: f'<{m.group(1)}{m.group(2)}>' if m.group(2) else '<br/>', escaped)
+    # Οι επιτρεπτές ετικέτες πρέπει να κλείνουν σωστά (αλλιώς το reportlab σκάει με «Parse error»):
+    # αν όχι, το κείμενο τυπώνεται όπως γράφτηκε, χωρίς καμία μορφοποίηση.
+    stack = []
+    for m in _PDF_TAG_PAIR.finditer(restored):
+        if not m.group(1):
+            stack.append(m.group(2))
+        elif not stack or stack.pop() != m.group(2):
+            return escaped
+    return escaped if stack else restored
+
+
+def Paragraph(text, *args, **kwargs):  # noqa: N802 (ίδιο όνομα με του reportlab σε όλο το αρχείο)
+    return _RLParagraph(_safe_pdf_markup(text), *args, **kwargs)
+
 
 EGSA87_TO_WGS84 = Transformer.from_crs(
     CRS.from_proj4(
@@ -310,6 +341,12 @@ _analytics_origin = origin_of(os.getenv('ANALYTICS_ORIGIN', '').strip())
 # και μιλάει με τον browser· *.protect.clerk.com = προστασία από bots. Βλ. οδηγίες CSP του Clerk.
 from clerk_auth import _frontend_api_host  # noqa: E402
 _clerk_fapi = f'https://{_frontend_api_host()}' if _frontend_api_host() else None
+# Με ρυθμισμένο Clerk, ΜΟΝΟ το Clerk συνδέει χρήστες στη σελίδα. Τα παλιά endpoints (κωδικός/Google/2FA της
+# lasca.db) και τα παλιά cookies σύνδεσης κλείνουν: αλλιώς ένας παλιός κωδικός θα δούλευε ακόμα κι αφού ο
+# χρήστης τον άλλαξε στο Clerk, και το «2FA» του Προφίλ δεν θα προστάτευε τη σύνδεση μέσω Clerk.
+# Το exe συνεχίζει κανονικά (σύνδεση μέσω browser → κλειδί συσκευής). LEGACY_AUTH=1 μόνο για έκτακτη ανάγκη.
+CLERK_ONLY = bool(_clerk_fapi or os.getenv('CLERK_JWKS_URL', '').strip()) \
+    and os.getenv('LEGACY_AUTH', '').strip() != '1'
 APP_CSP = build_csp({
     'script-src': ['https://accounts.google.com/gsi/client', 'https://challenges.cloudflare.com', _analytics_origin,
                    _clerk_fapi, 'https://*.protect.clerk.com'],
@@ -431,6 +468,12 @@ USER_AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 TERMS_VERSION = '2026-10-14'
 
 
+def avatar_signature(user_id, version):
+    import hmac as _hmac
+    msg = f'avatar:{int(user_id)}:{int(version)}'.encode()
+    return _hmac.new(app.config['SECRET_KEY'].encode(), msg, hashlib.sha256).hexdigest()[:32]
+
+
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -482,7 +525,9 @@ class User(db.Model, UserMixin):
             version = int(Path(self.avatar_path).stat().st_mtime_ns // 1000)
         except OSError:
             return None
-        return f'/api/users/{self.id}/avatar?v={version}'
+        # Υπογραφή: τη διεύθυνση την παίρνουν μόνο όσοι βλέπουν τον χρήστη (ο ίδιος, συνεργάτες). Χωρίς αυτήν
+        # ο καθένας θα κατέβαζε όλες τις φωτογραφίες προφίλ μετρώντας ids (/api/users/1/avatar, /2/avatar...).
+        return f'/api/users/{self.id}/avatar?v={version}&s={avatar_signature(self.id, version)}'
 
     def to_public_dict(self):
         display_name = (self.display_name or '').strip() or self.email.split('@', 1)[0]
@@ -673,6 +718,10 @@ def hash_device_token(token):
 
 @login_manager.user_loader
 def load_user(user_id):
+    # Με Clerk τα cookies σύνδεσης της lasca.db (και τα «Να με θυμάσαι» έως 90 ημερών από πριν το Clerk)
+    # δεν συνδέουν κανέναν: η ταυτότητα έρχεται μόνο από το token του Clerk ή από κλειδί συσκευής.
+    if CLERK_ONLY:
+        return None
     # Το id στο cookie είναι «id:έκδοση». Αν η έκδοση άλλαξε (αποσύνδεση από όλες τις
     # συσκευές ή αλλαγή κωδικού), το παλιό cookie δεν ισχύει πια.
     raw_id, _, raw_version = str(user_id).partition(':')
@@ -790,6 +839,29 @@ def require_login_for_api():
     return None
 
 
+# Παλιά σύνδεση της lasca.db (πριν το Clerk): εγγραφή/κωδικός/Google/2FA/επαναφορά κωδικού. Με Clerk κλείνουν
+# (βλ. CLERK_ONLY). Η σελίδα δεν τα χρησιμοποιεί πια· το exe συνδέεται μέσω browser (/api/auth/desktop/*).
+LEGACY_AUTH_PATHS = {
+    '/api/register', '/api/login', '/api/auth/google', '/api/auth/2fa/verify', '/api/auth/2fa/email',
+    '/api/auth/forgot', '/api/auth/reset', '/api/auth/reset/check', '/api/auth/password-check',
+    '/api/auth/verify-email', '/api/auth/resend-verification', '/api/me/password', '/api/me/verify-email',
+}
+LEGACY_AUTH_PREFIXES = ('/api/me/2fa',)
+
+
+@app.before_request
+def block_legacy_auth():
+    if not CLERK_ONLY or not request.path.startswith('/api/'):
+        return None
+    path = request.path.rstrip('/')
+    legacy = path in LEGACY_AUTH_PATHS or path.startswith(LEGACY_AUTH_PREFIXES) \
+        or (path == '/api/auth/device-token' and request.method == 'POST')
+    if legacy:
+        return jsonify({"error": "Η σύνδεση γίνεται πλέον μόνο μέσω του λογαριασμού LASCA (Clerk).",
+                        "code": "legacy_auth_disabled"}), 410
+    return None
+
+
 # Αυτά τα routes ελέγχουν μόνα τους τα δικαιώματα (collab.py / auth_security.py).
 _PROJECT_API_PREFIXES = ('/api/projects/list', '/api/projects/load', '/api/projects/save', '/api/me',
                          '/api/users', '/api/invites', '/api/auth', '/api/login', '/api/register', '/api/logout')
@@ -860,12 +932,18 @@ def normalize_email(value):
     return (value or '').strip().lower()
 
 
-def user_has_project_access(user, project):
+def user_project_role(user, project):
+    """owner | editor | viewer | None"""
     if user is None or project is None:
-        return False
+        return None
     if project.owner_id == user.id:
-        return True
-    return bool(ProjectMember.query.filter_by(project_id=project.id, user_id=user.id).first())
+        return 'owner'
+    member = ProjectMember.query.filter_by(project_id=project.id, user_id=user.id).first()
+    return member.role if member else None
+
+
+def user_has_project_access(user, project):
+    return user_project_role(user, project) is not None
 
 
 def project_record_by_name(project_name):
@@ -1088,11 +1166,44 @@ def _feedback_error(message: str, status_code: int):
 _PATH_RE = re.compile(r'(?:[A-Za-z]:\\|/(?:srv|home|root|usr|var|tmp|opt|Users)/)[^\s"\'<>]*')
 
 
+_GREEK_RE = re.compile(r'[Ͱ-Ͽἀ-῿]')
+_TECH_RE = re.compile(r'[A-Za-z]{4,}|[\\{}<>]|Traceback|line \d+')
+GENERIC_SERVER_ERROR = 'Σφάλμα κατά τον υπολογισμό. Έλεγξε τα δεδομένα και δοκίμασε ξανά.'
+
+
+_ALLOWED_WORDS_RE = re.compile(r'\b(project|projects|Excel|LASCA|DXF|KML|GeoJSON|PDF|email|EGSA|WGS84)\b', re.I)
+
+
+def _user_facing(message):
+    """Μήνυμα γραμμένο για τον χρήστη (ελληνικά, χωρίς τεχνικές λεπτομέρειες) ή εσωτερικό σφάλμα της Python;"""
+    if not isinstance(message, str) or not _GREEK_RE.search(message):
+        return False
+    return not _TECH_RE.search(_ALLOWED_WORDS_RE.sub('', message))
+
+
 @app.after_request
 def _scrub_server_errors(resp):
-    """Σφάλματα 5xx: δεν δείχνουμε στον χρήστη διαδρομές αρχείων του server."""
+    """Σφάλματα 5xx: πολλά endpoints επιστρέφουν str(e). Στον χρήστη φτάνει μόνο ελληνικό μήνυμα που γράψαμε
+    εμείς· τα εσωτερικά σφάλματα (KeyError, μηνύματα βιβλιοθηκών, διαδρομές αρχείων) γίνονται γενικό μήνυμα.
+    Η πλήρης αιτία μένει στα logs του server."""
     if resp.status_code >= 500 and request.path.startswith('/api/') and resp.mimetype == 'application/json':
         text = resp.get_data(as_text=True)
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            payload = None
+        if isinstance(payload, dict) and not IS_DEVELOPMENT:
+            changed = False
+            for key in ('error', 'message', 'details', 'detail', 'traceback'):
+                if key in payload and not _user_facing(payload[key]):
+                    if key in ('details', 'detail', 'traceback'):
+                        payload.pop(key)
+                    else:
+                        payload[key] = GENERIC_SERVER_ERROR
+                    changed = True
+            if changed:
+                resp.set_data(json.dumps(payload, ensure_ascii=False))
+                return resp
         cleaned = _PATH_RE.sub('[…]', text)
         if cleaned != text:
             resp.set_data(cleaned)
@@ -1145,6 +1256,8 @@ def _send_feedback_webhook(feedback: dict[str, str]) -> None:
     payload = {
         'content': formatted_message,
         'text': formatted_message,
+        # Το μήνυμα το γράφει ο χρήστης: κανένα @everyone/@here/@ρόλος δεν ειδοποιεί κανέναν (Discord/Slack).
+        'allowed_mentions': {'parse': []},
     }
     request_data = json.dumps(payload).encode('utf-8')
     webhook_request = Request(
@@ -1343,20 +1456,26 @@ else:
     WORKSPACE_DIR = get_safe_workspace_dir("LASCA")
 
 
-def get_request_project_dir(project_name):
-    """Resolve an optional request project without allowing workspace escape."""
+def get_request_project_dir(project_name, need='view'):
+    """Φάκελος του project του αιτήματος, μόνο αν ο χρήστης έχει πρόσβαση (need='view') ή δικαίωμα
+    επεξεργασίας (need='edit': ιδιοκτήτης/επεξεργαστής — ποτέ αναγνώστης). Project χωρίς εγγραφή στη βάση
+    δεν έχει φάκελο: για ανάγνωση επιστρέφει None, για εγγραφή PermissionError (αλλιώς κάποιος θα μπορούσε
+    να «φυτέψει» αρχεία σε φάκελο που θα πάρει αργότερα άλλος χρήστης με το ίδιο όνομα project)."""
     if not project_name:
         return None
     project_name = str(project_name).strip()
-    if current_user.is_authenticated:
-        project = project_record_by_name(project_name)
-        if project is not None and not user_has_project_access(current_user, project):
+    if not current_user.is_authenticated:
+        raise PermissionError("Απαιτείται σύνδεση")
+    project = project_record_by_name(project_name)
+    if project is None:
+        if need == 'edit':
             raise PermissionError(f"Δεν έχετε πρόσβαση στο project '{project_name}'")
-        if project is None:
-            project_path = (WORKSPACE_DIR / project_name).resolve()
-            if project_path.exists() and project_path.is_dir():
-                raise PermissionError(f"Δεν έχετε πρόσβαση στο project '{project_name}'")
-    return resolve_project_dir(WORKSPACE_DIR, project_name)
+        resolve_project_dir(WORKSPACE_DIR, project_name)   # ValueError για μη έγκυρα ονόματα
+        return None
+    role = user_project_role(current_user, project)
+    if role is None or (need == 'edit' and role == 'viewer'):
+        raise PermissionError(f"Δεν έχετε πρόσβαση στο project '{project_name}'")
+    return resolve_project_dir(WORKSPACE_DIR, project.name)
 
 # Helper functions για την Ταχυμετρία
 def g2r(gon):
@@ -1390,6 +1509,11 @@ def _resolve_clerk_user(token, update_last_seen=False):
     clerk_user_id = claims.get('sub')
     if not clerk_user_id:
         return None, 'Invalid token: missing user ID', 401
+    # azp = η σελίδα για την οποία εκδόθηκε το token. Δεχόμαστε μόνο τη δική μας (PUBLIC_URL/ALLOWED_ORIGINS).
+    azp = claims.get('azp')
+    if azp and str(azp).rstrip('/').lower() not in _allowed_origins():
+        logger.warning('Clerk token rejected: unexpected azp')
+        return None, 'Invalid token origin', 401
     g.clerk_claims = claims
 
     user = User.query.filter_by(clerk_id=clerk_user_id).first()
@@ -2356,9 +2480,9 @@ def run_traverse():
         project_name = get_active_project_name()
         print(f"DEBUG TRAVERSE: Το backend διάβασε project_name = '{project_name}'")
         
-        project_dir = get_request_project_dir(project_name)
-        
         try:
+            # Αποθήκευση μόνο από όσους μπορούν να αλλάξουν το project (όχι αναγνώστες).
+            project_dir = get_request_project_dir(project_name, need='edit')
             if project_dir is None:
                 raise ValueError("Δεν ορίστηκε έγκυρο ενεργό project")
             atomic_write_json(project_dir / "latest_traverse.json", calculated_stations_export)
@@ -5406,10 +5530,14 @@ def run_leveling():
         project_dir = get_request_project_dir(project_name)
         if project_dir is None:
             raise ValueError("Δεν ορίστηκε έγκυρο ενεργό project")
-        project_dir.mkdir(parents=True, exist_ok=True)
-        
+        try:
+            # Αποθήκευση μόνο από όσους μπορούν να αλλάξουν το project· ο αναγνώστης βλέπει μόνο αποτελέσματα.
+            writable_dir = get_request_project_dir(project_name, need='edit')
+        except PermissionError:
+            writable_dir = None
+
         # 3. Αποθήκευση Δεδομένων ΚΑΙ Αποτελεσμάτων στο Project
-        save_path = project_dir / "latest_leveling.json"
+        save_path = (writable_dir / "latest_leveling.json") if writable_dir else None
         
         response_data = {
             "forward": forward_data,
@@ -5421,9 +5549,10 @@ def run_leveling():
             }
         }
         
-        atomic_write_json(save_path, response_data)
-            
-        print(f"SUCCESS: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
+        if save_path is not None:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(save_path, response_data)
+            print(f"SUCCESS: Τα δεδομένα χωροστάθμισης αποθηκεύτηκαν στο: '{save_path}'")
 
         # 4. Επιστροφή στο React
         return jsonify({

@@ -85,9 +85,11 @@ ok(S.post(f'/api/projects/{pid2}/members',json={'email':'ilias@lasca.test'}).sta
 from PIL import Image
 buf=io.BytesIO(); Image.new('RGB',(600,300),(200,40,40)).save(buf,'PNG'); buf.seek(0)
 r=S.put('/api/me',data={'display_name':'Σάββας','avatar':(buf,'a.png')},content_type='multipart/form-data'); ok(r.status_code==200 and r.json['avatar_url'],'avatar upload processed')
-ok(A.get(r.json['avatar_url'].split('?')[0]).status_code==200,'collaborator sees avatar')
+ok(A.get(r.json['avatar_url']).mimetype=='image/webp','collaborator sees avatar (signed url)')
 lonely=m.app.test_client(); lonely.environ_base['HTTP_ORIGIN']='http://localhost'; lonely.post('/api/register',json={'email':'x@lasca.test','password':'Another-Strong-Pass-77?','display_name':'X','accept_terms':True,'age_confirmed':True})
-ok(lonely.get(r.json['avatar_url'].split('?')[0]).status_code==200,'avatar is publicly readable without an auth header')
+ok(lonely.get(r.json['avatar_url']).mimetype=='image/webp','signed avatar url works in <img> without an auth header')
+_unsigned=lonely.get(r.json['avatar_url'].split('?')[0]); ok(_unsigned.status_code==200 and _unsigned.mimetype=='image/svg+xml','unsigned avatar url gives only the default image (no id enumeration)')
+_forged=lonely.get(r.json['avatar_url'].split('&s=')[0]+'&s='+'0'*32); ok(_forged.mimetype=='image/svg+xml','forged avatar signature rejected')
 ok(S.get('/api/me/projects').json['stats']['collaborators']==2,'profile stats')
 ok(S.post('/api/me/password',json={'current_password':'wrong','new_password':'Brand-New-Pass-2026#'}).status_code==403,'wrong current password rejected')
 S2=client('savvas@lasca.test')
